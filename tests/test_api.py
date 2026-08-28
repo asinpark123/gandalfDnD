@@ -2,8 +2,9 @@ from typing import Any
 
 from fastapi.testclient import TestClient
 
+from app.db import get_engine
 from app.llm.factory import get_dm_provider
-from app.schemas import DMTurnOutput, HPDelta, InventoryChange, MoveLocation
+from app.schemas import DiceRequest, DMTurnOutput, HPDelta, InventoryChange, MoveLocation
 
 
 class StateChangingProvider:
@@ -22,6 +23,13 @@ class StateChangingProvider:
                     quantity_delta=-1,
                     reason="Dropped and extinguished",
                 ),
+            ],
+            dice_requests=[
+                DiceRequest(
+                    notation="1d20",
+                    modifier=2,
+                    purpose="Check whether Arin lands safely",
+                )
             ],
         )
 
@@ -58,7 +66,10 @@ def test_phase_zero_persists_state_turns_and_events(client: TestClient) -> None:
     )
     assert turn.status_code == 201, turn.text
     assert turn.json()["sequence"] == 1
+    assert turn.json()["dice_rolls"][0]["notation"] == "1d20"
+    assert 3 <= turn.json()["dice_rolls"][0]["total"] <= 22
 
+    get_engine().dispose()
     state = client.get(f"/campaigns/{campaign_id}/state")
     assert state.status_code == 200
     payload = state.json()
@@ -73,6 +84,7 @@ def test_phase_zero_persists_state_turns_and_events(client: TestClient) -> None:
         "campaign_created",
         "character_created",
         "player_action",
+        "dice_rolled",
         "dm_response",
         "state_changed",
     ]

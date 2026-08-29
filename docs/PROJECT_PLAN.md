@@ -17,6 +17,68 @@ decision is made, a significant bug is found, or validation changes what the tea
 the system. The objective is to preserve not only what was built, but whether it worked and what was
 learned.
 
+### 1.1 Documentation maintenance contract
+
+Maintaining this record is a required part of development. A feature, fix, migration, operational
+change, or investigation is not complete if it leaves this plan materially inaccurate.
+
+Every development session must:
+
+1. Start by reading the current delivery stage, milestone specification, open issue/debt register,
+   risks, decisions, and immediate actions in this document, then compare them with Git and the
+   actual repository state.
+2. Record newly discovered bugs, limitations, workarounds, risks, or changed assumptions as soon as
+   they are confirmed; do not wait for the end of a milestone.
+3. Finish by updating affected milestone status and evidence, issues, risks, decisions, immediate
+   actions, and the documentation change log before the implementation commit is considered done.
+4. Update the `Last updated` date whenever the document's substance changes.
+
+Accuracy rules:
+
+- report implemented behavior separately from proposed behavior;
+- mark a milestone `Done` only when its acceptance evidence is recorded;
+- move completed work to `Rework` if later evidence invalidates the original result;
+- close defects only with the resolution and regression evidence recorded;
+- label workarounds as workarounds and retain the permanent-fix destination;
+- correct superseded statements in place rather than leaving contradictory guidance;
+- reference commits, migrations, tests, event IDs, or manual evaluations where available;
+- never place credentials, personal data, unrevealed campaign content, or DM-only material here.
+
+A documentation freshness review is mandatory at every milestone gate and before every player-facing
+release. If code, tests, runtime state, and this document disagree, stop and investigate the
+disagreement; update the incorrect source and record any defect exposed by the mismatch.
+
+### 1.2 Long-term memory and audience contract
+
+This plan is the master continuity record for future development sessions. It is designed to let a
+developer reconstruct what exists, why it was built that way, what evidence supports it, what has
+failed, and what should happen next without depending on chat history.
+
+It also serves as the index for project and player documentation. Different audiences require
+different levels of detail:
+
+| Audience | This plan provides | Dedicated documentation as the project grows |
+| --- | --- | --- |
+| Developers | Architecture, milestones, evidence, debt, risks, and decisions | API, schema, rules-engine, testing, and operations references |
+| Maintainers/operators | Infrastructure state, known operational issues, and deployment gates | Runbooks, backup/restore, migration, monitoring, and incident guides |
+| Players | Supported features, limitations, release readiness, and links to safe guidance | Character creation, gameplay, rules help, campaign admin, and release notes |
+
+Player-facing documents must contain only public product/rules information and player-visible
+campaign concepts. They must never include hidden scenario data, DM prompts, secret DCs, future
+encounters, or unrestricted retrieval details. This master plan should link to those documents as
+they are created rather than becoming an unstructured replacement for all of them.
+
+Source-of-truth hierarchy:
+
+1. Runtime data, applied migrations, and executable code define what the system currently does.
+2. Automated and recorded manual evaluations establish whether that behavior works as intended.
+3. This plan records the verified current state, intent, interpretation, and development history.
+4. The README provides concise setup and entry points.
+5. Dedicated engineering, operations, and player documents explain their respective workflows.
+
+The hierarchy does not permit silent drift: lower-level evidence that contradicts a higher-level
+document creates a documentation defect that must be corrected and logged.
+
 ## 2. Product objective
 
 GandalfDnD will provide a persistent solo D&D experience with two eventually distinct AI roles:
@@ -521,6 +583,8 @@ Destination milestone:
 - New infrastructure must solve an observed requirement, not a hypothetical future need.
 - A completed milestone moves to `Rework` when later evidence invalidates its acceptance result.
 - Every workaround receives either a permanent-fix milestone or an explicit acceptance decision.
+- No implementation or fix is complete while this plan or affected player documentation is stale.
+- Every player-facing release requires a supported-features/limitations review and safe release notes.
 
 ## 17. Immediate next actions
 
@@ -531,3 +595,10 @@ Destination milestone:
 5. Implement guided character creation and finalize-character validation.
 6. Add authoritative check/save resolution and rule-resolution audit records.
 7. Review M1 evidence using the milestone review template before beginning the two-stage live AI flow.
+
+## 18. Documentation change log
+
+| Date | ID | Change | Reason/evidence | Follow-up |
+| --- | --- | --- | --- | --- |
+| 2026-08-29 | DOC-001 | Created the living strategy, M0 retrospective, M1–M9 roadmap, and issue/risk/decision registers | Phase 0 commits and test/migration evidence needed a durable project record | Maintain alongside every material development change |
+| 2026-08-29 | DOC-002 | Adopted the documentation maintenance, long-term memory, and audience contracts | Project owner designated this plan as redundant long-term memory, dev log, project reference, and player documentation index | Add dedicated engineering, operations, and player documents when their milestones begin |

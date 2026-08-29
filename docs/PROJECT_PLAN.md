@@ -1,7 +1,7 @@
 # GandalfDnD Development Strategy and Living Project Plan
 
 - **Document status:** Active
-- **Last updated:** 2026-08-29
+- **Last updated:** 2026-08-30
 - **Rules baseline:** SRD 5.2.1 (provisional until rules ingestion is implemented)
 - **Current delivery stage:** Planning Milestone 1 — Character creation and deterministic mechanics
 - **Canonical repository:** `~/Git/gandalfDnD`
@@ -473,7 +473,7 @@ deployable if Clawvis is offline.
 | GAP-002 | Product | Open | No deterministic quest/world decision model | Decisions have limited lasting effects | M3 |
 | TEST-001 | Validation | Open | OpenAI provider has no paid live evaluation | Real structured behavior unproven | Lantern Test; M2 |
 | WARN-001 | Dependency | Monitoring | Current TestClient emits an `httpx` deprecation warning | No functional failure today | Reassess FastAPI/Starlette test client during dependency maintenance |
-| OPS-001 | Source control | Blocked | Local `main` contains unpushed work; HTTPS has no usable credential and the Mac's existing SSH keys are not registered with GitHub | Remote is not current | Authenticate HTTPS or register the existing Ed25519 public key with GitHub, then push |
+| OPS-001 | Source control | Resolved | Initial push was blocked because HTTPS lacked credentials and Git did not automatically select the nonstandard SSH key filename | GitHub was temporarily behind local `main` | Registered the existing Ed25519 key, verified GitHub's host fingerprint, configured this repository's SSH command, and synchronized `main`; 2026-08-30 |
 | OPS-002 | Infrastructure | Deferred | pgvector is unavailable on `postgresvm` | No semantic memory yet | Evaluate/install only at M4 |
 
 New entries must include reproduction steps or evidence when applicable. Do not close an issue only
@@ -588,13 +588,12 @@ Destination milestone:
 
 ## 17. Immediate next actions
 
-1. Restore GitHub command-line authentication, then push the completed local commits.
-2. Specify the exact supported level-one character-creation slice for M1.
-3. Design versioned character/rules schemas before adding model prompts.
-4. Implement golden fixtures and deterministic derived-stat calculations.
-5. Implement guided character creation and finalize-character validation.
-6. Add authoritative check/save resolution and rule-resolution audit records.
-7. Review M1 evidence using the milestone review template before beginning the two-stage live AI flow.
+1. Specify the exact supported level-one character-creation slice for M1.
+2. Design versioned character/rules schemas before adding model prompts.
+3. Implement golden fixtures and deterministic derived-stat calculations.
+4. Implement guided character creation and finalize-character validation.
+5. Add authoritative check/save resolution and rule-resolution audit records.
+6. Review M1 evidence using the milestone review template before beginning the two-stage live AI flow.
 
 ## 18. Documentation change log
 
@@ -603,3 +602,4 @@ Destination milestone:
 | 2026-08-29 | DOC-001 | Created the living strategy, M0 retrospective, M1–M9 roadmap, and issue/risk/decision registers | Phase 0 commits and test/migration evidence needed a durable project record | Maintain alongside every material development change |
 | 2026-08-29 | DOC-002 | Adopted the documentation maintenance, long-term memory, and audience contracts | Project owner designated this plan as redundant long-term memory, dev log, project reference, and player documentation index | Add dedicated engineering, operations, and player documents when their milestones begin |
 | 2026-08-29 | DOC-003 | Recorded the blocked GitHub synchronization attempt | Remote was a safe fast-forward, but HTTPS credentials were unavailable and both existing Mac SSH keys were rejected by GitHub | Register/authenticate one GitHub credential, push, then close OPS-001 with synchronization evidence |
+| 2026-08-30 | DOC-004 | Closed OPS-001 after restoring authenticated GitHub synchronization | The registered Ed25519 key authenticated as `asinpark123`; the repository-specific SSH command selected it and `main` pushed successfully | Continue normal fetch-before-push workflow |

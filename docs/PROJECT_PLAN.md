@@ -473,7 +473,7 @@ deployable if Clawvis is offline.
 | GAP-002 | Product | Open | No deterministic quest/world decision model | Decisions have limited lasting effects | M3 |
 | TEST-001 | Validation | Open | OpenAI provider has no paid live evaluation | Real structured behavior unproven | Lantern Test; M2 |
 | WARN-001 | Dependency | Monitoring | Current TestClient emits an `httpx` deprecation warning | No functional failure today | Reassess FastAPI/Starlette test client during dependency maintenance |
-| OPS-001 | Source control | Open | Local `main` contains unpushed M0 and planning work | Remote is not current | Push after explicit authorization |
+| OPS-001 | Source control | Blocked | Local `main` contains unpushed work; HTTPS has no usable credential and the Mac's existing SSH keys are not registered with GitHub | Remote is not current | Authenticate HTTPS or register the existing Ed25519 public key with GitHub, then push |
 | OPS-002 | Infrastructure | Deferred | pgvector is unavailable on `postgresvm` | No semantic memory yet | Evaluate/install only at M4 |
 
 New entries must include reproduction steps or evidence when applicable. Do not close an issue only
@@ -588,7 +588,7 @@ Destination milestone:
 
 ## 17. Immediate next actions
 
-1. Push the completed M0 and planning commits after authorization.
+1. Restore GitHub command-line authentication, then push the completed local commits.
 2. Specify the exact supported level-one character-creation slice for M1.
 3. Design versioned character/rules schemas before adding model prompts.
 4. Implement golden fixtures and deterministic derived-stat calculations.
@@ -602,3 +602,4 @@ Destination milestone:
 | --- | --- | --- | --- | --- |
 | 2026-08-29 | DOC-001 | Created the living strategy, M0 retrospective, M1–M9 roadmap, and issue/risk/decision registers | Phase 0 commits and test/migration evidence needed a durable project record | Maintain alongside every material development change |
 | 2026-08-29 | DOC-002 | Adopted the documentation maintenance, long-term memory, and audience contracts | Project owner designated this plan as redundant long-term memory, dev log, project reference, and player documentation index | Add dedicated engineering, operations, and player documents when their milestones begin |
+| 2026-08-29 | DOC-003 | Recorded the blocked GitHub synchronization attempt | Remote was a safe fast-forward, but HTTPS credentials were unavailable and both existing Mac SSH keys were rejected by GitHub | Register/authenticate one GitHub credential, push, then close OPS-001 with synchronization evidence |

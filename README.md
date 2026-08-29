@@ -5,6 +5,9 @@ smallest trustworthy loop: campaign state enters the model as data, the model re
 proposals, application code validates those proposals, dice are rolled by code, and the accepted
 result is committed to PostgreSQL with an append-only event trail.
 
+The roadmap, milestone gates, validation history, architectural decisions, and issue register are
+maintained in the [living development plan](docs/PROJECT_PLAN.md).
+
 ## Phase 0 scope
 
 - FastAPI API with health, campaigns, one character, locations, turns, and player-visible events

@@ -249,6 +249,38 @@ A slice is done only when:
 Tests involving randomness must inject a seeded or fixed source. Tests involving an external model
 must separate deterministic provider-contract tests from explicitly paid live evaluations.
 
+### 7.6 Project-owner input and player acceptance checkpoints
+
+Development should continue autonomously from accepted specifications until a decision would
+materially change rules behavior, product scope, schema compatibility, privacy, operating cost, or
+the player experience. When such a decision is required, present the available evidence, a
+recommendation, alternatives, and the consequences of each choice rather than asking for routine
+implementation details.
+
+The project owner tests stable verification candidates, not incomplete intermediate builds. Codex
+continues to own automated unit, integration, API, migration, integrity, and regression testing on
+every slice. Before each owner test, provide a short checklist containing setup, actions, expected
+results, known limitations, and where observations will be recorded.
+
+| Checkpoint | Owner input required | Owner testing expectation |
+| --- | --- | --- |
+| M1.2 guided creation | None; the supported slice and deferrals are already accepted | Optional API/Swagger review of valid creation, rejected invalid choices, finalized sheet, and provenance |
+| M1.3 complete character state | No blocking input unless a new rules/product ambiguity appears; clarity feedback is welcome | Short acceptance review of AC, initiative, speed, proficiencies, equipment, HP/Hit Dice, features/resources, and beginner readability |
+| M1.4 deterministic resolution | Decide only genuinely ambiguous adjudication/product policies that cannot be resolved from the pinned SRD and accepted rulings | Important acceptance test proving saved character choices change checks/saves and model-supplied modifiers cannot override canonical results |
+| M2 live AI feasibility | Approve any paid live-model evaluation and provide desired narrative tone/content boundaries | Critical Lantern Test covering dialogue, movement, inventory, check, damage, restart, resume, and narration/mechanics agreement |
+| M3 persistent world | Provide campaign-structure preferences when they affect consequence and quest design | Multi-session play test confirming decisions, NPC relationships, quests, and revealed facts persist coherently across restarts |
+| M1.5 content expansion | Prioritize desired species, backgrounds, classes, feats, equipment routes, spellcasting, and play styles | Create contrasting supported characters and confirm their choices produce understandable, distinct state and later gameplay |
+| M5 combat and solo balance | Choose difficulty/lethality goals, companion policy, and whether measured solo adjustments may become explicit house rules | Repeated combat tests across favorable, difficult, defeat, recovery, and restart scenarios |
+| M6 spoiler-safe Guide | Choose preferred guidance depth and proactive-versus-requested help | Ask campaign-sensitive questions and verify useful guidance never reveals DM-only facts |
+| M7 player interface | Provide strong layout, accessibility, workflow, and usability feedback | Full ordinary-player journey without relying on direct API knowledge |
+| M8 deployment | Choose availability, privacy, hosting-cost, backup, and recovery expectations | Operational acceptance covering access, restart, backup/restore, failure reporting, and recovery |
+
+Owner test outcomes are durable evidence. Each observation must be classified as passed, defect,
+usability issue, rules/ruling question, feature request, or accepted limitation. Defects enter the
+issue register with reproduction evidence; mechanical ambiguities enter `docs/rules/RULINGS.md`;
+scope changes return to the milestone plan. A milestone is not closed merely because automated tests
+pass when its gate explicitly requires owner or live-play acceptance.
+
 ## 8. Status workflow
 
 Use these values consistently:
@@ -524,6 +556,10 @@ M1.2 milestone review:
 - eligible alternative base calculations remain distinct rather than being added together;
 - derived values remain reproducible projections of versioned source choices and grants;
 - no spellcasting fields are required by the initial supported slice.
+
+Owner checkpoint: no input is required to begin implementation. At `Verification`, provide a short
+sheet-readability and state-correctness checklist covering every field above; record feedback before
+M1.3 is closed.
 
 #### M1.4 Deterministic resolution service
 
@@ -828,6 +864,8 @@ Destination milestone:
    authoritative check/save resolution, fixed-dice replay, and model-modifier rejection.
 5. Review complete M1 evidence and documentation freshness before M2; move broader character options
    to M1.5 rather than expanding the exit gate during implementation.
+6. At each `Verification` gate, issue the owner checklist defined in section 7.6 and route every
+   observation to evidence, defects, rulings, scope, or an explicitly accepted limitation.
 
 ## 18. Documentation change log
 
@@ -842,3 +880,4 @@ Destination milestone:
 | 2026-08-30 | DOC-007 | Recorded M1.1 registry, artifact verification, database pinning, migration safety, tests, and `Verification` status | 22 tests, 91% coverage, exact official artifact checksum, schema validation, HTTP 200 health, and zero migration drift | Publish and verify the GitHub Release mirror, then close M1.1 and begin source-cited character definitions |
 | 2026-08-30 | DOC-008 | Closed M1.1 and advanced current delivery to M1.2 | Commit `bada61c`, migration `0002_ruleset_releases`, the official artifact, and the published project release all passed the recorded integrity, migration, API, schema, lint, runtime, and regression gates | Implement the source-cited Human/Soldier/Fighter guided-creation slice |
 | 2026-08-31 | DOC-009 | Closed M1.2, added the player character-creation guide, and advanced current delivery to M1.3 | Commit `ba7bca8`, 38 tests, 91% coverage, migration `0003`, immutable source-linked grants, schema/catalog integrity checks, zero Alembic drift, and development health all passed | Complete reproducible Phase 1 character state without expanding the supported creation slice |
+| 2026-08-31 | DOC-010 | Added project-owner decision gates and milestone-specific player acceptance checkpoints | The owner requested a durable record of when input is required and when hands-on testing is useful; M1.3 has no blocking input and receives a verification-stage sheet review | Provide a concise setup/actions/expected-results checklist at every applicable verification gate and record all outcomes |

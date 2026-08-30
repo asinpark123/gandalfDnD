@@ -40,6 +40,7 @@ def _create_campaign(client: TestClient) -> str:
         json={"name": "The Lantern Test", "starting_location": "Roadside Inn"},
     )
     assert response.status_code == 201
+    assert response.json()["ruleset_release_id"] == "srd-5.2.1"
     return response.json()["id"]
 
 
@@ -56,6 +57,7 @@ def test_phase_zero_persists_state_turns_and_events(client: TestClient) -> None:
         json={"name": "Arin", "max_hp": 10, "inventory": {"Torch": 1}},
     )
     assert character.status_code == 201
+    assert character.json()["ruleset_release_id"] == "srd-5.2.1"
 
     from app.api import app
 
@@ -67,6 +69,7 @@ def test_phase_zero_persists_state_turns_and_events(client: TestClient) -> None:
     assert turn.status_code == 201, turn.text
     assert turn.json()["sequence"] == 1
     assert turn.json()["dice_rolls"][0]["notation"] == "1d20"
+    assert turn.json()["dice_rolls"][0]["ruleset_release_id"] == "srd-5.2.1"
     assert 3 <= turn.json()["dice_rolls"][0]["total"] <= 22
 
     get_engine().dispose()
@@ -88,6 +91,7 @@ def test_phase_zero_persists_state_turns_and_events(client: TestClient) -> None:
         "dm_response",
         "state_changed",
     ]
+    assert {event["ruleset_release_id"] for event in events.json()} == {"srd-5.2.1"}
 
 
 def test_phase_zero_allows_only_one_character(client: TestClient) -> None:
@@ -95,3 +99,18 @@ def test_phase_zero_allows_only_one_character(client: TestClient) -> None:
     body = {"name": "Arin", "max_hp": 10}
     assert client.post(f"/campaigns/{campaign_id}/character", json=body).status_code == 201
     assert client.post(f"/campaigns/{campaign_id}/character", json=body).status_code == 409
+
+
+def test_campaign_rejects_unknown_dynamic_and_legacy_ruleset_inputs(
+    client: TestClient,
+) -> None:
+    unknown = client.post("/campaigns", json={"name": "Unknown", "ruleset_release_id": "srd-9.9.9"})
+    assert unknown.status_code == 422
+    assert unknown.json()["detail"] == "Unknown ruleset release: srd-9.9.9"
+
+    latest = client.post("/campaigns", json={"name": "Dynamic", "ruleset_release_id": "latest"})
+    assert latest.status_code == 422
+    assert latest.json()["detail"] == "Dynamic ruleset alias 'latest' is not supported"
+
+    legacy = client.post("/campaigns", json={"name": "Legacy", "ruleset": "SRD 5.2.1"})
+    assert legacy.status_code == 422

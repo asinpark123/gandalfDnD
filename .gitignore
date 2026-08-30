@@ -5,8 +5,8 @@ __pycache__/
 .ruff_cache/
 .coverage
 htmlcov/
+.cache/rulesets/
 .env
 .env.*
 !.env.example
 .DS_Store
-

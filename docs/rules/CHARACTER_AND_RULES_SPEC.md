@@ -268,13 +268,13 @@ their report-identified fixtures rather than weakening these contracts.
 
 | Requirement | Normative/design source | Implementation | Migration | Verification | Status |
 | --- | --- | --- | --- | --- | --- |
-| Immutable rules release and definitions | SRD legal/source artifact; RES-001; ADR-009 | Pending M1.1 | Pending | Manifest/checksum/coexistence tests | Planned |
+| Immutable rules release and definitions | SRD legal/source artifact; RES-001; ADR-009 | `app/rulesets.py`; `rulesets/`; project mirror pending | `0002_ruleset_releases` | Registry/schema/artifact/immutability/coexistence tests | Verification |
 | Character source provenance | RES-001 canonical-state model; ADR-010 | Pending M1.2–M1.3 | Pending | GF-004 | Planned |
 | Human/Soldier/Fighter creation | SRD 5.2.1 character creation/origins/classes | Pending M1.2 | Pending | GF-001–GF-003 | Planned |
 | Pure derived statistics | SRD formulas; ADR-011 | Pending M1.3 | Pending | GF-002–GF-007 | Planned |
 | Deterministic check/save resolution | SRD D20 tests; ADR-007/ADR-012 | Pending M1.4 | Pending | GF-006, GF-010–GF-011 | Planned |
 | Narrative/mechanical separation | Product trust boundary; ADR-012 | Existing M0 boundary, M1 extension pending | As required | GF-012 | Partial foundation only |
-| Explicit ruleset compatibility | RES-001 versioning; ADR-009 | Pending M1.1 | Pending | GF-013–GF-014 | Planned |
+| Explicit ruleset compatibility | RES-001 versioning; ADR-009 | Dynamic/cross-release rejection and coexistence implemented; migration execution intentionally deferred | `0002_ruleset_releases` pins existing records | GF-013–GF-014 foundation tests pass | Partial foundation verified |
 | Solo/house-rule separation | RES-001 balance findings; ADR-013 | Pending ruleset support | Pending | Future strict-SRD comparisons | Planned |
 
 Update this table in the same commit as implementation, migration, or evidence changes. A status may

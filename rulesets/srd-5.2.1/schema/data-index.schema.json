@@ -1,0 +1,50 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "$Schema"
+    },
+    "definition_files": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Definition Files",
+      "type": "array"
+    },
+    "ruleset_release_id": {
+      "title": "Ruleset Release Id",
+      "type": "string"
+    },
+    "schema_version": {
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "support_status": {
+      "enum": [
+        "foundation_only",
+        "character_creation",
+        "complete"
+      ],
+      "title": "Support Status",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema_version",
+    "ruleset_release_id",
+    "support_status",
+    "definition_files"
+  ],
+  "title": "NormalizedDataIndex",
+  "type": "object"
+}

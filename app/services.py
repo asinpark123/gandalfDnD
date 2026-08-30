@@ -6,7 +6,8 @@ from sqlalchemy.orm import Session
 
 from app.dice import DiceService
 from app.llm.base import DMProvider
-from app.models import Campaign, CampaignEvent, Character, DiceRoll, Location, Turn
+from app.models import Campaign, CampaignEvent, Character, DiceRoll, Location, RulesetRelease, Turn
+from app.rulesets import LoadedRulesetRelease, get_ruleset_registry
 from app.schemas import (
     CampaignCreate,
     CampaignState,
@@ -50,8 +51,14 @@ def _add_event(
     turn_id: uuid.UUID | None = None,
     visibility: str = "player",
 ) -> CampaignEvent:
+    ruleset_release_id = session.scalar(
+        select(Campaign.ruleset_release_id).where(Campaign.id == campaign_id)
+    )
+    if ruleset_release_id is None:
+        raise NotFoundError("Campaign not found")
     event = CampaignEvent(
         campaign_id=campaign_id,
+        ruleset_release_id=ruleset_release_id,
         turn_id=turn_id,
         sequence=_next_event_sequence(session, campaign_id),
         event_type=event_type,
@@ -63,8 +70,38 @@ def _add_event(
     return event
 
 
+def _ensure_ruleset_release(
+    session: Session, loaded_release: LoadedRulesetRelease
+) -> RulesetRelease:
+    manifest = loaded_release.manifest
+    release = session.get(RulesetRelease, manifest.id)
+    expected = {
+        "title": manifest.title,
+        "version": manifest.version,
+        "publication_date": manifest.publication_date,
+        "license_id": manifest.license.id,
+        "source_url": str(manifest.source_page),
+        "artifact_sha256": manifest.artifact.sha256,
+        "artifact_size_bytes": manifest.artifact.size_bytes,
+        "manifest_sha256": loaded_release.manifest_sha256,
+        "data_schema_version": manifest.normalized_data.schema_version,
+        "support_status": manifest.normalized_data.support_status,
+    }
+    if release is None:
+        release = RulesetRelease(id=manifest.id, **expected)
+        session.add(release)
+        session.flush()
+        return release
+    actual = {field: getattr(release, field) for field in expected}
+    if actual != expected:
+        raise ConflictError(f"Registered ruleset release {manifest.id!r} is immutable and differs")
+    return release
+
+
 def create_campaign(session: Session, data: CampaignCreate) -> Campaign:
-    campaign = Campaign(name=data.name, ruleset=data.ruleset)
+    loaded_release = get_ruleset_registry().get(data.ruleset_release_id)
+    _ensure_ruleset_release(session, loaded_release)
+    campaign = Campaign(name=data.name, ruleset_release_id=loaded_release.manifest.id)
     session.add(campaign)
     session.flush()
     location = Location(
@@ -78,20 +115,25 @@ def create_campaign(session: Session, data: CampaignCreate) -> Campaign:
         session,
         campaign.id,
         "campaign_created",
-        {"name": campaign.name, "starting_location": location.name},
+        {
+            "name": campaign.name,
+            "starting_location": location.name,
+            "ruleset_release_id": campaign.ruleset_release_id,
+        },
     )
     session.commit()
     return campaign
 
 
 def add_character(session: Session, campaign_id: uuid.UUID, data: CharacterCreate) -> Character:
-    _campaign_for_update(session, campaign_id)
+    campaign = _campaign_for_update(session, campaign_id)
     existing = session.scalar(select(Character).where(Character.campaign_id == campaign_id))
     if existing is not None:
         raise ConflictError("Phase 0 supports one character per campaign")
     inventory = {name.strip(): quantity for name, quantity in data.inventory.items()}
     character = Character(
         campaign_id=campaign_id,
+        ruleset_release_id=campaign.ruleset_release_id,
         name=data.name,
         max_hp=data.max_hp,
         hp=data.max_hp,
@@ -186,7 +228,7 @@ def process_turn(
     provider: DMProvider,
     dice_service: DiceService | None = None,
 ) -> TurnRead:
-    _campaign_for_update(session, campaign_id)
+    campaign = _campaign_for_update(session, campaign_id)
     state_before = get_campaign_state(session, campaign_id)
     character = session.scalar(select(Character).where(Character.campaign_id == campaign_id))
     output = provider.generate_turn(_provider_context(state_before), player_action)
@@ -225,6 +267,7 @@ def process_turn(
         result = roller.roll(request.notation, request.modifier)
         roll_model = DiceRoll(
             campaign_id=campaign_id,
+            ruleset_release_id=campaign.ruleset_release_id,
             turn_id=turn.id,
             notation=result.notation,
             rolls=result.rolls,

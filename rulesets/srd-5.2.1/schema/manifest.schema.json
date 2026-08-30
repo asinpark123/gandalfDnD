@@ -1,0 +1,200 @@
+{
+  "$defs": {
+    "ArtifactDefinition": {
+      "additionalProperties": false,
+      "properties": {
+        "filename": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+          "title": "Filename",
+          "type": "string"
+        },
+        "media_type": {
+          "const": "application/pdf",
+          "title": "Media Type",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        },
+        "size_bytes": {
+          "exclusiveMinimum": 0,
+          "title": "Size Bytes",
+          "type": "integer"
+        },
+        "sources": {
+          "items": {
+            "$ref": "#/$defs/ArtifactSource"
+          },
+          "minItems": 1,
+          "title": "Sources",
+          "type": "array"
+        }
+      },
+      "required": [
+        "filename",
+        "media_type",
+        "sha256",
+        "size_bytes",
+        "sources"
+      ],
+      "title": "ArtifactDefinition",
+      "type": "object"
+    },
+    "ArtifactSource": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "enum": [
+            "official",
+            "project_release"
+          ],
+          "title": "Name",
+          "type": "string"
+        },
+        "url": {
+          "format": "uri",
+          "minLength": 1,
+          "title": "Url",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "url"
+      ],
+      "title": "ArtifactSource",
+      "type": "object"
+    },
+    "LicenseDefinition": {
+      "additionalProperties": false,
+      "properties": {
+        "attribution_file": {
+          "title": "Attribution File",
+          "type": "string"
+        },
+        "id": {
+          "const": "CC-BY-4.0",
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "url": {
+          "format": "uri",
+          "minLength": 1,
+          "title": "Url",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "url",
+        "attribution_file"
+      ],
+      "title": "LicenseDefinition",
+      "type": "object"
+    },
+    "NormalizedDataDefinition": {
+      "additionalProperties": false,
+      "properties": {
+        "index_path": {
+          "pattern": "^[a-z0-9][a-z0-9./_-]*\\.json$",
+          "title": "Index Path",
+          "type": "string"
+        },
+        "schema_version": {
+          "pattern": "^\\d+\\.\\d+\\.\\d+$",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "support_status": {
+          "enum": [
+            "foundation_only",
+            "character_creation",
+            "complete"
+          ],
+          "title": "Support Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema_version",
+        "index_path",
+        "support_status"
+      ],
+      "title": "NormalizedDataDefinition",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "$Schema"
+    },
+    "artifact": {
+      "$ref": "#/$defs/ArtifactDefinition"
+    },
+    "id": {
+      "pattern": "^[a-z0-9][a-z0-9.-]{2,79}$",
+      "title": "Id",
+      "type": "string"
+    },
+    "license": {
+      "$ref": "#/$defs/LicenseDefinition"
+    },
+    "normalized_data": {
+      "$ref": "#/$defs/NormalizedDataDefinition"
+    },
+    "publication_date": {
+      "format": "date",
+      "title": "Publication Date",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "1.0.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "source_page": {
+      "format": "uri",
+      "minLength": 1,
+      "title": "Source Page",
+      "type": "string"
+    },
+    "title": {
+      "title": "Title",
+      "type": "string"
+    },
+    "version": {
+      "title": "Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema_version",
+    "id",
+    "title",
+    "version",
+    "publication_date",
+    "source_page",
+    "license",
+    "artifact",
+    "normalized_data"
+  ],
+  "title": "RulesetManifest",
+  "type": "object"
+}

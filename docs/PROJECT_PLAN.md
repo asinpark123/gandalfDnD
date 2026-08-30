@@ -3,7 +3,7 @@
 - **Document status:** Active
 - **Last updated:** 2026-08-30
 - **Rules baseline:** SRD 5.2.1 (provisional until rules ingestion is implemented)
-- **Current delivery stage:** Planning Milestone 1 — Character creation and deterministic mechanics
+- **Current delivery stage:** Milestone 1 implementation — M1.1 versioned rules data verification
 - **Canonical repository:** `~/Git/gandalfDnD`
 
 ## 1. Purpose of this document
@@ -268,7 +268,7 @@ Use these values consistently:
 | ID | Milestone | Status | Primary outcome |
 | --- | --- | --- | --- |
 | M0 | Persistence and safety foundation | Done | Canonical state and auditable turn skeleton |
-| M1 | Character creation and deterministic mechanics | Proposed | Character choices drive calculated outcomes |
+| M1 | Character creation and deterministic mechanics | In progress | Character choices drive calculated outcomes |
 | M2 | Two-stage AI turn and live feasibility | Proposed | Real DM uses recorded dice results safely |
 | M3 | Persistent world model | Proposed | NPCs, quests, scenes, clues, time, and visibility |
 | M4 | Long-term memory and retrieval | Proposed | Coherent recall without full history in context |
@@ -331,7 +331,7 @@ and deterministic mechanics are therefore promoted ahead of broader live-model t
 
 ### M1 — Character creation and deterministic mechanics
 
-- **Status:** Proposed
+- **Status:** In progress
 - **Priority:** Immediate
 
 Player outcome: a beginner can create a rules-valid level-one character, understand their choices,
@@ -356,7 +356,7 @@ Planned slices:
 
 #### M1.1 Versioned rules data
 
-**Status:** Ready
+**Status:** Verification
 
 Approved source and distribution strategy:
 
@@ -401,6 +401,39 @@ M1.1 acceptance gates:
 - campaign creation requires a registered stable ruleset and never resolves `latest` dynamically;
 - a newer mock ruleset can coexist without altering an existing campaign;
 - migration between rulesets is impossible without an explicit compatibility workflow.
+
+Implemented in the current M1.1 slice:
+
+- strict Pydantic-backed registry, manifest, normalized-data index, and deterministic generated JSON
+  Schemas under `rulesets/`;
+- exact SRD 5.2.1 source URL, publication metadata, CC-BY-4.0 attribution, 6,031,375-byte
+  size, and SHA-256 `8974902d109d6e63672d7c490bde9ccf052410503d9cfa768237154fbc5e3d87`;
+- ignored local cache and atomic verified fetch command with official/project source selection;
+- stable release-specific identity with no `latest` alias or arbitrary campaign ruleset strings;
+- immutable `ruleset_releases` PostgreSQL records and ruleset pins on campaigns, characters,
+  campaign events, and dice rolls;
+- migration `0002_ruleset_releases`, which preserves the legacy label, backfills recognized records,
+  temporarily and transactionally handles the append-only event trigger, and aborts without data
+  loss on an unmapped legacy value;
+- release coexistence, immutability, API rejection, schema freshness, artifact-integrity, migration
+  backfill/rollback, and provenance regression tests.
+
+Verification evidence recorded 2026-08-30:
+
+- 22 automated tests passed with 91% application statement coverage;
+- Ruff lint and formatting passed; immutable research sources are formatter-excluded;
+- generated ruleset JSON Schemas matched the checked-in schemas;
+- official cached PDF matched the manifest size and SHA-256;
+- Alembic reported no ORM/migration drift in development or test;
+- `gandalfdnd_dev` and `gandalfdnd_test` reached `0002_ruleset_releases (head)`;
+- development `/health` returned HTTP 200;
+- both Gandalf databases contained no legacy campaign rows before migration;
+- Clawvis and unrelated PostgreSQL databases/services were not accessed or changed.
+
+Remaining verification gate before `Done`:
+
+- publish the unchanged PDF at the manifest's versioned GitHub Release URL, fetch it through
+  `--source project_release`, and confirm it matches the same size and SHA-256.
 
 #### M1.2 Guided character creation
 
@@ -579,7 +612,7 @@ deployable if Clawvis is offline.
 | OPS-001 | Source control | Resolved | Initial push was blocked because HTTPS lacked credentials and Git did not automatically select the nonstandard SSH key filename | GitHub was temporarily behind local `main` | Registered the existing Ed25519 key, verified GitHub's host fingerprint, configured this repository's SSH command, and synchronized `main`; 2026-08-30 |
 | OPS-002 | Infrastructure | Deferred | pgvector is unavailable on `postgresvm` | No semantic memory yet | Evaluate/install only at M4 |
 | DOC-001 | Documentation | Open | RES-001's verbatim export contains temporary Deep Research citation tokens | Tokens are not durable implementation citations | Preserve the source unchanged; use official URLs and SRD pages in specifications and rule definitions; M1.1 onward |
-| GAP-003 | Rules | Open | No normalized SRD ruleset or source-provenance model exists yet | Character and rule calculations cannot be authoritative | Implement M1.1 registry and M1.2–M1.3 provenance schema |
+| GAP-003 | Rules | In progress | M1.1 now provides immutable release provenance, but normalized character-rule definitions and per-grant provenance do not exist yet | Character calculations are not yet authoritative | Implement source-cited definitions and character grants in M1.2–M1.3 |
 | GAP-004 | Product | Open | Solo balance has a research framework but no measured product results | Encounter/class support cannot yet claim solo balance | Establish strict-SRD baselines in M5; build balance harness after supported combat |
 | DEBT-003 | Architecture | Open | The research proposes greenfield service/table boundaries that have not been reconciled with Phase 0 models | Premature adoption could create redundant schema or services | Reconcile per vertical slice; do not bulk-create the proposed model; M1 onward |
 
@@ -715,21 +748,17 @@ Destination milestone:
 
 ## 17. Immediate next actions
 
-1. Reconcile the minimum RES-001 identity/provenance model with the existing Phase 0 campaign,
-   character, event, and dice schema; document the M1.1 migration boundary before writing it.
-2. Create the M1.1 ruleset registry, directory structure, attribution, and manifest schema.
-3. Download the official SRD 5.2.1 PDF, calculate and record its checksum, and add a verified fetch
-   workflow plus ignored local cache.
-4. Publish the unchanged source PDF as a versioned project download asset.
-5. Implement stable concept/release-specific definition identities and reject dynamic `latest` or
-   cross-release campaign commands.
-6. Turn the planned M1 fixtures and traceability rows into failing executable tests for the fixed
-   Human/Soldier/Fighter slice.
-7. Design and migrate only the character choices/grants/provenance needed by that slice.
-8. Implement guided character creation and transactional finalization.
-9. Implement pure derived-stat calculations, then authoritative check/save resolution and complete
+1. Publish the verified SRD 5.2.1 PDF at the manifest's versioned GitHub Release URL and validate
+   the project mirror with the same fetch/checksum path.
+2. Close the M1.1 milestone review with release URL/checksum evidence and the implementation commit.
+3. Define the source-cited normalized rule records required for the fixed Human/Soldier/Fighter
+   creation path without adding unrelated SRD content.
+4. Turn GF-001–GF-004, GF-006–GF-007, and GF-013–GF-014 into the M1.2–M1.4 executable sequence.
+5. Design and migrate only the character choices/grants/provenance needed by that slice.
+6. Implement guided character creation and transactional finalization.
+7. Implement pure derived-stat calculations, then authoritative check/save resolution and complete
    rule-resolution audit records.
-10. Review M1 evidence and documentation freshness before M2; move broader options to M1.5 rather
+8. Review M1 evidence and documentation freshness before M2; move broader options to M1.5 rather
     than expanding the exit gate during implementation.
 
 ## 18. Documentation change log
@@ -742,3 +771,4 @@ Destination milestone:
 | 2026-08-30 | DOC-004 | Closed OPS-001 after restoring authenticated GitHub synchronization | The registered Ed25519 key authenticated as `asinpark123`; the repository-specific SSH command selected it and `main` pushed successfully | Continue normal fetch-before-push workflow |
 | 2026-08-30 | DOC-005 | Approved immutable, downloadable, multi-version SRD source artifacts with separate normalized rules data | Product owner approved preserving SRD 5.2.1 for reference/download and supporting future player-selected rulesets | Implement M1.1 registry, attribution, checksum verification, local cache, and release asset |
 | 2026-08-30 | DOC-006 | Preserved and indexed RES-001, recorded its adoption review, created the character/rules specification and rulings register, and revised M1 scope/risks/decisions/traceability | Project owner approved the reviewed recommendations and required research to remain durable long-term development memory | Implement M1.1 from the fixed vertical slice; keep research, rulings, specifications, and evidence synchronized |
+| 2026-08-30 | DOC-007 | Recorded M1.1 registry, artifact verification, database pinning, migration safety, tests, and `Verification` status | 22 tests, 91% coverage, exact official artifact checksum, schema validation, HTTP 200 health, and zero migration drift | Publish and verify the GitHub Release mirror, then close M1.1 and begin source-cited character definitions |

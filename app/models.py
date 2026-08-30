@@ -1,10 +1,11 @@
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 
 from sqlalchemy import (
     Boolean,
     CheckConstraint,
+    Date,
     DateTime,
     ForeignKey,
     Index,
@@ -27,14 +28,44 @@ class TimestampMixin:
     )
 
 
+class RulesetRelease(TimestampMixin, Base):
+    __tablename__ = "ruleset_releases"
+
+    id: Mapped[str] = mapped_column(String(80), primary_key=True)
+    title: Mapped[str] = mapped_column(String(160), nullable=False)
+    version: Mapped[str] = mapped_column(String(40), nullable=False)
+    publication_date: Mapped[date] = mapped_column(Date, nullable=False)
+    license_id: Mapped[str] = mapped_column(String(40), nullable=False)
+    source_url: Mapped[str] = mapped_column(Text, nullable=False)
+    artifact_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    artifact_size_bytes: Mapped[int] = mapped_column(Integer, nullable=False)
+    manifest_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    data_schema_version: Mapped[str] = mapped_column(String(20), nullable=False)
+    support_status: Mapped[str] = mapped_column(String(30), nullable=False)
+
+    campaigns: Mapped[list["Campaign"]] = relationship(back_populates="ruleset_release")
+
+    __table_args__ = (
+        CheckConstraint("artifact_size_bytes > 0", name="ruleset_artifact_size_positive"),
+        CheckConstraint(
+            "support_status IN ('foundation_only', 'character_creation', 'complete')",
+            name="ruleset_support_status",
+        ),
+    )
+
+
 class Campaign(TimestampMixin, Base):
     __tablename__ = "campaigns"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(String(120), nullable=False)
-    ruleset: Mapped[str] = mapped_column(String(40), nullable=False, default="SRD 5.2.1")
+    ruleset_release_id: Mapped[str] = mapped_column(
+        ForeignKey("ruleset_releases.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    legacy_ruleset_label: Mapped[str | None] = mapped_column(String(40))
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="active")
 
+    ruleset_release: Mapped[RulesetRelease] = relationship(back_populates="campaigns")
     characters: Mapped[list["Character"]] = relationship(back_populates="campaign")
     locations: Mapped[list["Location"]] = relationship(back_populates="campaign")
 
@@ -71,6 +102,9 @@ class Character(TimestampMixin, Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     campaign_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("campaigns.id", ondelete="CASCADE"), nullable=False, unique=True
+    )
+    ruleset_release_id: Mapped[str] = mapped_column(
+        ForeignKey("ruleset_releases.id", ondelete="RESTRICT"), nullable=False, index=True
     )
     name: Mapped[str] = mapped_column(String(120), nullable=False)
     max_hp: Mapped[int] = mapped_column(Integer, nullable=False)
@@ -112,6 +146,9 @@ class CampaignEvent(TimestampMixin, Base):
     campaign_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("campaigns.id", ondelete="CASCADE"), nullable=False, index=True
     )
+    ruleset_release_id: Mapped[str] = mapped_column(
+        ForeignKey("ruleset_releases.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
     turn_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("turns.id", ondelete="SET NULL"), index=True
     )
@@ -133,6 +170,9 @@ class DiceRoll(TimestampMixin, Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     campaign_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("campaigns.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    ruleset_release_id: Mapped[str] = mapped_column(
+        ForeignKey("ruleset_releases.id", ondelete="RESTRICT"), nullable=False, index=True
     )
     turn_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("turns.id", ondelete="SET NULL"), index=True

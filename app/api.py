@@ -10,6 +10,7 @@ from app.config import Settings, get_settings
 from app.db import get_session
 from app.llm.base import DMProvider
 from app.llm.factory import get_dm_provider
+from app.rulesets import UnknownRulesetError
 from app.schemas import (
     CampaignCreate,
     CampaignRead,
@@ -49,6 +50,12 @@ def create_app() -> FastAPI:
     def campaigns_create(data: CampaignCreate, session: SessionDep) -> CampaignRead:
         try:
             return CampaignRead.model_validate(create_campaign(session, data))
+        except UnknownRulesetError as exc:
+            session.rollback()
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        except ConflictError as exc:
+            session.rollback()
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
         except IntegrityError as exc:
             session.rollback()
             raise HTTPException(status_code=409, detail="Campaign could not be created") from exc

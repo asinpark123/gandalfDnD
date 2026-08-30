@@ -1,0 +1,11 @@
+{
+  "$schema": "./schema/registry.schema.json",
+  "schema_version": "1.0.0",
+  "default_release_id": "srd-5.2.1",
+  "releases": [
+    {
+      "id": "srd-5.2.1",
+      "manifest": "srd-5.2.1/manifest.json"
+    }
+  ]
+}

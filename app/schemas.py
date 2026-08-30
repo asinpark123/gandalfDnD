@@ -8,8 +8,10 @@ ShortText = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1
 
 
 class CampaignCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     name: ShortText
-    ruleset: str = Field(default="SRD 5.2.1", min_length=1, max_length=40)
+    ruleset_release_id: str = Field(default="srd-5.2.1", pattern=r"^[a-z0-9][a-z0-9.-]{2,79}$")
     starting_location: ShortText = "Roadside Inn"
 
 
@@ -18,7 +20,7 @@ class CampaignRead(BaseModel):
 
     id: uuid.UUID
     name: str
-    ruleset: str
+    ruleset_release_id: str
     status: str
     created_at: datetime
 
@@ -33,6 +35,7 @@ class CharacterRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
+    ruleset_release_id: str
     name: str
     hp: int
     max_hp: int
@@ -93,6 +96,7 @@ class DiceRollRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
+    ruleset_release_id: str
     notation: str
     rolls: list[int]
     modifier: int
@@ -121,6 +125,7 @@ class EventRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
+    ruleset_release_id: str
     sequence: int
     event_type: str
     visibility: str

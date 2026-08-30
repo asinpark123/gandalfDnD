@@ -1,4 +1,5 @@
 from functools import lru_cache
+from pathlib import Path
 from typing import Literal
 
 from pydantic import SecretStr
@@ -18,6 +19,8 @@ class Settings(BaseSettings):
     llm_provider: Literal["deterministic", "openai"] = "deterministic"
     openai_api_key: SecretStr | None = None
     openai_model: str = "gpt-5.4"
+    ruleset_registry_path: Path = Path("rulesets/registry.json")
+    ruleset_cache_dir: Path = Path(".cache/rulesets")
 
 
 @lru_cache

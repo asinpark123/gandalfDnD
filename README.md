@@ -22,6 +22,30 @@ maintained in the [living development plan](docs/PROJECT_PLAN.md).
 Documentation distinguishes planned behavior from verified implementation. Phase 0 behavior below
 remains the current executable product while M1 is still being developed.
 
+## Versioned rulesets
+
+Campaigns, characters, campaign events, and dice rolls are pinned to an immutable ruleset release.
+The registered foundation release is `srd-5.2.1`; arbitrary names and dynamic aliases such as
+`latest` are rejected.
+
+Validate the registry and its generated JSON Schemas:
+
+```bash
+python -m scripts.validate_rulesets
+python -m scripts.export_ruleset_schemas --check
+```
+
+Fetch the unchanged official SRD into the ignored local cache with manifest size and SHA-256
+verification:
+
+```bash
+python -m scripts.fetch_ruleset --release srd-5.2.1
+```
+
+The PDF remains outside normal Git history. Its official and project-release download locations,
+checksum, size, license, attribution, normalized-data status, and schema versions are recorded in
+[`rulesets/srd-5.2.1/manifest.json`](rulesets/srd-5.2.1/manifest.json).
+
 ## Phase 0 scope
 
 - FastAPI API with health, campaigns, one character, locations, turns, and player-visible events
@@ -108,5 +132,6 @@ targets the development database or any pre-existing service database.
 - Campaign events are immutable after insertion.
 - Every model output is typed and validated before commit.
 - Dice outcomes come from `DiceService`, never model invention.
+- Ruleset releases are immutable; changing versions requires a future explicit migration workflow.
 - The development and test credentials are separate and ignored by Git.
 - Clawvis is outside GandalfDnD's Phase 0 topology and must remain untouched.

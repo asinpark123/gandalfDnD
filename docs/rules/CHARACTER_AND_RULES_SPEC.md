@@ -1,6 +1,6 @@
 # Character and Deterministic Rules Specification
 
-- **Status:** Active planning specification; implementation pending
+- **Status:** Active; M1.1 verified, M1.2–M1.4 implementation pending
 - **Rules baseline:** SRD 5.2.1
 - **Initial delivery scope:** M1.1–M1.4
 - **Research basis:** [RES-001 review](../research/2026-08-30-character-system-adoption.md)
@@ -268,7 +268,7 @@ their report-identified fixtures rather than weakening these contracts.
 
 | Requirement | Normative/design source | Implementation | Migration | Verification | Status |
 | --- | --- | --- | --- | --- | --- |
-| Immutable rules release and definitions | SRD legal/source artifact; RES-001; ADR-009 | `app/rulesets.py`; `rulesets/`; project mirror pending | `0002_ruleset_releases` | Registry/schema/artifact/immutability/coexistence tests | Verification |
+| Immutable rules release and definitions | SRD legal/source artifact; RES-001; ADR-009 | `app/rulesets.py`; `rulesets/`; versioned project release | `0002_ruleset_releases` | 22-test suite plus official/project artifact checksum verification | Verified foundation |
 | Character source provenance | RES-001 canonical-state model; ADR-010 | Pending M1.2–M1.3 | Pending | GF-004 | Planned |
 | Human/Soldier/Fighter creation | SRD 5.2.1 character creation/origins/classes | Pending M1.2 | Pending | GF-001–GF-003 | Planned |
 | Pure derived statistics | SRD formulas; ADR-011 | Pending M1.3 | Pending | GF-002–GF-007 | Planned |

@@ -2,8 +2,8 @@
 
 - **Document status:** Active
 - **Last updated:** 2026-08-30
-- **Rules baseline:** SRD 5.2.1 (provisional until rules ingestion is implemented)
-- **Current delivery stage:** Milestone 1 implementation — M1.1 versioned rules data verification
+- **Rules baseline:** SRD 5.2.1 (pinned; normalized character rules pending)
+- **Current delivery stage:** Milestone 1 implementation — M1.2 guided character creation
 - **Canonical repository:** `~/Git/gandalfDnD`
 
 ## 1. Purpose of this document
@@ -356,7 +356,7 @@ Planned slices:
 
 #### M1.1 Versioned rules data
 
-**Status:** Verification
+**Status:** Done
 
 Approved source and distribution strategy:
 
@@ -402,7 +402,7 @@ M1.1 acceptance gates:
 - a newer mock ruleset can coexist without altering an existing campaign;
 - migration between rulesets is impossible without an explicit compatibility workflow.
 
-Implemented in the current M1.1 slice:
+Implemented in M1.1:
 
 - strict Pydantic-backed registry, manifest, normalized-data index, and deterministic generated JSON
   Schemas under `rulesets/`;
@@ -423,17 +423,35 @@ Verification evidence recorded 2026-08-30:
 - 22 automated tests passed with 91% application statement coverage;
 - Ruff lint and formatting passed; immutable research sources are formatter-excluded;
 - generated ruleset JSON Schemas matched the checked-in schemas;
-- official cached PDF matched the manifest size and SHA-256;
+- both the official PDF and the versioned project-release download matched the manifest's
+  6,031,375-byte size and SHA-256;
+- GitHub Release
+  [`ruleset-srd-5.2.1-source-v1`](https://github.com/asinpark123/gandalfDnD/releases/tag/ruleset-srd-5.2.1-source-v1)
+  published the unchanged source artifact and reported the same SHA-256 digest;
 - Alembic reported no ORM/migration drift in development or test;
 - `gandalfdnd_dev` and `gandalfdnd_test` reached `0002_ruleset_releases (head)`;
 - development `/health` returned HTTP 200;
 - both Gandalf databases contained no legacy campaign rows before migration;
 - Clawvis and unrelated PostgreSQL databases/services were not accessed or changed.
 
-Remaining verification gate before `Done`:
+M1.1 milestone review:
 
-- publish the unchanged PDF at the manifest's versioned GitHub Release URL, fetch it through
-  `--source project_release`, and confirm it matches the same size and SHA-256.
+- **Review date:** 2026-08-30
+- **Implementation commit / migration:** `bada61c`; `0002_ruleset_releases`
+- **Acceptance result:** all gates passed; proceed to M1.2.
+- **What worked well:** a single manifest drives database identity, retrieval integrity, schema
+  validation, API boundaries, and regression tests; transactional migration tests caught and fixed
+  trigger/nullability edge cases before development migration.
+- **Issues encountered:** the first release command used an abbreviated commit as
+  `target_commitish`, which GitHub rejected before creating any release; retrying against the
+  already-pushed `main` branch succeeded without partial state.
+- **Workaround or debt:** normalized data remains intentionally `foundation_only`; this is planned
+  M1.2 work rather than a silent partial rules implementation. The existing Starlette/httpx test
+  deprecation warning is non-blocking and should be resolved during dependency maintenance.
+- **Architecture/scope result:** immutable release provenance is accepted; explicit cross-version
+  conversion remains deferred until a real migration requirement exists.
+- **Go / rework / stop decision:** Go. Begin source-cited Human/Soldier/Fighter character records
+  and guided creation; rework M1.1 only if new integrity or migration evidence fails.
 
 #### M1.2 Guided character creation
 
@@ -748,17 +766,14 @@ Destination milestone:
 
 ## 17. Immediate next actions
 
-1. Publish the verified SRD 5.2.1 PDF at the manifest's versioned GitHub Release URL and validate
-   the project mirror with the same fetch/checksum path.
-2. Close the M1.1 milestone review with release URL/checksum evidence and the implementation commit.
-3. Define the source-cited normalized rule records required for the fixed Human/Soldier/Fighter
+1. Define the source-cited normalized rule records required for the fixed Human/Soldier/Fighter
    creation path without adding unrelated SRD content.
-4. Turn GF-001–GF-004, GF-006–GF-007, and GF-013–GF-014 into the M1.2–M1.4 executable sequence.
-5. Design and migrate only the character choices/grants/provenance needed by that slice.
-6. Implement guided character creation and transactional finalization.
-7. Implement pure derived-stat calculations, then authoritative check/save resolution and complete
+2. Turn GF-001–GF-004, GF-006–GF-007, and GF-013–GF-014 into the M1.2–M1.4 executable sequence.
+3. Design and migrate only the character choices/grants/provenance needed by that slice.
+4. Implement guided character creation and transactional finalization.
+5. Implement pure derived-stat calculations, then authoritative check/save resolution and complete
    rule-resolution audit records.
-8. Review M1 evidence and documentation freshness before M2; move broader options to M1.5 rather
+6. Review M1 evidence and documentation freshness before M2; move broader options to M1.5 rather
     than expanding the exit gate during implementation.
 
 ## 18. Documentation change log
@@ -772,3 +787,4 @@ Destination milestone:
 | 2026-08-30 | DOC-005 | Approved immutable, downloadable, multi-version SRD source artifacts with separate normalized rules data | Product owner approved preserving SRD 5.2.1 for reference/download and supporting future player-selected rulesets | Implement M1.1 registry, attribution, checksum verification, local cache, and release asset |
 | 2026-08-30 | DOC-006 | Preserved and indexed RES-001, recorded its adoption review, created the character/rules specification and rulings register, and revised M1 scope/risks/decisions/traceability | Project owner approved the reviewed recommendations and required research to remain durable long-term development memory | Implement M1.1 from the fixed vertical slice; keep research, rulings, specifications, and evidence synchronized |
 | 2026-08-30 | DOC-007 | Recorded M1.1 registry, artifact verification, database pinning, migration safety, tests, and `Verification` status | 22 tests, 91% coverage, exact official artifact checksum, schema validation, HTTP 200 health, and zero migration drift | Publish and verify the GitHub Release mirror, then close M1.1 and begin source-cited character definitions |
+| 2026-08-30 | DOC-008 | Closed M1.1 and advanced current delivery to M1.2 | Commit `bada61c`, migration `0002_ruleset_releases`, the official artifact, and the published project release all passed the recorded integrity, migration, API, schema, lint, runtime, and regression gates | Implement the source-cited Human/Soldier/Fighter guided-creation slice |

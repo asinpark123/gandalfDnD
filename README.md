@@ -8,6 +8,20 @@ result is committed to PostgreSQL with an append-only event trail.
 The roadmap, milestone gates, validation history, architectural decisions, and issue register are
 maintained in the [living development plan](docs/PROJECT_PLAN.md).
 
+## Project documentation
+
+- [Living development plan](docs/PROJECT_PLAN.md) — current status, milestones, validation evidence,
+  risks, decisions, bugs, and next actions
+- [Research index](docs/research/README.md) — preserved research sources, provenance, integrity, and
+  adoption reviews
+- [Character and deterministic rules specification](docs/rules/CHARACTER_AND_RULES_SPEC.md) —
+  canonical character state, rules boundaries, M1 scope, golden fixtures, and traceability
+- [Rules and product-rulings register](docs/rules/RULINGS.md) — SRD interpretations, product
+  policies, adjudications, house rules, and unresolved decisions
+
+Documentation distinguishes planned behavior from verified implementation. Phase 0 behavior below
+remains the current executable product while M1 is still being developed.
+
 ## Phase 0 scope
 
 - FastAPI API with health, campaigns, one character, locations, turns, and player-visible events

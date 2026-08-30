@@ -79,6 +79,15 @@ Source-of-truth hierarchy:
 The hierarchy does not permit silent drift: lower-level evidence that contradicts a higher-level
 document creates a documentation defect that must be corrected and logged.
 
+Current documentation index:
+
+| Area | Authoritative project document |
+| --- | --- |
+| Development status, milestones, evidence, risks, and decisions | This living plan |
+| Research provenance and historical research inputs | [`research/README.md`](research/README.md) |
+| Character state and deterministic rules engineering contract | [`rules/CHARACTER_AND_RULES_SPEC.md`](rules/CHARACTER_AND_RULES_SPEC.md) |
+| Rules interpretations, product policies, adjudications, and house rules | [`rules/RULINGS.md`](rules/RULINGS.md) |
+
 ## 2. Product objective
 
 GandalfDnD will provide a persistent solo D&D experience with two eventually distinct AI roles:
@@ -155,6 +164,20 @@ is insufficient.
 Campaign events, dice outcomes, rule resolutions, prompt/model versions, and retrieval decisions
 must be sufficient to explain why a result occurred. Corrective events supersede mistakes; history
 is not silently rewritten.
+
+### 5.7 Source provenance and derived state
+
+Character choices, grants, equipment state, resource expenditure, and effect instances are
+canonical source facts with ruleset and acquisition provenance. Modifiers, maximums, proficiency
+bonus, eligible Armor Class calculations, and similar values are derived projections. A cached
+projection may be rebuilt but may never become independently editable mechanical truth.
+
+### 5.8 Explicit rules, rulings, and house rules
+
+Normative SRD definitions, Gandalf implementation interpretations, product policies, campaign
+adjudications, and house rules are separate classifications. Natural-language narration never
+creates a mechanical rule. Every mechanical Gandalf addition is labelled, versioned, tested, and
+presented separately from the immutable SRD baseline.
 
 ## 6. Current infrastructure
 
@@ -314,6 +337,21 @@ and deterministic mechanics are therefore promoted ahead of broader live-model t
 Player outcome: a beginner can create a rules-valid level-one character, understand their choices,
 and receive mechanically reproducible checks derived from the saved character sheet.
 
+Planning basis:
+
+- the project owner accepted the findings in [RES-001](research/README.md) on 2026-08-30;
+- the adopted, modified, and deferred recommendations are recorded in the
+  [research review](research/2026-08-30-character-system-adoption.md);
+- the engineering contract is [`rules/CHARACTER_AND_RULES_SPEC.md`](rules/CHARACTER_AND_RULES_SPEC.md);
+- implementation interpretations and unresolved product choices must be recorded in
+  [`rules/RULINGS.md`](rules/RULINGS.md);
+- research adoption is planning evidence only and does not change M1 implementation status.
+
+Initial supported slice: one level-one Human with the Soldier background and Fighter class using
+standard-array ability generation. All mandatory choices for that path must be genuinely rules-valid;
+unsupported options must be rejected rather than partially implemented. This exact slice is a
+delivery constraint, not a claim that other SRD options are invalid.
+
 Planned slices:
 
 #### M1.1 Versioned rules data
@@ -367,10 +405,12 @@ M1.1 acceptance gates:
 #### M1.2 Guided character creation
 
 - draft/finalized character-creation lifecycle;
-- rules-valid identity, abilities, class, background, level, and starting equipment choices;
+- rules-valid Human/Soldier/Fighter identity, abilities, level, required languages, skills, feats,
+  Fighting Style, weapon mastery, and one supported starting-equipment route;
+- standard array as the only M1 ability-generation method;
 - guided descriptions suitable for a first-time player;
 - calculated starting HP and proficiencies;
-- creation events record every consequential choice;
+- creation events record every consequential choice with rule-definition and acquisition provenance;
 - finalized characters are immutable except through explicit advancement/admin workflows.
 
 #### M1.3 Complete Phase 1 character state
@@ -379,28 +419,49 @@ M1.1 acceptance gates:
 - proficiency bonus, skills, and saving throws;
 - armor class, initiative, speed, hit dice, and level;
 - equipped versus carried inventory;
-- features, conditions, and expendable resources;
-- spellcasting fields only for the initially supported character options.
+- supported Fighter/Human/background features and expendable resources;
+- eligible alternative base calculations remain distinct rather than being added together;
+- derived values remain reproducible projections of versioned source choices and grants;
+- no spellcasting fields are required by the initial supported slice.
 
 #### M1.4 Deterministic resolution service
 
 - calculate modifiers from canonical state rather than model-provided numbers;
 - resolve ability checks and saving throws first;
-- record rule version, formula inputs, dice, and total in a rule-resolution record;
+- record rule/definition versions, formula and provenance inputs, exact dice faces, RNG/resolver
+  versions, total, and typed outcome in a rule-resolution record;
 - reject actions blocked by conditions, missing proficiency, or unavailable resources where rules
   require it;
 - return a typed outcome for later narration.
 
-Acceptance gates:
+#### M1.5 Deferred character-content expansion
+
+- **Status:** Deferred until M1.4 evidence is accepted
+
+Add other species, backgrounds, ability-generation methods, feats, classes, equipment routes, and
+level-one spellcasting in complete vertical slices. Later advancement, multiclassing, spell and
+combat interactions must use equivalence-class and boundary fixtures rather than an exhaustive
+species × background × class × feat × spell matrix. This expansion does not block M2's feasibility
+proof with the initial supported character.
+
+M1.1–M1.4 acceptance gates (M1.5 is not required):
 
 - one complete supported level-one character can be created through the API without manual DB edits;
 - all derived values match golden test fixtures;
-- invalid option combinations and illegal point allocations are rejected;
+- invalid option combinations and illegal standard-array assignments are rejected;
+- every consequential choice and derived component retains source provenance;
 - a check's modifier cannot be supplied or overridden by the model;
 - identical state plus fixed dice produces an identical mechanical result;
 - creation and resolution survive restart and can be reconstructed from events;
+- prose alone cannot apply a mechanical condition, bonus, damage, healing, resource, proficiency,
+  or item change;
+- a command referencing another rules release is rejected outside an explicit migration workflow;
 - a beginner-facing explanation exists for each creation choice in the supported slice;
 - every rule-derived value identifies the immutable ruleset and normalized rule-data version used.
+
+Golden fixtures and requirement-to-source/implementation/test traceability are maintained in
+[`rules/CHARACTER_AND_RULES_SPEC.md`](rules/CHARACTER_AND_RULES_SPEC.md). Update that matrix in the
+same commit as the corresponding code, migration, or verification evidence.
 
 ### M2 — Two-stage AI turn and live feasibility
 
@@ -517,6 +578,10 @@ deployable if Clawvis is offline.
 | WARN-001 | Dependency | Monitoring | Current TestClient emits an `httpx` deprecation warning | No functional failure today | Reassess FastAPI/Starlette test client during dependency maintenance |
 | OPS-001 | Source control | Resolved | Initial push was blocked because HTTPS lacked credentials and Git did not automatically select the nonstandard SSH key filename | GitHub was temporarily behind local `main` | Registered the existing Ed25519 key, verified GitHub's host fingerprint, configured this repository's SSH command, and synchronized `main`; 2026-08-30 |
 | OPS-002 | Infrastructure | Deferred | pgvector is unavailable on `postgresvm` | No semantic memory yet | Evaluate/install only at M4 |
+| DOC-001 | Documentation | Open | RES-001's verbatim export contains temporary Deep Research citation tokens | Tokens are not durable implementation citations | Preserve the source unchanged; use official URLs and SRD pages in specifications and rule definitions; M1.1 onward |
+| GAP-003 | Rules | Open | No normalized SRD ruleset or source-provenance model exists yet | Character and rule calculations cannot be authoritative | Implement M1.1 registry and M1.2–M1.3 provenance schema |
+| GAP-004 | Product | Open | Solo balance has a research framework but no measured product results | Encounter/class support cannot yet claim solo balance | Establish strict-SRD baselines in M5; build balance harness after supported combat |
+| DEBT-003 | Architecture | Open | The research proposes greenfield service/table boundaries that have not been reconciled with Phase 0 models | Premature adoption could create redundant schema or services | Reconcile per vertical slice; do not bulk-create the proposed model; M1 onward |
 
 New entries must include reproduction steps or evidence when applicable. Do not close an issue only
 because a workaround exists; record both the workaround and the permanent resolution.
@@ -536,6 +601,13 @@ because a workaround exists; record both the workaround and the permanent resolu
 | RISK-009 | SSH tunnel interrupts local development | Medium | Low | Clear health errors and tunnel runbook; later private app VM |
 | RISK-010 | Overbuilding infrastructure delays gameplay proof | Medium | Medium | Vertical slices and milestone gates; defer optional systems |
 | RISK-011 | Binary rules documents make Git history unnecessarily large | Medium | Low | Store official PDFs as versioned GitHub Release assets; keep only manifests and derived data in Git |
+| RISK-012 | Supporting all character options before one complete slice delays executable evidence | High | High | Fixed Human/Soldier/Fighter M1 slice; defer breadth to M1.5 |
+| RISK-013 | A generic rules DSL is designed before concrete semantics are proven | Medium | High | Start with typed data and pure functions; generalize only repeated rules; permit focused versioned resolvers |
+| RISK-014 | Natural-language SRD exceptions are translated silently or incorrectly | High | High | Durable source/page citations, explicit rulings, specialized fixtures, and “specific beats general” review |
+| RISK-015 | Narration creates hidden mechanical effects | High | High | Mechanical write boundary, typed commands/events, world-fact namespace, and rejection fixture |
+| RISK-016 | Party-oriented encounter guidance is treated as a solo safety guarantee | High | High | Strict single-PC benchmarks, action-economy metrics, seeded simulations, and labelled house-rule comparisons |
+| RISK-017 | Gandalf additions are mistaken for official SRD rules | Medium | High | Separate versioned house-rule packages, UI labels, source/rationale, tests, and migration identity |
+| RISK-018 | Research recommendations drift from code or are mistaken for implemented behavior | Medium | Medium | Research index/reviews, traceability matrix, implementation-status labels, and milestone evidence gates |
 
 ## 13. Architectural decision log
 
@@ -550,6 +622,11 @@ because a workaround exists; record both the workaround and the permanent resolu
 | ADR-007 | 2026-08-29 | Deterministic mechanics, generative narrative | Character choices and rules must have trustworthy effects | If product direction changes |
 | ADR-008 | 2026-08-29 | Build character creation before broad live-model play | Phase 0 exposed that minimal HP/inventory cannot validate D&D outcomes | After M1 acceptance |
 | ADR-009 | 2026-08-30 | Preserve immutable versioned SRD artifacts separately from normalized rules data | Players need downloadable references while the engine needs reproducible structured rules and existing campaigns must never change silently | If licensing, source distribution, or artifact-hosting requirements change |
+| ADR-010 | 2026-08-30 | Preserve provenance for character grants/choices and derive calculated values from canonical source facts | Advancement, explanation, replay, replacement, and ruleset migration require knowing why each value exists | Only if a proven storage constraint requires a rebuildable cache/projection |
+| ADR-011 | 2026-08-30 | Use one complete Human/Soldier/Fighter/standard-array vertical slice for M1 before broad character content | RES-001 is comprehensive but implementing all level-one options first would delay evidence and hide defects | After M1.4 acceptance |
+| ADR-012 | 2026-08-30 | Only validated rules commands/events may change mechanical state; narration and world facts cannot silently establish mechanics | Persistent narrative freedom must not compromise deterministic, auditable D&D outcomes | Never for authoritative mechanics |
+| ADR-013 | 2026-08-30 | Measure strict SRD solo behavior before adding separately versioned solo house rules | Party-dependent features and encounter action economy cannot be corrected safely through invisible exceptions | After supported combat produces balance evidence |
+| ADR-014 | 2026-08-30 | Introduce structured rule operators incrementally from proven semantics, with versioned specialized resolvers for exceptions | Avoid both feature-specific subclass sprawl and a premature universal rules language | When repeated implemented rules justify a new operator |
 
 ## 14. Milestone review template
 
@@ -629,19 +706,31 @@ Destination milestone:
 - Every workaround receives either a permanent-fix milestone or an explicit acceptance decision.
 - No implementation or fix is complete while this plan or affected player documentation is stale.
 - Every player-facing release requires a supported-features/limitations review and safe release notes.
+- Every new research artifact must be preserved/indexed when lawful, reviewed separately, and linked
+  to the decisions or milestones it influences.
+- Every rules implementation interpretation or product policy that changes legal choices or outcomes
+  must be recorded in `docs/rules/RULINGS.md` with durable source citations and required fixtures.
+- Research recommendations remain non-implemented until the traceability matrix and milestone
+  evidence identify the corresponding code, migration, and passing verification.
 
 ## 17. Immediate next actions
 
-1. Create the M1.1 ruleset registry, directory structure, attribution, and manifest schema.
-2. Download the official SRD 5.2.1 PDF, calculate and record its checksum, and add a verified fetch
+1. Reconcile the minimum RES-001 identity/provenance model with the existing Phase 0 campaign,
+   character, event, and dice schema; document the M1.1 migration boundary before writing it.
+2. Create the M1.1 ruleset registry, directory structure, attribution, and manifest schema.
+3. Download the official SRD 5.2.1 PDF, calculate and record its checksum, and add a verified fetch
    workflow plus ignored local cache.
-3. Publish the unchanged source PDF as a versioned project download asset.
-4. Specify the exact supported level-one character-creation slice for M1.2–M1.4.
-5. Design versioned character/rules schemas before adding model prompts.
-6. Implement golden fixtures and deterministic derived-stat calculations.
-7. Implement guided character creation and finalize-character validation.
-8. Add authoritative check/save resolution and rule-resolution audit records.
-9. Review M1 evidence using the milestone review template before beginning the two-stage live AI flow.
+4. Publish the unchanged source PDF as a versioned project download asset.
+5. Implement stable concept/release-specific definition identities and reject dynamic `latest` or
+   cross-release campaign commands.
+6. Turn the planned M1 fixtures and traceability rows into failing executable tests for the fixed
+   Human/Soldier/Fighter slice.
+7. Design and migrate only the character choices/grants/provenance needed by that slice.
+8. Implement guided character creation and transactional finalization.
+9. Implement pure derived-stat calculations, then authoritative check/save resolution and complete
+   rule-resolution audit records.
+10. Review M1 evidence and documentation freshness before M2; move broader options to M1.5 rather
+    than expanding the exit gate during implementation.
 
 ## 18. Documentation change log
 
@@ -652,3 +741,4 @@ Destination milestone:
 | 2026-08-29 | DOC-003 | Recorded the blocked GitHub synchronization attempt | Remote was a safe fast-forward, but HTTPS credentials were unavailable and both existing Mac SSH keys were rejected by GitHub | Register/authenticate one GitHub credential, push, then close OPS-001 with synchronization evidence |
 | 2026-08-30 | DOC-004 | Closed OPS-001 after restoring authenticated GitHub synchronization | The registered Ed25519 key authenticated as `asinpark123`; the repository-specific SSH command selected it and `main` pushed successfully | Continue normal fetch-before-push workflow |
 | 2026-08-30 | DOC-005 | Approved immutable, downloadable, multi-version SRD source artifacts with separate normalized rules data | Product owner approved preserving SRD 5.2.1 for reference/download and supporting future player-selected rulesets | Implement M1.1 registry, attribution, checksum verification, local cache, and release asset |
+| 2026-08-30 | DOC-006 | Preserved and indexed RES-001, recorded its adoption review, created the character/rules specification and rulings register, and revised M1 scope/risks/decisions/traceability | Project owner approved the reviewed recommendations and required research to remain durable long-term development memory | Implement M1.1 from the fixed vertical slice; keep research, rulings, specifications, and evidence synchronized |

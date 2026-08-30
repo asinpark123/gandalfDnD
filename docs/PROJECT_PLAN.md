@@ -318,10 +318,51 @@ Planned slices:
 
 #### M1.1 Versioned rules data
 
-- define the supported rules corpus and attribution boundary;
-- introduce versioned rule records or code-native definitions for supported character options;
-- prevent a campaign's rule version from changing silently;
-- add validation that rejects unsupported or cross-version options.
+**Status:** Ready
+
+Approved source and distribution strategy:
+
+- use the unchanged official SRD 5.2.1 PDF from `https://www.dndbeyond.com/srd` as the first
+  authoritative source artifact;
+- treat the complete licensed SRD accurately as an SRD, not as every rule or option from commercial
+  D&D publications;
+- preserve required CC-BY-4.0 attribution and clearly identify every Gandalf adaptation;
+- store the original PDF as a versioned GitHub Release/download asset rather than repeatedly adding
+  binary revisions to normal Git history;
+- provide a fetch command that downloads the official artifact into an ignored local cache and
+  refuses files whose SHA-256 checksum does not match the version manifest;
+- store manifests, attribution, schemas, normalized rules, extraction code, and tests in Git;
+- keep extracted machine-readable rules separate from the unchanged source document;
+- add each future SRD/rules version alongside existing versions instead of overwriting one;
+- pin every campaign to one immutable ruleset identifier;
+- allow ruleset migration only through an explicit player/admin operation with compatibility
+  validation, recorded conversion events, and rollback guidance;
+- reject unsupported or cross-version character options at domain boundaries.
+
+Planned repository layout:
+
+```text
+rulesets/
+├── registry.json
+└── srd-5.2.1/
+    ├── manifest.json
+    ├── ATTRIBUTION.md
+    ├── README.md
+    ├── schema/
+    └── data/
+```
+
+M1.1 acceptance gates:
+
+- the official PDF is retrievable from its official source and from a versioned project download;
+- both copies match the manifest checksum;
+- the manifest records source URL, publication/version data, license, attribution, checksum,
+  extraction schema version, and Gandalf support status;
+- the repository contains no unlicensed non-SRD D&D content;
+- normalized data identifies its source version and can be regenerated deterministically;
+- campaign creation requires a registered stable ruleset and never resolves `latest` dynamically;
+- a newer mock ruleset can coexist without altering an existing campaign;
+- migration between rulesets is impossible without an explicit compatibility workflow.
 
 #### M1.2 Guided character creation
 
@@ -358,7 +399,8 @@ Acceptance gates:
 - a check's modifier cannot be supplied or overridden by the model;
 - identical state plus fixed dice produces an identical mechanical result;
 - creation and resolution survive restart and can be reconstructed from events;
-- a beginner-facing explanation exists for each creation choice in the supported slice.
+- a beginner-facing explanation exists for each creation choice in the supported slice;
+- every rule-derived value identifies the immutable ruleset and normalized rule-data version used.
 
 ### M2 — Two-stage AI turn and live feasibility
 
@@ -489,10 +531,11 @@ because a workaround exists; record both the workaround and the permanent resolu
 | RISK-004 | RAG replaces exact state | Medium | High | Relational state always injected separately; retrieval contracts |
 | RISK-005 | Provider outage partially commits a turn | Medium | High | Turn state machine, idempotency, atomic finalization |
 | RISK-006 | Concurrent turns create ordering conflicts | Medium | Medium | Campaign locking, unique sequences, idempotency keys |
-| RISK-007 | Rules corpus or attribution is unclear | Medium | High | Explicit corpus/version review before ingestion |
+| RISK-007 | Rules corpus, attribution, or adaptations drift from the licensed source | Medium | High | Immutable source artifact, CC-BY attribution, checksummed manifests, source references, and regeneration tests |
 | RISK-008 | Context/token cost grows with campaign age | High | Medium | Filtered state, summaries, retrieval budgets, usage logging |
 | RISK-009 | SSH tunnel interrupts local development | Medium | Low | Clear health errors and tunnel runbook; later private app VM |
 | RISK-010 | Overbuilding infrastructure delays gameplay proof | Medium | Medium | Vertical slices and milestone gates; defer optional systems |
+| RISK-011 | Binary rules documents make Git history unnecessarily large | Medium | Low | Store official PDFs as versioned GitHub Release assets; keep only manifests and derived data in Git |
 
 ## 13. Architectural decision log
 
@@ -506,6 +549,7 @@ because a workaround exists; record both the workaround and the permanent resolu
 | ADR-006 | 2026-08-29 | Defer pgvector until exact world state works | Semantic memory cannot repair weak canonical state | M4 |
 | ADR-007 | 2026-08-29 | Deterministic mechanics, generative narrative | Character choices and rules must have trustworthy effects | If product direction changes |
 | ADR-008 | 2026-08-29 | Build character creation before broad live-model play | Phase 0 exposed that minimal HP/inventory cannot validate D&D outcomes | After M1 acceptance |
+| ADR-009 | 2026-08-30 | Preserve immutable versioned SRD artifacts separately from normalized rules data | Players need downloadable references while the engine needs reproducible structured rules and existing campaigns must never change silently | If licensing, source distribution, or artifact-hosting requirements change |
 
 ## 14. Milestone review template
 
@@ -588,12 +632,16 @@ Destination milestone:
 
 ## 17. Immediate next actions
 
-1. Specify the exact supported level-one character-creation slice for M1.
-2. Design versioned character/rules schemas before adding model prompts.
-3. Implement golden fixtures and deterministic derived-stat calculations.
-4. Implement guided character creation and finalize-character validation.
-5. Add authoritative check/save resolution and rule-resolution audit records.
-6. Review M1 evidence using the milestone review template before beginning the two-stage live AI flow.
+1. Create the M1.1 ruleset registry, directory structure, attribution, and manifest schema.
+2. Download the official SRD 5.2.1 PDF, calculate and record its checksum, and add a verified fetch
+   workflow plus ignored local cache.
+3. Publish the unchanged source PDF as a versioned project download asset.
+4. Specify the exact supported level-one character-creation slice for M1.2–M1.4.
+5. Design versioned character/rules schemas before adding model prompts.
+6. Implement golden fixtures and deterministic derived-stat calculations.
+7. Implement guided character creation and finalize-character validation.
+8. Add authoritative check/save resolution and rule-resolution audit records.
+9. Review M1 evidence using the milestone review template before beginning the two-stage live AI flow.
 
 ## 18. Documentation change log
 
@@ -603,3 +651,4 @@ Destination milestone:
 | 2026-08-29 | DOC-002 | Adopted the documentation maintenance, long-term memory, and audience contracts | Project owner designated this plan as redundant long-term memory, dev log, project reference, and player documentation index | Add dedicated engineering, operations, and player documents when their milestones begin |
 | 2026-08-29 | DOC-003 | Recorded the blocked GitHub synchronization attempt | Remote was a safe fast-forward, but HTTPS credentials were unavailable and both existing Mac SSH keys were rejected by GitHub | Register/authenticate one GitHub credential, push, then close OPS-001 with synchronization evidence |
 | 2026-08-30 | DOC-004 | Closed OPS-001 after restoring authenticated GitHub synchronization | The registered Ed25519 key authenticated as `asinpark123`; the repository-specific SSH command selected it and `main` pushed successfully | Continue normal fetch-before-push workflow |
+| 2026-08-30 | DOC-005 | Approved immutable, downloadable, multi-version SRD source artifacts with separate normalized rules data | Product owner approved preserving SRD 5.2.1 for reference/download and supporting future player-selected rulesets | Implement M1.1 registry, attribution, checksum verification, local cache, and release asset |

@@ -2,7 +2,9 @@ import uuid
 from datetime import datetime
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, PositiveInt, StringConstraints
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints
+
+from app.character_creation import CharacterSheet
 
 ShortText = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=160)]
 
@@ -21,14 +23,15 @@ class CampaignRead(BaseModel):
     id: uuid.UUID
     name: str
     ruleset_release_id: str
+    ruleset_data_catalog_id: str
     status: str
     created_at: datetime
 
 
 class CharacterCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     name: ShortText
-    max_hp: PositiveInt = Field(le=999)
-    inventory: dict[str, PositiveInt] = Field(default_factory=dict)
 
 
 class CharacterRead(BaseModel):
@@ -36,10 +39,31 @@ class CharacterRead(BaseModel):
 
     id: uuid.UUID
     ruleset_release_id: str
+    ruleset_data_catalog_id: str
     name: str
-    hp: int
-    max_hp: int
+    creation_status: str
+    revision: int
+    hp: int | None
+    max_hp: int | None
     inventory: dict[str, int]
+    character_sheet: CharacterSheet | None
+    finalized_at: datetime | None
+
+
+class CharacterGrantRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    ruleset_release_id: str
+    ruleset_data_catalog_id: str
+    acquisition_event_id: uuid.UUID
+    revision: int
+    grant_type: str
+    choice_slot: str
+    definition_key: str
+    source_definition_key: str
+    value: dict
+    active: bool
 
 
 class LocationRead(BaseModel):
@@ -97,6 +121,7 @@ class DiceRollRead(BaseModel):
 
     id: uuid.UUID
     ruleset_release_id: str
+    ruleset_data_catalog_id: str
     notation: str
     rolls: list[int]
     modifier: int
@@ -126,6 +151,7 @@ class EventRead(BaseModel):
 
     id: uuid.UUID
     ruleset_release_id: str
+    ruleset_data_catalog_id: str
     sequence: int
     event_type: str
     visibility: str

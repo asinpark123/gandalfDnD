@@ -3,6 +3,7 @@ import argparse
 import json
 from pathlib import Path
 
+from app.character_creation import CharacterCreationCatalog
 from app.rulesets import NormalizedDataIndex, RegistryDocument, RulesetManifest
 
 REPOSITORY_ROOT = Path(__file__).parents[1]
@@ -10,6 +11,8 @@ SCHEMAS = {
     REPOSITORY_ROOT / "rulesets/schema/registry.schema.json": RegistryDocument,
     REPOSITORY_ROOT / "rulesets/srd-5.2.1/schema/manifest.schema.json": RulesetManifest,
     REPOSITORY_ROOT / "rulesets/srd-5.2.1/schema/data-index.schema.json": NormalizedDataIndex,
+    REPOSITORY_ROOT
+    / "rulesets/srd-5.2.1/schema/character-creation.schema.json": CharacterCreationCatalog,
 }
 
 

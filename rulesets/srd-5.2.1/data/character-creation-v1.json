@@ -1,0 +1,236 @@
+{
+  "$schema": "../schema/character-creation.schema.json",
+  "schema_version": "1.0.0",
+  "id": "srd-5.2.1-character-creation-v1",
+  "ruleset_release_id": "srd-5.2.1",
+  "resolver_version": "character-creation-1.0.0",
+  "sources": [
+    {
+      "id": "srd-core-d20",
+      "title": "System Reference Document 5.2.1",
+      "section": "Playing the Game: Proficiency and Skills",
+      "printed_pages": [8, 9],
+      "url": "https://www.dndbeyond.com/srd"
+    },
+    {
+      "id": "srd-character-creation",
+      "title": "System Reference Document 5.2.1",
+      "section": "Character Creation",
+      "printed_pages": [19, 20, 21, 22, 23],
+      "url": "https://www.dndbeyond.com/srd"
+    },
+    {
+      "id": "srd-fighter",
+      "title": "System Reference Document 5.2.1",
+      "section": "Classes: Fighter",
+      "printed_pages": [47, 48],
+      "url": "https://www.dndbeyond.com/srd"
+    },
+    {
+      "id": "srd-soldier",
+      "title": "System Reference Document 5.2.1",
+      "section": "Character Origins: Soldier",
+      "printed_pages": [83],
+      "url": "https://www.dndbeyond.com/srd"
+    },
+    {
+      "id": "srd-human",
+      "title": "System Reference Document 5.2.1",
+      "section": "Character Origins: Human",
+      "printed_pages": [86],
+      "url": "https://www.dndbeyond.com/srd"
+    },
+    {
+      "id": "srd-feats",
+      "title": "System Reference Document 5.2.1",
+      "section": "Feats: Origin and Fighting Style Feats",
+      "printed_pages": [87, 88],
+      "url": "https://www.dndbeyond.com/srd"
+    },
+    {
+      "id": "srd-equipment",
+      "title": "System Reference Document 5.2.1",
+      "section": "Equipment: Weapons, Armor, Tools, and Adventuring Gear",
+      "printed_pages": [91, 92, 94, 95, 97],
+      "url": "https://www.dndbeyond.com/srd"
+    }
+  ],
+  "abilities": [
+    {"id": "strength", "definition_key": "srd-5.2.1:ability.strength", "name": "Strength", "beginner_description": "Physical power and athletic force.", "source_ids": ["srd-character-creation"]},
+    {"id": "dexterity", "definition_key": "srd-5.2.1:ability.dexterity", "name": "Dexterity", "beginner_description": "Agility, reflexes, and precise movement.", "source_ids": ["srd-character-creation"]},
+    {"id": "constitution", "definition_key": "srd-5.2.1:ability.constitution", "name": "Constitution", "beginner_description": "Health, endurance, and resilience.", "source_ids": ["srd-character-creation"]},
+    {"id": "intelligence", "definition_key": "srd-5.2.1:ability.intelligence", "name": "Intelligence", "beginner_description": "Reasoning, recall, and analysis.", "source_ids": ["srd-character-creation"]},
+    {"id": "wisdom", "definition_key": "srd-5.2.1:ability.wisdom", "name": "Wisdom", "beginner_description": "Awareness, intuition, and judgment.", "source_ids": ["srd-character-creation"]},
+    {"id": "charisma", "definition_key": "srd-5.2.1:ability.charisma", "name": "Charisma", "beginner_description": "Confidence, presence, and influence.", "source_ids": ["srd-character-creation"]}
+  ],
+  "alignments": [
+    {"id": "lg", "definition_key": "srd-5.2.1:alignment.lawful_good", "name": "Lawful Good", "beginner_description": "Do what is right while respecting order and duty.", "source_ids": ["srd-character-creation"]},
+    {"id": "ng", "definition_key": "srd-5.2.1:alignment.neutral_good", "name": "Neutral Good", "beginner_description": "Help others without being strongly bound to order or rebellion.", "source_ids": ["srd-character-creation"]},
+    {"id": "cg", "definition_key": "srd-5.2.1:alignment.chaotic_good", "name": "Chaotic Good", "beginner_description": "Follow conscience and personal freedom while helping others.", "source_ids": ["srd-character-creation"]},
+    {"id": "ln", "definition_key": "srd-5.2.1:alignment.lawful_neutral", "name": "Lawful Neutral", "beginner_description": "Follow law, tradition, or a personal code.", "source_ids": ["srd-character-creation"]},
+    {"id": "n", "definition_key": "srd-5.2.1:alignment.neutral", "name": "Neutral", "beginner_description": "Choose what seems best without a strong moral or orderly extreme.", "source_ids": ["srd-character-creation"]},
+    {"id": "cn", "definition_key": "srd-5.2.1:alignment.chaotic_neutral", "name": "Chaotic Neutral", "beginner_description": "Value personal freedom and follow changing impulses.", "source_ids": ["srd-character-creation"]},
+    {"id": "le", "definition_key": "srd-5.2.1:alignment.lawful_evil", "name": "Lawful Evil", "beginner_description": "Pursue selfish ends within a code or hierarchy.", "source_ids": ["srd-character-creation"]},
+    {"id": "ne", "definition_key": "srd-5.2.1:alignment.neutral_evil", "name": "Neutral Evil", "beginner_description": "Pursue selfish ends without loyalty to order or freedom.", "source_ids": ["srd-character-creation"]},
+    {"id": "ce", "definition_key": "srd-5.2.1:alignment.chaotic_evil", "name": "Chaotic Evil", "beginner_description": "Act with destructive selfishness and little restraint.", "source_ids": ["srd-character-creation"]}
+  ],
+  "skills": [
+    {"id": "acrobatics", "definition_key": "srd-5.2.1:skill.acrobatics", "name": "Acrobatics", "beginner_description": "Balance and acrobatic movement.", "source_ids": ["srd-core-d20"], "typical_ability": "dexterity"},
+    {"id": "animal_handling", "definition_key": "srd-5.2.1:skill.animal_handling", "name": "Animal Handling", "beginner_description": "Calm, train, or direct animals.", "source_ids": ["srd-core-d20"], "typical_ability": "wisdom"},
+    {"id": "arcana", "definition_key": "srd-5.2.1:skill.arcana", "name": "Arcana", "beginner_description": "Recall lore about magic and the planes.", "source_ids": ["srd-core-d20"], "typical_ability": "intelligence"},
+    {"id": "athletics", "definition_key": "srd-5.2.1:skill.athletics", "name": "Athletics", "beginner_description": "Climb, jump, swim, and exert force.", "source_ids": ["srd-core-d20"], "typical_ability": "strength"},
+    {"id": "deception", "definition_key": "srd-5.2.1:skill.deception", "name": "Deception", "beginner_description": "Mislead others convincingly.", "source_ids": ["srd-core-d20"], "typical_ability": "charisma"},
+    {"id": "history", "definition_key": "srd-5.2.1:skill.history", "name": "History", "beginner_description": "Recall historical people, places, and events.", "source_ids": ["srd-core-d20"], "typical_ability": "intelligence"},
+    {"id": "insight", "definition_key": "srd-5.2.1:skill.insight", "name": "Insight", "beginner_description": "Read moods, motives, and intentions.", "source_ids": ["srd-core-d20"], "typical_ability": "wisdom"},
+    {"id": "intimidation", "definition_key": "srd-5.2.1:skill.intimidation", "name": "Intimidation", "beginner_description": "Influence through threats or force of presence.", "source_ids": ["srd-core-d20"], "typical_ability": "charisma"},
+    {"id": "investigation", "definition_key": "srd-5.2.1:skill.investigation", "name": "Investigation", "beginner_description": "Find information and deduce how things work.", "source_ids": ["srd-core-d20"], "typical_ability": "intelligence"},
+    {"id": "medicine", "definition_key": "srd-5.2.1:skill.medicine", "name": "Medicine", "beginner_description": "Diagnose illness or determine causes of injury and death.", "source_ids": ["srd-core-d20"], "typical_ability": "wisdom"},
+    {"id": "nature", "definition_key": "srd-5.2.1:skill.nature", "name": "Nature", "beginner_description": "Recall lore about terrain, plants, animals, and weather.", "source_ids": ["srd-core-d20"], "typical_ability": "intelligence"},
+    {"id": "perception", "definition_key": "srd-5.2.1:skill.perception", "name": "Perception", "beginner_description": "Notice details using your senses.", "source_ids": ["srd-core-d20"], "typical_ability": "wisdom"},
+    {"id": "performance", "definition_key": "srd-5.2.1:skill.performance", "name": "Performance", "beginner_description": "Act, tell stories, make music, or dance.", "source_ids": ["srd-core-d20"], "typical_ability": "charisma"},
+    {"id": "persuasion", "definition_key": "srd-5.2.1:skill.persuasion", "name": "Persuasion", "beginner_description": "Convince others honestly and graciously.", "source_ids": ["srd-core-d20"], "typical_ability": "charisma"},
+    {"id": "religion", "definition_key": "srd-5.2.1:skill.religion", "name": "Religion", "beginner_description": "Recall lore about gods, rituals, and holy symbols.", "source_ids": ["srd-core-d20"], "typical_ability": "intelligence"},
+    {"id": "sleight_of_hand", "definition_key": "srd-5.2.1:skill.sleight_of_hand", "name": "Sleight of Hand", "beginner_description": "Pick pockets, conceal objects, and perform legerdemain.", "source_ids": ["srd-core-d20"], "typical_ability": "dexterity"},
+    {"id": "stealth", "definition_key": "srd-5.2.1:skill.stealth", "name": "Stealth", "beginner_description": "Move quietly and avoid notice.", "source_ids": ["srd-core-d20"], "typical_ability": "dexterity"},
+    {"id": "survival", "definition_key": "srd-5.2.1:skill.survival", "name": "Survival", "beginner_description": "Track, forage, navigate, and avoid natural hazards.", "source_ids": ["srd-core-d20"], "typical_ability": "wisdom"}
+  ],
+  "languages": [
+    {"id": "common", "definition_key": "srd-5.2.1:language.common", "name": "Common", "beginner_description": "Every player character knows Common automatically.", "source_ids": ["srd-character-creation"]},
+    {"id": "common_sign", "definition_key": "srd-5.2.1:language.common_sign", "name": "Common Sign Language", "beginner_description": "A widespread signed language.", "source_ids": ["srd-character-creation"]},
+    {"id": "draconic", "definition_key": "srd-5.2.1:language.draconic", "name": "Draconic", "beginner_description": "A standard language associated with dragons and dragonborn.", "source_ids": ["srd-character-creation"]},
+    {"id": "dwarvish", "definition_key": "srd-5.2.1:language.dwarvish", "name": "Dwarvish", "beginner_description": "A standard language associated with dwarves.", "source_ids": ["srd-character-creation"]},
+    {"id": "elvish", "definition_key": "srd-5.2.1:language.elvish", "name": "Elvish", "beginner_description": "A standard language associated with elves.", "source_ids": ["srd-character-creation"]},
+    {"id": "giant", "definition_key": "srd-5.2.1:language.giant", "name": "Giant", "beginner_description": "A standard language associated with giants.", "source_ids": ["srd-character-creation"]},
+    {"id": "gnomish", "definition_key": "srd-5.2.1:language.gnomish", "name": "Gnomish", "beginner_description": "A standard language associated with gnomes.", "source_ids": ["srd-character-creation"]},
+    {"id": "goblin", "definition_key": "srd-5.2.1:language.goblin", "name": "Goblin", "beginner_description": "A widespread standard language.", "source_ids": ["srd-character-creation"]},
+    {"id": "halfling", "definition_key": "srd-5.2.1:language.halfling", "name": "Halfling", "beginner_description": "A standard language associated with halflings.", "source_ids": ["srd-character-creation"]},
+    {"id": "orc", "definition_key": "srd-5.2.1:language.orc", "name": "Orc", "beginner_description": "A standard language associated with orcs.", "source_ids": ["srd-character-creation"]}
+  ],
+  "gaming_sets": [
+    {"id": "dice", "definition_key": "srd-5.2.1:tool.gaming_set.dice", "name": "Dice Set", "beginner_description": "A compact set of gaming dice.", "source_ids": ["srd-equipment"]},
+    {"id": "dragonchess", "definition_key": "srd-5.2.1:tool.gaming_set.dragonchess", "name": "Dragonchess Set", "beginner_description": "A strategy gaming set.", "source_ids": ["srd-equipment"]},
+    {"id": "playing_cards", "definition_key": "srd-5.2.1:tool.gaming_set.playing_cards", "name": "Playing Card Set", "beginner_description": "A deck used for many games.", "source_ids": ["srd-equipment"]},
+    {"id": "three_dragon_ante", "definition_key": "srd-5.2.1:tool.gaming_set.three_dragon_ante", "name": "Three-Dragon Ante Set", "beginner_description": "A card-based gaming set.", "source_ids": ["srd-equipment"]}
+  ],
+  "standard_array": {
+    "id": "standard_array",
+    "definition_key": "srd-5.2.1:ability_method.standard_array",
+    "name": "Standard Array",
+    "beginner_description": "Assign 15, 14, 13, 12, 10, and 8 once each among the six abilities.",
+    "source_ids": ["srd-character-creation"],
+    "scores": [15, 14, 13, 12, 10, 8]
+  },
+  "background": {
+    "id": "soldier",
+    "definition_key": "srd-5.2.1:background.soldier",
+    "name": "Soldier",
+    "beginner_description": "A martial background granting physical ability increases, combat-oriented skills, Savage Attacker, and one gaming-set proficiency.",
+    "source_ids": ["srd-soldier"],
+    "ability_score_options": ["strength", "dexterity", "constitution"],
+    "granted_feat_definition_key": "srd-5.2.1:feat.origin.savage_attacker",
+    "skill_proficiencies": ["athletics", "intimidation"],
+    "gaming_set_choice_count": 1,
+    "equipment_package_definition_key": "srd-5.2.1:equipment_package.soldier.a"
+  },
+  "species": {
+    "id": "human",
+    "definition_key": "srd-5.2.1:species.human",
+    "name": "Human",
+    "beginner_description": "A versatile Humanoid with Resourceful, Skillful, and Versatile traits.",
+    "source_ids": ["srd-human"],
+    "creature_type": "humanoid",
+    "sizes": ["small", "medium"],
+    "speed_feet": 30,
+    "skill_choice_count": 1,
+    "origin_feat_choice_count": 1,
+    "origin_feat_options": ["srd-5.2.1:feat.origin.alert", "srd-5.2.1:feat.origin.skilled"],
+    "feature_definition_keys": ["srd-5.2.1:species_feature.human.resourceful", "srd-5.2.1:species_feature.human.skillful", "srd-5.2.1:species_feature.human.versatile"]
+  },
+  "character_class": {
+    "id": "fighter",
+    "definition_key": "srd-5.2.1:class.fighter",
+    "name": "Fighter",
+    "beginner_description": "A level-one martial class trained with all standard armor and weapons.",
+    "source_ids": ["srd-fighter"],
+    "level": 1,
+    "hit_die": 10,
+    "proficiency_bonus": 2,
+    "saving_throw_proficiencies": ["strength", "constitution"],
+    "skill_choice_count": 2,
+    "skill_options": ["acrobatics", "animal_handling", "athletics", "history", "insight", "intimidation", "persuasion", "perception", "survival"],
+    "armor_training": ["light", "medium", "heavy", "shields"],
+    "weapon_proficiencies": ["simple", "martial"],
+    "fighting_style_choice_count": 1,
+    "fighting_style_options": ["srd-5.2.1:feat.fighting_style.archery", "srd-5.2.1:feat.fighting_style.defense", "srd-5.2.1:feat.fighting_style.great_weapon_fighting", "srd-5.2.1:feat.fighting_style.two_weapon_fighting"],
+    "weapon_mastery_choice_count": 3,
+    "weapon_mastery_options": ["srd-5.2.1:weapon.javelin", "srd-5.2.1:weapon.flail", "srd-5.2.1:weapon.greatsword"],
+    "feature_definition_keys": ["srd-5.2.1:class_feature.fighter.fighting_style", "srd-5.2.1:class_feature.fighter.second_wind", "srd-5.2.1:class_feature.fighter.weapon_mastery"],
+    "second_wind_uses": 2,
+    "equipment_package_definition_key": "srd-5.2.1:equipment_package.fighter.a"
+  },
+  "features": [
+    {"id": "human_resourceful", "definition_key": "srd-5.2.1:species_feature.human.resourceful", "name": "Resourceful", "beginner_description": "Gain Heroic Inspiration after finishing a Long Rest.", "source_ids": ["srd-human"]},
+    {"id": "human_skillful", "definition_key": "srd-5.2.1:species_feature.human.skillful", "name": "Skillful", "beginner_description": "Gain proficiency in one chosen skill.", "source_ids": ["srd-human"]},
+    {"id": "human_versatile", "definition_key": "srd-5.2.1:species_feature.human.versatile", "name": "Versatile", "beginner_description": "Gain one chosen Origin feat.", "source_ids": ["srd-human"]},
+    {"id": "fighter_fighting_style", "definition_key": "srd-5.2.1:class_feature.fighter.fighting_style", "name": "Fighting Style", "beginner_description": "Choose one supported Fighting Style feat.", "source_ids": ["srd-fighter"]},
+    {"id": "fighter_second_wind", "definition_key": "srd-5.2.1:class_feature.fighter.second_wind", "name": "Second Wind", "beginner_description": "Two uses at level one; a use can restore 1d10 plus Fighter level Hit Points.", "source_ids": ["srd-fighter"]},
+    {"id": "fighter_weapon_mastery", "definition_key": "srd-5.2.1:class_feature.fighter.weapon_mastery", "name": "Weapon Mastery", "beginner_description": "Use the mastery properties of three selected Simple or Martial weapon kinds.", "source_ids": ["srd-fighter"]}
+  ],
+  "origin_feats": [
+    {"id": "savage_attacker", "definition_key": "srd-5.2.1:feat.origin.savage_attacker", "name": "Savage Attacker", "beginner_description": "Once per turn, roll weapon damage dice twice and use either roll.", "source_ids": ["srd-feats"], "additional_skill_choice_count": 0},
+    {"id": "alert", "definition_key": "srd-5.2.1:feat.origin.alert", "name": "Alert", "beginner_description": "Add Proficiency Bonus to Initiative and potentially swap Initiative with a willing ally.", "source_ids": ["srd-feats"], "additional_skill_choice_count": 0},
+    {"id": "skilled", "definition_key": "srd-5.2.1:feat.origin.skilled", "name": "Skilled", "beginner_description": "Gain three additional supported skill proficiencies in this initial slice.", "source_ids": ["srd-feats"], "additional_skill_choice_count": 3}
+  ],
+  "fighting_styles": [
+    {"id": "archery", "definition_key": "srd-5.2.1:feat.fighting_style.archery", "name": "Archery", "beginner_description": "Improve attack rolls made with ranged weapons.", "source_ids": ["srd-feats"], "effect_summary": "+2 to attack rolls with Ranged weapons"},
+    {"id": "defense", "definition_key": "srd-5.2.1:feat.fighting_style.defense", "name": "Defense", "beginner_description": "Improve Armor Class while wearing armor.", "source_ids": ["srd-feats"], "effect_summary": "+1 Armor Class while wearing Light, Medium, or Heavy armor"},
+    {"id": "great_weapon_fighting", "definition_key": "srd-5.2.1:feat.fighting_style.great_weapon_fighting", "name": "Great Weapon Fighting", "beginner_description": "Raise very low damage-die results with eligible two-handed melee weapons.", "source_ids": ["srd-feats"], "effect_summary": "Treat eligible weapon damage-die results of 1 or 2 as 3"},
+    {"id": "two_weapon_fighting", "definition_key": "srd-5.2.1:feat.fighting_style.two_weapon_fighting", "name": "Two-Weapon Fighting", "beginner_description": "Add the ability modifier to eligible extra Light-weapon attack damage.", "source_ids": ["srd-feats"], "effect_summary": "Add the ability modifier to eligible Light-weapon extra-attack damage"}
+  ],
+  "weapons": [
+    {"id": "javelin", "definition_key": "srd-5.2.1:weapon.javelin", "name": "Javelin", "beginner_description": "A Simple melee weapon that can be thrown.", "source_ids": ["srd-equipment"], "category": "simple", "mastery": "slow"},
+    {"id": "flail", "definition_key": "srd-5.2.1:weapon.flail", "name": "Flail", "beginner_description": "A one-handed Martial melee weapon.", "source_ids": ["srd-equipment"], "category": "martial", "mastery": "sap"},
+    {"id": "greatsword", "definition_key": "srd-5.2.1:weapon.greatsword", "name": "Greatsword", "beginner_description": "A heavy, two-handed Martial melee weapon.", "source_ids": ["srd-equipment"], "category": "martial", "mastery": "graze"}
+  ],
+  "equipment_packages": [
+    {
+      "id": "soldier_a",
+      "definition_key": "srd-5.2.1:equipment_package.soldier.a",
+      "name": "Soldier Equipment A",
+      "beginner_description": "The supported Soldier equipment package.",
+      "source_ids": ["srd-soldier", "srd-equipment"],
+      "items": [
+        {"item_id": "spear", "name": "Spear", "quantity": 1},
+        {"item_id": "shortbow", "name": "Shortbow", "quantity": 1},
+        {"item_id": "arrow", "name": "Arrow", "quantity": 20},
+        {"item_id": "chosen_gaming_set", "name": "Chosen Gaming Set", "quantity": 1},
+        {"item_id": "healers_kit", "name": "Healer's Kit", "quantity": 1},
+        {"item_id": "quiver", "name": "Quiver", "quantity": 1},
+        {"item_id": "travelers_clothes", "name": "Traveler's Clothes", "quantity": 1}
+      ],
+      "gold_pieces": 14
+    },
+    {
+      "id": "fighter_a",
+      "definition_key": "srd-5.2.1:equipment_package.fighter.a",
+      "name": "Fighter Equipment A",
+      "beginner_description": "The supported Strength-focused Fighter equipment package.",
+      "source_ids": ["srd-fighter", "srd-equipment"],
+      "items": [
+        {"item_id": "chain_mail", "name": "Chain Mail", "quantity": 1},
+        {"item_id": "greatsword", "name": "Greatsword", "quantity": 1},
+        {"item_id": "flail", "name": "Flail", "quantity": 1},
+        {"item_id": "javelin", "name": "Javelin", "quantity": 8},
+        {"item_id": "dungeoneers_pack", "name": "Dungeoneer's Pack", "quantity": 1}
+      ],
+      "gold_pieces": 4
+    }
+  ],
+  "supported_profile": {
+    "species_definition_key": "srd-5.2.1:species.human",
+    "background_definition_key": "srd-5.2.1:background.soldier",
+    "class_definition_key": "srd-5.2.1:class.fighter",
+    "ability_method_definition_key": "srd-5.2.1:ability_method.standard_array",
+    "equipment_route_id": "soldier-a+fighter-a"
+  }
+}

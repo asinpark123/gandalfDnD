@@ -36,6 +36,10 @@ before shipping.
 | RUL-008 | Product architecture | A future rules release coexists immutably. Campaign conversion is explicit, validated, transactional, recorded, and never a mutable update of old rule definitions. | M1.1 and migrations | GF-013–GF-014; future migration fixtures |
 | RUL-009 | Product architecture | Common rule semantics begin as typed data and pure functions and are generalized only from proven repetition. Exceptional rules may use versioned specialized resolvers. | All rules implementation | Review at each abstraction addition |
 | RUL-010 | Product policy | Gandalf mechanical additions—including ultimate abilities, numerical reputation effects, solo buffs, or milestone levelling—must be separately identified and versioned as house rules. | Future house rules | Package identity, UI label, source/rationale and golden tests |
+| RUL-021 | Product policy | The M1.2 Human Origin-feat menu supports Alert and Skilled. Magic Initiate is a valid SRD option but is deferred until spellcasting exists; Savage Attacker is already granted by Soldier and cannot be selected a second time in this slice. Source: SRD 5.2.1 Human p. 86, Soldier p. 83, feats pp. 87–88. | `srd-5.2.1-character-creation-v1` | Catalog-option, duplicate-grant, and finalization tests |
+| RUL-022 | Product policy | Skilled initially grants three distinct supported skills. The SRD also permits tool choices, but arbitrary tool selection is deferred until tool definitions and their gameplay semantics are implemented. Source: SRD 5.2.1 Skilled, p. 87. | `srd-5.2.1-character-creation-v1` | Skilled cardinality, overlap, and unsupported-choice tests |
+| RUL-023 | Product policy | M1.2 supports only Soldier equipment option A plus Fighter equipment option A. Fighter weapon-mastery choices are restricted to the three weapon definitions supplied by that fixed route: Javelin, Flail, and Greatsword. Other valid SRD packages and mastery choices are deferred, not reclassified as illegal. Source: SRD 5.2.1 Fighter pp. 47–48, Soldier p. 83, weapons/equipment pp. 91–97. | `srd-5.2.1-character-creation-v1` | Exact route, three-unique-masteries, inventory, and unsupported-option tests |
+| RUL-024 | Product architecture | A normalized catalog is immutable and separately identified from its source release. New campaigns use the release's explicit default catalog; existing records retain their prior catalog until an explicit compatibility workflow converts them. | M1.2 onward | Hash/identity validation, migration backfill, pin immutability, and coexistence tests |
 
 ## Open and deferred rulings
 
@@ -77,3 +81,4 @@ Revisit condition:
 | Date | Change |
 | --- | --- |
 | 2026-08-30 | Created the register from the accepted RES-001 review; recorded M1 scope and foundational boundaries while preserving unresolved policies as open/deferred. |
+| 2026-08-31 | Recorded the accepted M1.2 feat, Skilled, equipment/mastery, and immutable data-catalog support policies with source pages and regression requirements. |

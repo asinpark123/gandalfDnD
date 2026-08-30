@@ -1,8 +1,56 @@
 {
   "$defs": {
+    "DataCatalogEntry": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "pattern": "^[a-z0-9][a-z0-9.-]{2,99}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "foundation",
+            "character_creation"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "path": {
+          "pattern": "^[a-z0-9][a-z0-9./_-]*\\.json$",
+          "title": "Path",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "path",
+        "sha256"
+      ],
+      "title": "DataCatalogEntry",
+      "type": "object"
+    },
     "RegistryEntry": {
       "additionalProperties": false,
       "properties": {
+        "data_catalogs": {
+          "items": {
+            "$ref": "#/$defs/DataCatalogEntry"
+          },
+          "minItems": 1,
+          "title": "Data Catalogs",
+          "type": "array"
+        },
+        "default_data_catalog_id": {
+          "title": "Default Data Catalog Id",
+          "type": "string"
+        },
         "id": {
           "pattern": "^[a-z0-9][a-z0-9.-]{2,79}$",
           "title": "Id",
@@ -16,7 +64,9 @@
       },
       "required": [
         "id",
-        "manifest"
+        "manifest",
+        "default_data_catalog_id",
+        "data_catalogs"
       ],
       "title": "RegistryEntry",
       "type": "object"
@@ -49,7 +99,7 @@
       "type": "array"
     },
     "schema_version": {
-      "const": "1.0.0",
+      "const": "1.1.0",
       "title": "Schema Version",
       "type": "string"
     }

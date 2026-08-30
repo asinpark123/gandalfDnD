@@ -1,13 +1,29 @@
 import uuid
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.character_creation import (
+    CharacterCreationCatalog,
+    CharacterFinalizeRequest,
+    finalize_character_choices,
+)
 from app.dice import DiceService
 from app.llm.base import DMProvider
-from app.models import Campaign, CampaignEvent, Character, DiceRoll, Location, RulesetRelease, Turn
-from app.rulesets import LoadedRulesetRelease, get_ruleset_registry
+from app.models import (
+    Campaign,
+    CampaignEvent,
+    Character,
+    CharacterGrant,
+    DiceRoll,
+    Location,
+    RulesetDataCatalog,
+    RulesetRelease,
+    Turn,
+)
+from app.rulesets import LoadedRulesetDataCatalog, LoadedRulesetRelease, get_ruleset_registry
 from app.schemas import (
     CampaignCreate,
     CampaignState,
@@ -51,14 +67,18 @@ def _add_event(
     turn_id: uuid.UUID | None = None,
     visibility: str = "player",
 ) -> CampaignEvent:
-    ruleset_release_id = session.scalar(
-        select(Campaign.ruleset_release_id).where(Campaign.id == campaign_id)
-    )
-    if ruleset_release_id is None:
+    pin = session.execute(
+        select(Campaign.ruleset_release_id, Campaign.ruleset_data_catalog_id).where(
+            Campaign.id == campaign_id
+        )
+    ).one_or_none()
+    if pin is None:
         raise NotFoundError("Campaign not found")
+    ruleset_release_id, ruleset_data_catalog_id = pin
     event = CampaignEvent(
         campaign_id=campaign_id,
         ruleset_release_id=ruleset_release_id,
+        ruleset_data_catalog_id=ruleset_data_catalog_id,
         turn_id=turn_id,
         sequence=_next_event_sequence(session, campaign_id),
         event_type=event_type,
@@ -98,10 +118,46 @@ def _ensure_ruleset_release(
     return release
 
 
+def _ensure_ruleset_data_catalog(
+    session: Session,
+    loaded_catalog: LoadedRulesetDataCatalog,
+    ruleset_release_id: str,
+) -> RulesetDataCatalog:
+    document = loaded_catalog.document
+    schema_version = document.schema_version
+    support_status = (
+        document.support_status if hasattr(document, "support_status") else "character_creation"
+    )
+    expected = {
+        "ruleset_release_id": ruleset_release_id,
+        "kind": loaded_catalog.kind,
+        "schema_version": schema_version,
+        "support_status": support_status,
+        "catalog_sha256": loaded_catalog.sha256,
+    }
+    catalog = session.get(RulesetDataCatalog, loaded_catalog.id)
+    if catalog is None:
+        catalog = RulesetDataCatalog(id=loaded_catalog.id, **expected)
+        session.add(catalog)
+        session.flush()
+        return catalog
+    actual = {field: getattr(catalog, field) for field in expected}
+    if actual != expected:
+        raise ConflictError(f"Ruleset data catalog {loaded_catalog.id!r} is immutable and differs")
+    return catalog
+
+
 def create_campaign(session: Session, data: CampaignCreate) -> Campaign:
-    loaded_release = get_ruleset_registry().get(data.ruleset_release_id)
+    registry = get_ruleset_registry()
+    loaded_release = registry.get(data.ruleset_release_id)
+    loaded_catalog = registry.get_data_catalog(data.ruleset_release_id)
     _ensure_ruleset_release(session, loaded_release)
-    campaign = Campaign(name=data.name, ruleset_release_id=loaded_release.manifest.id)
+    _ensure_ruleset_data_catalog(session, loaded_catalog, loaded_release.manifest.id)
+    campaign = Campaign(
+        name=data.name,
+        ruleset_release_id=loaded_release.manifest.id,
+        ruleset_data_catalog_id=loaded_catalog.id,
+    )
     session.add(campaign)
     session.flush()
     location = Location(
@@ -119,6 +175,7 @@ def create_campaign(session: Session, data: CampaignCreate) -> Campaign:
             "name": campaign.name,
             "starting_location": location.name,
             "ruleset_release_id": campaign.ruleset_release_id,
+            "ruleset_data_catalog_id": campaign.ruleset_data_catalog_id,
         },
     )
     session.commit()
@@ -129,26 +186,335 @@ def add_character(session: Session, campaign_id: uuid.UUID, data: CharacterCreat
     campaign = _campaign_for_update(session, campaign_id)
     existing = session.scalar(select(Character).where(Character.campaign_id == campaign_id))
     if existing is not None:
-        raise ConflictError("Phase 0 supports one character per campaign")
-    inventory = {name.strip(): quantity for name, quantity in data.inventory.items()}
+        raise ConflictError("A campaign supports one player character")
+    loaded_catalog = get_ruleset_registry().get_data_catalog(
+        campaign.ruleset_release_id, campaign.ruleset_data_catalog_id
+    )
+    if loaded_catalog.kind != "character_creation":
+        raise ConflictError("Campaign data catalog does not support guided character creation")
     character = Character(
         campaign_id=campaign_id,
         ruleset_release_id=campaign.ruleset_release_id,
+        ruleset_data_catalog_id=campaign.ruleset_data_catalog_id,
         name=data.name,
-        max_hp=data.max_hp,
-        hp=data.max_hp,
-        inventory=inventory,
+        creation_status="draft",
+        revision=0,
+        max_hp=None,
+        hp=None,
+        inventory={},
     )
     session.add(character)
     session.flush()
     _add_event(
         session,
         campaign_id,
-        "character_created",
-        {"character_id": str(character.id), "name": character.name, "max_hp": character.max_hp},
+        "character_draft_created",
+        {
+            "character_id": str(character.id),
+            "name": character.name,
+            "ruleset_data_catalog_id": character.ruleset_data_catalog_id,
+        },
     )
     session.commit()
     return character
+
+
+def _catalog_definition_sources(catalog: CharacterCreationCatalog) -> dict[str, list[str]]:
+    definitions = [
+        *catalog.abilities,
+        *catalog.alignments,
+        *catalog.skills,
+        *catalog.languages,
+        *catalog.gaming_sets,
+        catalog.standard_array,
+        catalog.background,
+        catalog.species,
+        catalog.character_class,
+        *catalog.features,
+        *catalog.origin_feats,
+        *catalog.fighting_styles,
+        *catalog.weapons,
+        *catalog.equipment_packages,
+    ]
+    return {definition.definition_key: definition.source_ids for definition in definitions}
+
+
+def _build_character_grants(
+    character: Character,
+    event: CampaignEvent,
+    request: CharacterFinalizeRequest,
+    catalog: CharacterCreationCatalog,
+) -> list[CharacterGrant]:
+    source_ids = _catalog_definition_sources(catalog)
+    grants: list[tuple[str, str, str, str, dict[str, Any]]] = []
+
+    def add(
+        grant_type: str,
+        slot: str,
+        definition_key: str,
+        source_definition_key: str,
+        value: dict[str, Any],
+    ) -> None:
+        value = {**value, "source_ids": source_ids.get(definition_key, [])}
+        grants.append((grant_type, slot, definition_key, source_definition_key, value))
+
+    add(
+        "selection",
+        "identity.species",
+        request.species_definition_key,
+        request.species_definition_key,
+        {"size": request.size},
+    )
+    add(
+        "selection",
+        "identity.background",
+        request.background_definition_key,
+        request.background_definition_key,
+        {},
+    )
+    add(
+        "selection",
+        "identity.class",
+        request.class_definition_key,
+        request.class_definition_key,
+        {"level": 1},
+    )
+    add(
+        "selection",
+        "abilities.method",
+        request.ability_method_definition_key,
+        request.ability_method_definition_key,
+        {},
+    )
+    alignment = next(
+        option for option in catalog.alignments if option.id == request.alignment.lower()
+    )
+    add(
+        "selection",
+        "identity.alignment",
+        alignment.definition_key,
+        alignment.definition_key,
+        {"alignment": request.alignment},
+    )
+    language_by_id = {option.id: option for option in catalog.languages}
+    add(
+        "grant",
+        "language.common",
+        language_by_id["common"].definition_key,
+        language_by_id["common"].definition_key,
+        {"language": "common"},
+    )
+    for language in request.languages:
+        definition_key = language_by_id[language].definition_key
+        add(
+            "selection",
+            f"language.{language}",
+            definition_key,
+            request.species_definition_key,
+            {"language": language},
+        )
+    ability_by_id = {option.id: option for option in catalog.abilities}
+    for ability, score in request.base_ability_scores.items():
+        add(
+            "selection",
+            f"ability.base.{ability}",
+            ability_by_id[ability].definition_key,
+            request.ability_method_definition_key,
+            {"score": score},
+        )
+    for ability, increase in request.background_ability_increases.items():
+        add(
+            "grant",
+            f"ability.background.{ability}",
+            ability_by_id[ability].definition_key,
+            request.background_definition_key,
+            {"increase": increase},
+        )
+    skill_by_id = {option.id: option for option in catalog.skills}
+    for skill in catalog.background.skill_proficiencies:
+        add(
+            "grant",
+            f"skill.background.{skill}",
+            skill_by_id[skill].definition_key,
+            request.background_definition_key,
+            {"proficient": True},
+        )
+    for skill in request.fighter_skills:
+        add(
+            "selection",
+            f"skill.class.{skill}",
+            skill_by_id[skill].definition_key,
+            request.class_definition_key,
+            {"proficient": True},
+        )
+    human_skillful = "srd-5.2.1:species_feature.human.skillful"
+    add(
+        "selection",
+        f"skill.human.{request.human_skill}",
+        skill_by_id[request.human_skill].definition_key,
+        human_skillful,
+        {"proficient": True},
+    )
+    for skill in request.skilled_feat_skills:
+        add(
+            "selection",
+            f"skill.feat.{skill}",
+            skill_by_id[skill].definition_key,
+            request.origin_feat_definition_key,
+            {"proficient": True},
+        )
+    add(
+        "grant",
+        "feat.background",
+        catalog.background.granted_feat_definition_key,
+        request.background_definition_key,
+        {},
+    )
+    add(
+        "selection",
+        "feat.human",
+        request.origin_feat_definition_key,
+        "srd-5.2.1:species_feature.human.versatile",
+        {},
+    )
+    gaming_set = next(option for option in catalog.gaming_sets if option.id == request.gaming_set)
+    add(
+        "selection",
+        "tool.background.gaming_set",
+        gaming_set.definition_key,
+        request.background_definition_key,
+        {"gaming_set": request.gaming_set},
+    )
+    add(
+        "selection",
+        "class.fighting_style",
+        request.fighting_style_definition_key,
+        "srd-5.2.1:class_feature.fighter.fighting_style",
+        {},
+    )
+    for definition_key in request.weapon_mastery_definition_keys:
+        add(
+            "selection",
+            f"class.weapon_mastery.{definition_key.rsplit('.', 1)[-1]}",
+            definition_key,
+            "srd-5.2.1:class_feature.fighter.weapon_mastery",
+            {},
+        )
+    for package_key in (
+        catalog.background.equipment_package_definition_key,
+        catalog.character_class.equipment_package_definition_key,
+    ):
+        package_owner = package_key.split(".")[-2]
+        add(
+            "selection",
+            f"equipment.{package_owner}",
+            package_key,
+            package_key,
+            {"route": request.equipment_route_id},
+        )
+    for save in catalog.character_class.saving_throw_proficiencies:
+        add(
+            "grant",
+            f"saving_throw.{save}",
+            ability_by_id[save].definition_key,
+            request.class_definition_key,
+            {"proficient": True},
+        )
+    for feature_key in [
+        *catalog.species.feature_definition_keys,
+        *catalog.character_class.feature_definition_keys,
+    ]:
+        add(
+            "grant",
+            f"feature.{feature_key.rsplit('.', 1)[-1]}",
+            feature_key,
+            request.species_definition_key
+            if ":species_feature." in feature_key
+            else request.class_definition_key,
+            {},
+        )
+
+    return [
+        CharacterGrant(
+            character_id=character.id,
+            campaign_id=character.campaign_id,
+            ruleset_release_id=character.ruleset_release_id,
+            ruleset_data_catalog_id=character.ruleset_data_catalog_id,
+            acquisition_event_id=event.id,
+            revision=character.revision,
+            grant_type=grant_type,
+            choice_slot=slot,
+            definition_key=definition_key,
+            source_definition_key=source_definition_key,
+            value=value,
+            active=True,
+        )
+        for grant_type, slot, definition_key, source_definition_key, value in grants
+    ]
+
+
+def finalize_character(
+    session: Session, campaign_id: uuid.UUID, data: CharacterFinalizeRequest
+) -> Character:
+    campaign = _campaign_for_update(session, campaign_id)
+    character = session.scalar(
+        select(Character).where(Character.campaign_id == campaign_id).with_for_update()
+    )
+    if character is None:
+        raise NotFoundError("Character draft not found")
+    if character.creation_status != "draft":
+        raise ConflictError("Character has already been finalized")
+    loaded_catalog = get_ruleset_registry().get_data_catalog(
+        campaign.ruleset_release_id, campaign.ruleset_data_catalog_id
+    )
+    if loaded_catalog.kind != "character_creation" or not isinstance(
+        loaded_catalog.document, CharacterCreationCatalog
+    ):
+        raise ConflictError("Campaign data catalog does not support guided character creation")
+    sheet = finalize_character_choices(loaded_catalog.document, data)
+
+    character.creation_status = "finalized"
+    character.revision = 1
+    character.max_hp = sheet.max_hp
+    character.hp = sheet.max_hp
+    character.inventory = sheet.starting_inventory
+    character.character_sheet = sheet.model_dump(mode="json")
+    character.finalized_at = datetime.now(UTC)
+    session.flush()
+    event = _add_event(
+        session,
+        campaign_id,
+        "character_finalized",
+        {
+            "character_id": str(character.id),
+            "revision": character.revision,
+            "choices": data.model_dump(mode="json"),
+            "sheet": sheet.model_dump(mode="json"),
+        },
+    )
+    session.add_all(
+        _build_character_grants(
+            character,
+            event,
+            data,
+            loaded_catalog.document,
+        )
+    )
+    session.commit()
+    return character
+
+
+def list_character_grants(session: Session, campaign_id: uuid.UUID) -> list[CharacterGrant]:
+    character = session.scalar(select(Character).where(Character.campaign_id == campaign_id))
+    if character is None:
+        raise NotFoundError("Character not found")
+    return list(
+        session.scalars(
+            select(CharacterGrant)
+            .where(CharacterGrant.character_id == character.id)
+            .order_by(CharacterGrant.choice_slot, CharacterGrant.definition_key)
+        )
+    )
 
 
 def get_campaign_state(session: Session, campaign_id: uuid.UUID) -> CampaignState:
@@ -229,8 +595,10 @@ def process_turn(
     dice_service: DiceService | None = None,
 ) -> TurnRead:
     campaign = _campaign_for_update(session, campaign_id)
-    state_before = get_campaign_state(session, campaign_id)
     character = session.scalar(select(Character).where(Character.campaign_id == campaign_id))
+    if character is not None and character.creation_status == "draft":
+        raise ConflictError("Character must be finalized before play begins")
+    state_before = get_campaign_state(session, campaign_id)
     output = provider.generate_turn(_provider_context(state_before), player_action)
 
     snapshot = None
@@ -268,6 +636,7 @@ def process_turn(
         roll_model = DiceRoll(
             campaign_id=campaign_id,
             ruleset_release_id=campaign.ruleset_release_id,
+            ruleset_data_catalog_id=campaign.ruleset_data_catalog_id,
             turn_id=turn.id,
             notation=result.notation,
             rolls=result.rolls,

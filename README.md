@@ -18,9 +18,12 @@ maintained in the [living development plan](docs/PROJECT_PLAN.md).
   canonical character state, rules boundaries, M1 scope, golden fixtures, and traceability
 - [Rules and product-rulings register](docs/rules/RULINGS.md) — SRD interpretations, product
   policies, adjudications, house rules, and unresolved decisions
+- [Player character-creation guide](docs/player/CHARACTER_CREATION.md) — supported choices,
+  step-by-step API workflow, limitations, and rules-source notes
 
-Documentation distinguishes planned behavior from verified implementation. Phase 0 behavior below
-remains the current executable product while M1 is still being developed.
+Documentation distinguishes planned behavior from verified implementation. M1.2 guided character
+creation is now executable and verified; complete derived state and authoritative check/save
+resolution remain M1.3 and M1.4 work.
 
 ## Versioned rulesets
 
@@ -43,13 +46,17 @@ python -m scripts.fetch_ruleset --release srd-5.2.1
 ```
 
 The PDF remains outside normal Git history. Its official and project-release download locations,
-checksum, size, license, attribution, normalized-data status, and schema versions are recorded in
+checksum, size, license, attribution, normalized-data catalogs, and schema versions are recorded in
 [`rulesets/srd-5.2.1/manifest.json`](rulesets/srd-5.2.1/manifest.json).
 
-## Phase 0 scope
+## Current verified scope
 
 - FastAPI API with health, campaigns, one character, locations, turns, and player-visible events
 - PostgreSQL as the canonical source of truth through SQLAlchemy 2 and Alembic
+- guided draft/finalize creation for one level-one Human/Soldier/Fighter using the standard array
+- source-cited, immutable character choices and grants pinned to a normalized data catalog
+- calculated ability scores/modifiers, level-one HP, proficiency bonus, skill and saving-throw
+  proficiencies, features, equipment, and selected character options
 - HP, inventory, and current-location state changes with pre-commit validation
 - auditable application dice rolls, including internally logged hidden rolls
 - provider-neutral DM interface
@@ -107,7 +114,10 @@ canonical state: all proposed changes pass through `StateChangeValidator` first.
 | --- | --- | --- |
 | `GET` | `/health` | Confirm the API can reach its configured database |
 | `POST` | `/campaigns` | Create a campaign and starting location |
-| `POST` | `/campaigns/{id}/character` | Add the Phase 0 solo character |
+| `GET` | `/rulesets/{release}/character-creation/options` | Read supported choices and beginner explanations |
+| `POST` | `/campaigns/{id}/character` | Create the solo character draft |
+| `POST` | `/campaigns/{id}/character/finalize` | Validate and finalize all required character choices |
+| `GET` | `/campaigns/{id}/character/grants` | Read immutable choice/grant provenance |
 | `GET` | `/campaigns/{id}/state` | Read canonical campaign, character, and location state |
 | `POST` | `/campaigns/{id}/turns` | Process and persist one player action |
 | `GET` | `/campaigns/{id}/events` | Read the ordered player-visible event trail |
@@ -123,8 +133,8 @@ ruff format --check .
 pytest
 ```
 
-The integration test recreates only Phase 0 rows inside the dedicated test database. It never
-targets the development database or any pre-existing service database.
+The integration tests recreate only GandalfDnD-owned rows inside the dedicated test database. They
+never target the development database or any pre-existing service database.
 
 ## Design constraints
 
@@ -133,5 +143,7 @@ targets the development database or any pre-existing service database.
 - Every model output is typed and validated before commit.
 - Dice outcomes come from `DiceService`, never model invention.
 - Ruleset releases are immutable; changing versions requires a future explicit migration workflow.
+- Normalized data catalogs are immutable; pre-M1.2 records retain their original foundation catalog
+  rather than silently acquiring later rules semantics.
 - The development and test credentials are separate and ignored by Git.
 - Clawvis is outside GandalfDnD's Phase 0 topology and must remain untouched.

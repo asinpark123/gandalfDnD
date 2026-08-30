@@ -1,11 +1,26 @@
 {
   "$schema": "./schema/registry.schema.json",
-  "schema_version": "1.0.0",
+  "schema_version": "1.1.0",
   "default_release_id": "srd-5.2.1",
   "releases": [
     {
       "id": "srd-5.2.1",
-      "manifest": "srd-5.2.1/manifest.json"
+      "manifest": "srd-5.2.1/manifest.json",
+      "default_data_catalog_id": "srd-5.2.1-character-creation-v1",
+      "data_catalogs": [
+        {
+          "id": "srd-5.2.1-foundation-v1",
+          "kind": "foundation",
+          "path": "data/index.json",
+          "sha256": "f2014945cb0b81a6dd192e0a6c1e02fb136ba4d4734d35a8160f9e3e5e7a3893"
+        },
+        {
+          "id": "srd-5.2.1-character-creation-v1",
+          "kind": "character_creation",
+          "path": "data/character-creation-v1.json",
+          "sha256": "ddbd172feeeb191789f1b95f93762c661dda06888dad067e28c7fc6ffda391cb"
+        }
+      ]
     }
   ]
 }

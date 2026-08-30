@@ -24,12 +24,24 @@ existing cache entry that fails verification is reported and never silently over
 
 Use `--source official` or `--source project_release` to select a particular manifest source.
 
-## Normalized data status
+## Normalized data catalogs
 
-`data/index.json` is intentionally `foundation_only`: it establishes the release identity and data
-schema but contains no extracted rule definitions yet. Character-creation definitions will be added
-in M1.2 as deterministic, source-cited data. Unsupported content must not be inferred from the PDF
-or accepted through free-form input.
+The unchanged source artifact and Gandalf's normalized machine-readable data have separate immutable
+identities. The release currently registers:
+
+- `srd-5.2.1-foundation-v1` — the M1.1 identity-only foundation, SHA-256
+  `f2014945cb0b81a6dd192e0a6c1e02fb136ba4d4734d35a8160f9e3e5e7a3893`;
+- `srd-5.2.1-character-creation-v1` — the M1.2 source-cited Human/Soldier/Fighter creation catalog,
+  SHA-256 `ddbd172feeeb191789f1b95f93762c661dda06888dad067e28c7fc6ffda391cb`.
+
+New campaigns default to the character-creation catalog. Pre-existing records stay pinned to the
+foundation catalog so adding normalized rules never changes old campaign semantics silently.
+
+The M1.2 catalog includes the supported ability, skill, language, Human, Soldier, Fighter, feat,
+Fighting Style, weapon-mastery, and fixed-equipment definitions plus beginner descriptions and
+durable printed-page citations. It intentionally excludes unsupported character options; clients
+must use the catalog rather than infer additional support from the PDF or submit free-form rules
+content. Current product boundaries are recorded in `docs/rules/RULINGS.md`.
 
 Regenerate or check the JSON Schemas with:
 

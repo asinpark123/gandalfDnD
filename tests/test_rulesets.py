@@ -15,7 +15,7 @@ from sqlalchemy.exc import DBAPIError
 
 from alembic import command
 from app.db import get_engine
-from app.models import Campaign, RulesetRelease
+from app.models import Campaign, RulesetDataCatalog, RulesetRelease
 from app.rulesets import (
     ArtifactIntegrityError,
     LoadedRulesetRelease,
@@ -45,6 +45,12 @@ def test_checked_in_registry_and_generated_schemas_are_valid() -> None:
     assert release.manifest.artifact.size_bytes == 6031375
     assert release.data_index.definition_files == []
     assert release.data_index.support_status == "foundation_only"
+    assert release.default_data_catalog_id == "srd-5.2.1-character-creation-v1"
+    character_catalog = registry.get_data_catalog("srd-5.2.1")
+    assert character_catalog.kind == "character_creation"
+    assert character_catalog.sha256 == (
+        "ddbd172feeeb191789f1b95f93762c661dda06888dad067e28c7fc6ffda391cb"
+    )
 
     result = subprocess.run(
         [sys.executable, "-m", "scripts.export_ruleset_schemas", "--check"],
@@ -92,10 +98,13 @@ def _small_release(data: bytes = b"immutable rules") -> LoadedRulesetRelease:
         manifest_sha256="0" * 64,
         data_index=NormalizedDataIndex(
             schema_version="1.0.0",
+            data_catalog_id="test-1.0.0-foundation-v1",
             ruleset_release_id="test-1.0.0",
             support_status="foundation_only",
             definition_files=[],
         ),
+        default_data_catalog_id="test-1.0.0-foundation-v1",
+        data_catalogs={},
     )
 
 
@@ -147,19 +156,33 @@ def _registry_with_mock_release(tmp_path: Path) -> RulesetRegistry:
     manifest["version"] = "6.0.0"
     manifest["normalized_data"]["index_path"] = "data/index.json"
     (mock_dir / "manifest.json").write_text(json.dumps(manifest))
-    (mock_dir / "data/index.json").write_text(
-        json.dumps(
-            {
-                "schema_version": "1.0.0",
-                "ruleset_release_id": "mock-6.0.0",
-                "support_status": "foundation_only",
-                "definition_files": [],
-            }
-        )
+    mock_index = json.dumps(
+        {
+            "schema_version": "1.0.0",
+            "data_catalog_id": "mock-6.0.0-foundation-v1",
+            "ruleset_release_id": "mock-6.0.0",
+            "support_status": "foundation_only",
+            "definition_files": [],
+        }
     )
+    (mock_dir / "data/index.json").write_text(mock_index)
     registry_path = rulesets / "registry.json"
     registry = json.loads(registry_path.read_text())
-    registry["releases"].append({"id": "mock-6.0.0", "manifest": "mock-6.0.0/manifest.json"})
+    registry["releases"].append(
+        {
+            "id": "mock-6.0.0",
+            "manifest": "mock-6.0.0/manifest.json",
+            "default_data_catalog_id": "mock-6.0.0-foundation-v1",
+            "data_catalogs": [
+                {
+                    "id": "mock-6.0.0-foundation-v1",
+                    "kind": "foundation",
+                    "path": "data/index.json",
+                    "sha256": hashlib.sha256(mock_index.encode()).hexdigest(),
+                }
+            ],
+        }
+    )
     registry_path.write_text(json.dumps(registry))
     return RulesetRegistry.load(registry_path)
 
@@ -198,14 +221,54 @@ def test_database_ruleset_release_is_immutable(client: TestClient) -> None:
         )
 
 
+def test_database_data_catalog_and_campaign_pins_are_immutable(client: TestClient) -> None:
+    campaign = client.post("/campaigns", json={"name": "Pinned"})
+    assert campaign.status_code == 201
+    with (
+        pytest.raises(DBAPIError, match="ruleset_data_catalogs is immutable"),
+        get_engine().begin() as connection,
+    ):
+        connection.execute(
+            text(
+                "UPDATE ruleset_data_catalogs SET support_status = 'complete' "
+                "WHERE id = 'srd-5.2.1-character-creation-v1'"
+            )
+        )
+    with (
+        pytest.raises(DBAPIError, match="campaign ruleset pins are immutable"),
+        get_engine().begin() as connection,
+    ):
+        connection.execute(
+            text(
+                "UPDATE campaigns SET ruleset_data_catalog_id = 'srd-5.2.1-foundation-v1' "
+                "WHERE id = :id"
+            ),
+            {"id": campaign.json()["id"]},
+        )
+
+
 def test_registry_rejects_path_traversal(tmp_path: Path) -> None:
     registry_path = tmp_path / "registry.json"
     registry_path.write_text(
         json.dumps(
             {
-                "schema_version": "1.0.0",
+                "schema_version": "1.1.0",
                 "default_release_id": "test-1.0.0",
-                "releases": [{"id": "test-1.0.0", "manifest": "../manifest.json"}],
+                "releases": [
+                    {
+                        "id": "test-1.0.0",
+                        "manifest": "../manifest.json",
+                        "default_data_catalog_id": "test-1.0.0-foundation-v1",
+                        "data_catalogs": [
+                            {
+                                "id": "test-1.0.0-foundation-v1",
+                                "kind": "foundation",
+                                "path": "data/index.json",
+                                "sha256": "0" * 64,
+                            }
+                        ],
+                    }
+                ],
             }
         )
     )
@@ -273,18 +336,31 @@ def test_migration_backfills_legacy_mechanical_records() -> None:
                 ),
                 {"id": campaign_id},
             ).one() == ("srd-5.2.1", "SRD 5.2.1")
+            assert (
+                connection.execute(
+                    text("SELECT ruleset_data_catalog_id FROM campaigns WHERE id = :id"),
+                    {"id": campaign_id},
+                ).scalar_one()
+                == "srd-5.2.1-foundation-v1"
+            )
             for table, record_id in (
                 ("characters", character_id),
                 ("campaign_events", event_id),
                 ("dice_rolls", roll_id),
             ):
-                assert (
-                    connection.execute(
-                        text(f"SELECT ruleset_release_id FROM {table} WHERE id = :id"),
-                        {"id": record_id},
-                    ).scalar_one()
-                    == "srd-5.2.1"
-                )
+                assert connection.execute(
+                    text(
+                        f"SELECT ruleset_release_id, ruleset_data_catalog_id "
+                        f"FROM {table} WHERE id = :id"
+                    ),
+                    {"id": record_id},
+                ).one() == ("srd-5.2.1", "srd-5.2.1-foundation-v1")
+            assert connection.execute(
+                select(RulesetDataCatalog.id).order_by(RulesetDataCatalog.id)
+            ).scalars().all() == [
+                "srd-5.2.1-character-creation-v1",
+                "srd-5.2.1-foundation-v1",
+            ]
     finally:
         command.upgrade(_alembic_config(), "head")
 

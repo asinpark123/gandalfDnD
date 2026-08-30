@@ -15,6 +15,7 @@ from urllib.request import urlopen
 
 from pydantic import AnyHttpUrl, BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from app.character_creation import CharacterCreationCatalog
 from app.config import get_settings
 
 ReleaseId = str
@@ -29,6 +30,10 @@ class UnknownRulesetError(RulesetRegistryError):
     pass
 
 
+class UnknownRulesetDataCatalogError(RulesetRegistryError):
+    pass
+
+
 class ArtifactIntegrityError(RulesetRegistryError):
     pass
 
@@ -37,14 +42,32 @@ class StrictModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class DataCatalogEntry(StrictModel):
+    id: str = Field(pattern=r"^[a-z0-9][a-z0-9.-]{2,99}$")
+    kind: Literal["foundation", "character_creation"]
+    path: str = Field(pattern=r"^[a-z0-9][a-z0-9./_-]*\.json$")
+    sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+
 class RegistryEntry(StrictModel):
     id: str = Field(pattern=r"^[a-z0-9][a-z0-9.-]{2,79}$")
     manifest: str = Field(pattern=r"^[a-z0-9][a-z0-9./-]*\.json$")
+    default_data_catalog_id: str
+    data_catalogs: list[DataCatalogEntry] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def validate_data_catalogs(self) -> RegistryEntry:
+        catalog_ids = [catalog.id for catalog in self.data_catalogs]
+        if len(catalog_ids) != len(set(catalog_ids)):
+            raise ValueError("ruleset data catalog IDs must be unique")
+        if self.default_data_catalog_id not in catalog_ids:
+            raise ValueError("default_data_catalog_id must identify a registered data catalog")
+        return self
 
 
 class RegistryDocument(StrictModel):
     schema_uri: str | None = Field(default=None, alias="$schema")
-    schema_version: Literal["1.0.0"]
+    schema_version: Literal["1.1.0"]
     default_release_id: str
     releases: list[RegistryEntry] = Field(min_length=1)
 
@@ -118,9 +141,19 @@ class RulesetManifest(StrictModel):
 class NormalizedDataIndex(StrictModel):
     schema_uri: str | None = Field(default=None, alias="$schema")
     schema_version: str = Field(pattern=r"^\d+\.\d+\.\d+$")
+    data_catalog_id: str
     ruleset_release_id: str
     support_status: Literal["foundation_only", "character_creation", "complete"]
     definition_files: list[str]
+
+
+@dataclass(frozen=True)
+class LoadedRulesetDataCatalog:
+    id: str
+    kind: Literal["foundation", "character_creation"]
+    path: Path
+    sha256: Sha256
+    document: NormalizedDataIndex | CharacterCreationCatalog
 
 
 @dataclass(frozen=True)
@@ -129,6 +162,8 @@ class LoadedRulesetRelease:
     manifest_path: Path
     manifest_sha256: Sha256
     data_index: NormalizedDataIndex
+    default_data_catalog_id: str
+    data_catalogs: dict[str, LoadedRulesetDataCatalog]
 
 
 def _read_json(path: Path) -> tuple[dict, bytes]:
@@ -192,11 +227,50 @@ class RulesetRegistry:
             if data_index.support_status != manifest.normalized_data.support_status:
                 raise RulesetRegistryError("normalized-data support statuses do not match")
 
+            data_catalogs: dict[str, LoadedRulesetDataCatalog] = {}
+            for catalog_entry in entry.data_catalogs:
+                catalog_path = _resolve_inside(manifest_path.parent, catalog_entry.path)
+                catalog_data, catalog_raw = _read_json(catalog_path)
+                actual_sha256 = hashlib.sha256(catalog_raw).hexdigest()
+                if actual_sha256 != catalog_entry.sha256:
+                    raise RulesetRegistryError(
+                        f"Data catalog {catalog_entry.id!r} failed checksum verification"
+                    )
+                try:
+                    if catalog_entry.kind == "foundation":
+                        catalog_document: NormalizedDataIndex | CharacterCreationCatalog = (
+                            NormalizedDataIndex.model_validate(catalog_data)
+                        )
+                    else:
+                        catalog_document = CharacterCreationCatalog.model_validate(catalog_data)
+                except ValueError as exc:
+                    raise RulesetRegistryError(
+                        f"Invalid ruleset data catalog: {catalog_path}"
+                    ) from exc
+                document_id = (
+                    catalog_document.data_catalog_id
+                    if isinstance(catalog_document, NormalizedDataIndex)
+                    else catalog_document.id
+                )
+                if document_id != catalog_entry.id:
+                    raise RulesetRegistryError("data catalog ID does not match its registry entry")
+                if catalog_document.ruleset_release_id != manifest.id:
+                    raise RulesetRegistryError("data catalog uses another ruleset release")
+                data_catalogs[catalog_entry.id] = LoadedRulesetDataCatalog(
+                    id=catalog_entry.id,
+                    kind=catalog_entry.kind,
+                    path=catalog_path,
+                    sha256=actual_sha256,
+                    document=catalog_document,
+                )
+
             releases[entry.id] = LoadedRulesetRelease(
                 manifest=manifest,
                 manifest_path=manifest_path,
                 manifest_sha256=hashlib.sha256(manifest_raw).hexdigest(),
                 data_index=data_index,
+                default_data_catalog_id=entry.default_data_catalog_id,
+                data_catalogs=data_catalogs,
             )
         return cls(document, releases)
 
@@ -215,6 +289,18 @@ class RulesetRegistry:
             return self._releases[release_id]
         except KeyError as exc:
             raise UnknownRulesetError(f"Unknown ruleset release: {release_id}") from exc
+
+    def get_data_catalog(
+        self, release_id: str, data_catalog_id: str | None = None
+    ) -> LoadedRulesetDataCatalog:
+        release = self.get(release_id)
+        selected_id = data_catalog_id or release.default_data_catalog_id
+        try:
+            return release.data_catalogs[selected_id]
+        except KeyError as exc:
+            raise UnknownRulesetDataCatalogError(
+                f"Unknown data catalog for {release_id}: {selected_id}"
+            ) from exc
 
 
 @lru_cache

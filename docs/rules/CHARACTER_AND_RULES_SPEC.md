@@ -1,6 +1,6 @@
 # Character and Deterministic Rules Specification
 
-- **Status:** Active; M1.1 verified, M1.2–M1.4 implementation pending
+- **Status:** Active; M1.1–M1.2 verified, M1.3–M1.4 implementation pending
 - **Rules baseline:** SRD 5.2.1
 - **Initial delivery scope:** M1.1–M1.4
 - **Research basis:** [RES-001 review](../research/2026-08-30-character-system-adoption.md)
@@ -246,10 +246,10 @@ migrations.
 
 | ID | Fixture | M1 expectation | Status |
 | --- | --- | --- | --- |
-| GF-001 | Creation completeness | Finalization rejects every missing or unsupported required choice | Planned |
-| GF-002 | Soldier Fighter abilities | Standard array Str 15/Dex 14/Con 13 with Soldier +2 Str/+1 Con gives 17/14/14 and modifiers +3/+2/+2 | Planned |
-| GF-003 | Level-one Fighter derivation | GF-002 produces HP 12 before any additional source grant, Strength save +5, Constitution save +4, initiative +2 | Planned |
-| GF-004 | Provenance | Every value in GF-002/GF-003 identifies all contributing definitions and acquisition events | Planned |
+| GF-001 | Creation completeness | Finalization rejects every missing or unsupported required choice | Verified M1.2 |
+| GF-002 | Soldier Fighter abilities | Standard array Str 15/Dex 14/Con 13 with Soldier +2 Str/+1 Con gives 17/14/14 and modifiers +3/+2/+2 | Verified M1.2 |
+| GF-003 | Level-one Fighter derivation | GF-002 produces HP 12 before any additional source grant, Strength save +5, Constitution save +4, initiative +2 | Partial: HP/ability modifiers verified M1.2; saves/initiative projection M1.3 |
+| GF-004 | Provenance | Every value in GF-002/GF-003 identifies all contributing definitions and acquisition events | Partial: choices/grants verified M1.2; complete derived-component provenance M1.3 |
 | GF-005 | Skill and tool interaction | When both legitimately apply, PB is added once and Advantage is granted | Deferred to tool-enabled slice |
 | GF-006 | Advantage cancellation | Any Advantage and any Disadvantage sources cancel to one d20 | Planned |
 | GF-007 | Alternative base AC | Eligible base calculations are selected, never summed | Planned |
@@ -268,13 +268,13 @@ their report-identified fixtures rather than weakening these contracts.
 
 | Requirement | Normative/design source | Implementation | Migration | Verification | Status |
 | --- | --- | --- | --- | --- | --- |
-| Immutable rules release and definitions | SRD legal/source artifact; RES-001; ADR-009 | `app/rulesets.py`; `rulesets/`; versioned project release | `0002_ruleset_releases` | 22-test suite plus official/project artifact checksum verification | Verified foundation |
-| Character source provenance | RES-001 canonical-state model; ADR-010 | Pending M1.2–M1.3 | Pending | GF-004 | Planned |
-| Human/Soldier/Fighter creation | SRD 5.2.1 character creation/origins/classes | Pending M1.2 | Pending | GF-001–GF-003 | Planned |
-| Pure derived statistics | SRD formulas; ADR-011 | Pending M1.3 | Pending | GF-002–GF-007 | Planned |
+| Immutable rules release and definitions | SRD legal/source artifact; RES-001; ADR-009/ADR-015 | `app/rulesets.py`; `rulesets/`; versioned source release and separately hashed data catalogs | `0002_ruleset_releases`; `0003_guided_character_creation` | 38-test suite, schema freshness, catalog and source-artifact checksums | Verified through M1.2 |
+| Character source provenance | RES-001 canonical-state model; ADR-010 | `CharacterGrant`; `app/character_creation.py`; `app/services.py`; grants API | `0003_guided_character_creation` | creation/grant immutability tests; GF-004 creation portion | Partial verified M1.2; derived components M1.3 |
+| Human/Soldier/Fighter creation | SRD 5.2.1 character creation pp. 19–23; Fighter pp. 47–48; Soldier p. 83; Human p. 86; feats pp. 87–88; equipment pp. 91–97 | character-creation catalog, validator, options/draft/finalize APIs, player guide | `0003_guided_character_creation` | GF-001–GF-003 creation tests and API golden workflow | Verified M1.2 |
+| Pure derived statistics | SRD formulas; ADR-011 | M1.2 ability modifiers and level-one HP in `app/character_creation.py`; remaining kernel pending M1.3 | `0003_guided_character_creation` stores the reproducible creation sheet and grants | GF-002 and GF-003 HP/modifier portion pass | Partial verified M1.2 |
 | Deterministic check/save resolution | SRD D20 tests; ADR-007/ADR-012 | Pending M1.4 | Pending | GF-006, GF-010–GF-011 | Planned |
 | Narrative/mechanical separation | Product trust boundary; ADR-012 | Existing M0 boundary, M1 extension pending | As required | GF-012 | Partial foundation only |
-| Explicit ruleset compatibility | RES-001 versioning; ADR-009 | Dynamic/cross-release rejection and coexistence implemented; migration execution intentionally deferred | `0002_ruleset_releases` pins existing records | GF-013–GF-014 foundation tests pass | Partial foundation verified |
+| Explicit ruleset compatibility | RES-001 versioning; ADR-009/ADR-015 | Dynamic/cross-release rejection, coexistence, and exact release/catalog pins implemented; conversion execution intentionally deferred | `0002_ruleset_releases`; `0003` preserves legacy foundation pins | GF-013–GF-014 foundation/catalog tests pass | Partial foundation verified; conversion deferred |
 | Solo/house-rule separation | RES-001 balance findings; ADR-013 | Pending ruleset support | Pending | Future strict-SRD comparisons | Planned |
 
 Update this table in the same commit as implementation, migration, or evidence changes. A status may

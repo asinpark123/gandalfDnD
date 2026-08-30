@@ -1,6 +1,7 @@
 {
   "$schema": "../schema/data-index.schema.json",
   "schema_version": "1.0.0",
+  "data_catalog_id": "srd-5.2.1-foundation-v1",
   "ruleset_release_id": "srd-5.2.1",
   "support_status": "foundation_only",
   "definition_files": []

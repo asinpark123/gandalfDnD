@@ -1,9 +1,9 @@
 # GandalfDnD Development Strategy and Living Project Plan
 
 - **Document status:** Active
-- **Last updated:** 2026-08-30
-- **Rules baseline:** SRD 5.2.1 (pinned; normalized character rules pending)
-- **Current delivery stage:** Milestone 1 implementation — M1.2 guided character creation
+- **Last updated:** 2026-08-31
+- **Rules baseline:** SRD 5.2.1 (pinned; M1.2 character-creation catalog verified)
+- **Current delivery stage:** Milestone 1 implementation — M1.3 complete Phase 1 character state
 - **Canonical repository:** `~/Git/gandalfDnD`
 
 ## 1. Purpose of this document
@@ -87,6 +87,7 @@ Current documentation index:
 | Research provenance and historical research inputs | [`research/README.md`](research/README.md) |
 | Character state and deterministic rules engineering contract | [`rules/CHARACTER_AND_RULES_SPEC.md`](rules/CHARACTER_AND_RULES_SPEC.md) |
 | Rules interpretations, product policies, adjudications, and house rules | [`rules/RULINGS.md`](rules/RULINGS.md) |
+| Supported player character-creation workflow and limitations | [`player/CHARACTER_CREATION.md`](player/CHARACTER_CREATION.md) |
 
 ## 2. Product objective
 
@@ -445,9 +446,10 @@ M1.1 milestone review:
 - **Issues encountered:** the first release command used an abbreviated commit as
   `target_commitish`, which GitHub rejected before creating any release; retrying against the
   already-pushed `main` branch succeeded without partial state.
-- **Workaround or debt:** normalized data remains intentionally `foundation_only`; this is planned
-  M1.2 work rather than a silent partial rules implementation. The existing Starlette/httpx test
-  deprecation warning is non-blocking and should be resolved during dependency maintenance.
+- **Workaround or debt at M1.1 closure:** normalized data was intentionally `foundation_only`; that
+  planned work was subsequently completed for the supported creation slice in M1.2. The existing
+  Starlette/httpx test deprecation warning is non-blocking and should be resolved during dependency
+  maintenance.
 - **Architecture/scope result:** immutable release provenance is accepted; explicit cross-version
   conversion remains deferred until a real migration requirement exists.
 - **Go / rework / stop decision:** Go. Begin source-cited Human/Soldier/Fighter character records
@@ -455,14 +457,62 @@ M1.1 milestone review:
 
 #### M1.2 Guided character creation
 
-- draft/finalized character-creation lifecycle;
-- rules-valid Human/Soldier/Fighter identity, abilities, level, required languages, skills, feats,
-  Fighting Style, weapon mastery, and one supported starting-equipment route;
-- standard array as the only M1 ability-generation method;
-- guided descriptions suitable for a first-time player;
-- calculated starting HP and proficiencies;
-- creation events record every consequential choice with rule-definition and acquisition provenance;
-- finalized characters are immutable except through explicit advancement/admin workflows.
+**Status:** Done
+
+Implemented:
+
+- an immutable, separately checksummed `srd-5.2.1-character-creation-v1` data catalog with durable
+  SRD page citations and beginner descriptions;
+- a draft/finalized lifecycle in which turns are blocked until successful finalization;
+- strict Human/Soldier/Fighter validation covering standard array, Soldier increases, languages,
+  non-overlapping skills, Human Origin feat, gaming set, Fighting Style, weapon masteries, size,
+  alignment, and the supported Soldier A plus Fighter A equipment route;
+- pure level-one ability-modifier and maximum-HP calculations plus the creation-time sheet projection
+  for proficiencies, equipment, features, and Second Wind maximum uses;
+- immutable character grants linking each consequential choice or grant to its ruleset release,
+  catalog, source definition, acquisition event, choice slot, revision, and source citation IDs;
+- database protection for rules-data catalogs, character grants, finalized creation facts, and
+  campaign ruleset/catalog pins;
+- API routes for catalog options, name-only drafts, transactional finalization, and grant provenance;
+- safe migration backfill: pre-M1.2 records retain the foundation catalog while new campaigns use
+  the guided-creation catalog;
+- a player-facing guide for the supported workflow and limitations.
+
+Verification evidence recorded 2026-08-31:
+
+- 38 automated tests passed with 91% application statement coverage;
+- GF-001, GF-002, and the M1.2 portion of GF-003 pass, including the golden 17/14/14 ability result,
+  +3/+2/+2 modifiers, and level-one maximum HP 12;
+- invalid catalog IDs, incomplete/duplicate/overlapping choices, invalid standard arrays, invalid
+  Soldier increases, and unsupported free-form input are rejected without finalizing the draft;
+- source-linked grants, finalized creation facts, catalog metadata, and campaign pins reject
+  direct database updates or deletes;
+- schema generation/freshness, normalized-catalog checksums, Ruff lint, and formatting checks passed;
+- migration `0003_guided_character_creation` applied to development and passed transactional upgrade,
+  backfill, immutability, and guarded-downgrade tests in the isolated test database;
+- Alembic reported no ORM/migration drift; development `/health` returned HTTP 200;
+- Clawvis and unrelated PostgreSQL databases/services were not accessed or changed.
+
+M1.2 milestone review:
+
+- **Review date:** 2026-08-31
+- **Implementation/migration:** M1.2 feature commit; `0003_guided_character_creation`
+- **Acceptance result:** all M1.2 gates passed; proceed to M1.3.
+- **What worked well:** the catalog response drives both beginner guidance and strict validation;
+  the same immutable acquisition event and source IDs make the finalized sheet auditable without
+  allowing API/model text to become rules data.
+- **Issues encountered:** isolated migration tests intentionally clear application tables, which can
+  remove the M1.1 release seed before testing M1.2 from a synthetic baseline. The migration now
+  restores the exact known release row with `ON CONFLICT DO NOTHING`; it never updates an existing
+  release or broadens database access.
+- **Workaround or debt:** Magic Initiate, Skilled tool choices, alternate equipment packages, and
+  broader creation content are explicitly deferred. M1.2 projects several starting statistics, but
+  complete equipment state, AC alternatives, resources, and reproducible component provenance remain
+  M1.3 work. The existing Starlette/httpx deprecation warning remains non-blocking.
+- **Architecture/scope result:** source artifacts, releases, and normalized catalogs have distinct
+  immutable identities; existing records never silently adopt a new catalog.
+- **Go / rework / stop decision:** Go. Build M1.3 from the saved source facts and grants; do not
+  expand character breadth before the deterministic M1.4 exit gate.
 
 #### M1.3 Complete Phase 1 character state
 
@@ -623,16 +673,17 @@ deployable if Clawvis is offline.
 | ISSUE-001 | Environment | Resolved | VM template revoked `CREATE` on `public`, initially blocking Alembic | Tests/migrations failed | Granted each restricted role schema creation only in its own DB; M0 |
 | DEBT-001 | Architecture | Open | Model requests its own dice modifier | Fairness and correctness are incomplete | Calculate from character/rules state; M1.4 |
 | DEBT-002 | Architecture | Open | Narration is generated before dice results | Narration may contradict outcome | Two-stage turn flow; M2 |
-| GAP-001 | Product | Open | Character creation is only name, HP, inventory | Not sufficient for real D&D | M1.1–M1.3 |
+| GAP-001 | Product | In progress | M1.2 now creates one complete legal Human/Soldier/Fighter and preserves its grants, but full Phase 1 equipment/defense/resource state is not complete | Character breadth and some playable state remain limited | Complete the initial state projection in M1.3; expand breadth only in M1.5 |
 | GAP-002 | Product | Open | No deterministic quest/world decision model | Decisions have limited lasting effects | M3 |
 | TEST-001 | Validation | Open | OpenAI provider has no paid live evaluation | Real structured behavior unproven | Lantern Test; M2 |
 | WARN-001 | Dependency | Monitoring | Current TestClient emits an `httpx` deprecation warning | No functional failure today | Reassess FastAPI/Starlette test client during dependency maintenance |
 | OPS-001 | Source control | Resolved | Initial push was blocked because HTTPS lacked credentials and Git did not automatically select the nonstandard SSH key filename | GitHub was temporarily behind local `main` | Registered the existing Ed25519 key, verified GitHub's host fingerprint, configured this repository's SSH command, and synchronized `main`; 2026-08-30 |
 | OPS-002 | Infrastructure | Deferred | pgvector is unavailable on `postgresvm` | No semantic memory yet | Evaluate/install only at M4 |
 | DOC-001 | Documentation | Open | RES-001's verbatim export contains temporary Deep Research citation tokens | Tokens are not durable implementation citations | Preserve the source unchanged; use official URLs and SRD pages in specifications and rule definitions; M1.1 onward |
-| GAP-003 | Rules | In progress | M1.1 now provides immutable release provenance, but normalized character-rule definitions and per-grant provenance do not exist yet | Character calculations are not yet authoritative | Implement source-cited definitions and character grants in M1.2–M1.3 |
+| GAP-003 | Rules | In progress | M1.2 provides immutable source-cited character definitions and per-grant provenance, but not every M1.3 derived component or M1.4 resolution input is reconstructible yet | Creation is authoritative; live check/save mechanics are not | Complete reproducible state derivations in M1.3 and authoritative resolution in M1.4 |
 | GAP-004 | Product | Open | Solo balance has a research framework but no measured product results | Encounter/class support cannot yet claim solo balance | Establish strict-SRD baselines in M5; build balance harness after supported combat |
 | DEBT-003 | Architecture | Open | The research proposes greenfield service/table boundaries that have not been reconciled with Phase 0 models | Premature adoption could create redundant schema or services | Reconcile per vertical slice; do not bulk-create the proposed model; M1 onward |
+| ISSUE-002 | Migration/test fixture | Resolved | Synthetic M1.2 migration tests could begin after isolated cleanup had removed the M1.1 seed row | The new foreign-key-backed catalog seed could not be installed from that test baseline | `0003` inserts the exact immutable M1.1 release with `ON CONFLICT DO NOTHING`; transactional migration tests and the full suite pass |
 
 New entries must include reproduction steps or evidence when applicable. Do not close an issue only
 because a workaround exists; record both the workaround and the permanent resolution.
@@ -678,6 +729,7 @@ because a workaround exists; record both the workaround and the permanent resolu
 | ADR-012 | 2026-08-30 | Only validated rules commands/events may change mechanical state; narration and world facts cannot silently establish mechanics | Persistent narrative freedom must not compromise deterministic, auditable D&D outcomes | Never for authoritative mechanics |
 | ADR-013 | 2026-08-30 | Measure strict SRD solo behavior before adding separately versioned solo house rules | Party-dependent features and encounter action economy cannot be corrected safely through invisible exceptions | After supported combat produces balance evidence |
 | ADR-014 | 2026-08-30 | Introduce structured rule operators incrementally from proven semantics, with versioned specialized resolvers for exceptions | Avoid both feature-specific subclass sprawl and a premature universal rules language | When repeated implemented rules justify a new operator |
+| ADR-015 | 2026-08-31 | Give normalized data catalogs immutable identities separate from source releases and pin every record to both | The official artifact can remain unchanged while supported machine-readable subsets evolve; old campaigns must not silently adopt later semantics | When an explicit catalog/ruleset conversion workflow is implemented |
 
 ## 14. Milestone review template
 
@@ -766,15 +818,16 @@ Destination milestone:
 
 ## 17. Immediate next actions
 
-1. Define the source-cited normalized rule records required for the fixed Human/Soldier/Fighter
-   creation path without adding unrelated SRD content.
-2. Turn GF-001–GF-004, GF-006–GF-007, and GF-013–GF-014 into the M1.2–M1.4 executable sequence.
-3. Design and migrate only the character choices/grants/provenance needed by that slice.
-4. Implement guided character creation and transactional finalization.
-5. Implement pure derived-stat calculations, then authoritative check/save resolution and complete
-   rule-resolution audit records.
-6. Review M1 evidence and documentation freshness before M2; move broader options to M1.5 rather
-    than expanding the exit gate during implementation.
+1. Specify the M1.3 canonical/projection boundary for equipment state, AC alternatives, Hit Dice,
+   initiative, speed, passive Perception, and current/max feature resources.
+2. Extend the pure derivation kernel so every M1.3 value is reproducible from the pinned catalog and
+   immutable character choices/grants, completing GF-003, GF-004, and GF-007.
+3. Add only the schema/migration/API fields required by that state slice, with restart and
+   reconstruction tests; do not duplicate derivable facts as independently editable inputs.
+4. Begin M1.4 only after the M1.3 golden sheet and provenance gates pass; then implement
+   authoritative check/save resolution, fixed-dice replay, and model-modifier rejection.
+5. Review complete M1 evidence and documentation freshness before M2; move broader character options
+   to M1.5 rather than expanding the exit gate during implementation.
 
 ## 18. Documentation change log
 
@@ -788,3 +841,4 @@ Destination milestone:
 | 2026-08-30 | DOC-006 | Preserved and indexed RES-001, recorded its adoption review, created the character/rules specification and rulings register, and revised M1 scope/risks/decisions/traceability | Project owner approved the reviewed recommendations and required research to remain durable long-term development memory | Implement M1.1 from the fixed vertical slice; keep research, rulings, specifications, and evidence synchronized |
 | 2026-08-30 | DOC-007 | Recorded M1.1 registry, artifact verification, database pinning, migration safety, tests, and `Verification` status | 22 tests, 91% coverage, exact official artifact checksum, schema validation, HTTP 200 health, and zero migration drift | Publish and verify the GitHub Release mirror, then close M1.1 and begin source-cited character definitions |
 | 2026-08-30 | DOC-008 | Closed M1.1 and advanced current delivery to M1.2 | Commit `bada61c`, migration `0002_ruleset_releases`, the official artifact, and the published project release all passed the recorded integrity, migration, API, schema, lint, runtime, and regression gates | Implement the source-cited Human/Soldier/Fighter guided-creation slice |
+| 2026-08-31 | DOC-009 | Closed M1.2, added the player character-creation guide, and advanced current delivery to M1.3 | 38 tests, 91% coverage, migration `0003`, immutable source-linked grants, schema/catalog integrity checks, zero Alembic drift, and development health all passed | Complete reproducible Phase 1 character state without expanding the supported creation slice |

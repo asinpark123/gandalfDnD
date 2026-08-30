@@ -18,6 +18,9 @@ def main() -> int:
             f"artifact={release.manifest.artifact.sha256} "
             f"status={release.manifest.normalized_data.support_status}"
         )
+        for catalog_id, catalog in release.data_catalogs.items():
+            print(f"  catalog={catalog_id} kind={catalog.kind} sha256={catalog.sha256}")
+        print(f"  default catalog={release.default_data_catalog_id}")
     print(f"Default release: {registry.default_release_id}")
     return 0
 

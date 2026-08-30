@@ -13,6 +13,10 @@
       "default": null,
       "title": "$Schema"
     },
+    "data_catalog_id": {
+      "title": "Data Catalog Id",
+      "type": "string"
+    },
     "definition_files": {
       "items": {
         "type": "string"
@@ -41,6 +45,7 @@
   },
   "required": [
     "schema_version",
+    "data_catalog_id",
     "ruleset_release_id",
     "support_status",
     "definition_files"

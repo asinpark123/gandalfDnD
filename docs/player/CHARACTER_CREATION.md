@@ -55,6 +55,9 @@ source definition, acquisition event, choice slot, and cited source IDs for audi
 
 ## Current limitations
 
+- M1.2 currently permits one character per campaign. M1.3 will introduce Party Commander so one
+  human player can create and directly control multiple independently persisted party characters;
+  Protagonist with Companions and Lone Hero modes follow later in that order.
 - Other species, backgrounds, classes, ability-generation methods, equipment routes, and most feats
   are deferred until after the initial deterministic-mechanics milestone.
 - Magic Initiate is deferred because the first slice has no spellcasting engine.

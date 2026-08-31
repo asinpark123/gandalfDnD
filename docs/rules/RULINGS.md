@@ -26,7 +26,7 @@ before shipping.
 
 | ID | Classification | Decision and rationale | Scope | Required evidence |
 | --- | --- | --- | --- | --- |
-| RUL-001 | Product policy | M1 supports one complete level-one Human/Soldier/Fighter path using standard array. Breadth is deferred so the first rules slice can be proven end to end. | M1.2–M1.4 | GF-001–GF-004 |
+| RUL-001 | Product policy | Every initial M1 character uses the complete level-one Human/Soldier/Fighter path and standard array. M1.2 proved one character; M1.3 reuses the same content slice for multiple Party Commander characters. Content breadth remains deferred so party state and deterministic mechanics are proven end to end first. | M1.2–M1.4 | GF-001–GF-004; GF-015 |
 | RUL-002 | Product policy | Standard array is the only M1 ability-generation method. This does not classify point buy or random generation as non-SRD; their product support is deferred. | M1 | Valid/invalid assignment tests |
 | RUL-003 | Product policy | Alignment may guide bounded narration but never supplies an unstated mechanical modifier. | All releases | Narrative context and mechanical-write rejection tests |
 | RUL-004 | Implementation interpretation | Contextual checks carry an explicit ability and optional skill/tool selection. Skills are not globally hard-locked to one ability. | D20 resolver | Typed check contract and fixtures |
@@ -40,6 +40,7 @@ before shipping.
 | RUL-022 | Product policy | Skilled initially grants three distinct supported skills. The SRD also permits tool choices, but arbitrary tool selection is deferred until tool definitions and their gameplay semantics are implemented. Source: SRD 5.2.1 Skilled, p. 87. | `srd-5.2.1-character-creation-v1` | Skilled cardinality, overlap, and unsupported-choice tests |
 | RUL-023 | Product policy | M1.2 supports only Soldier equipment option A plus Fighter equipment option A. Fighter weapon-mastery choices are restricted to the three weapon definitions supplied by that fixed route: Javelin, Flail, and Greatsword. Other valid SRD packages and mastery choices are deferred, not reclassified as illegal. Source: SRD 5.2.1 Fighter pp. 47–48, Soldier p. 83, weapons/equipment pp. 91–97. | `srd-5.2.1-character-creation-v1` | Exact route, three-unique-masteries, inventory, and unsupported-option tests |
 | RUL-024 | Product architecture | A normalized catalog is immutable and separately identified from its source release. New campaigns use the release's explicit default catalog; existing records retain their prior catalog until an explicit compatibility workflow converts them. | M1.2 onward | Hash/identity validation, migration backfill, pin immutability, and coexistence tests |
+| RUL-025 | Product architecture | Solo-player modes are delivered in the order Party Commander, Protagonist with Companions, then Lone Hero. Party Commander directly controls every player character and establishes ordinary party mechanics. Delegated companion decisions later reuse the same deterministic engine. Lone-hero balance is designed last from measured baselines, and any compensation is an explicit house rule. | M1.3 onward | GF-015; party combat/world fixtures; companion equivalence/override tests; later strict-versus-house-rule solo benchmarks |
 
 ## Open and deferred rulings
 
@@ -47,7 +48,7 @@ before shipping.
 | --- | --- | --- | --- | --- |
 | RUL-011 | Deferred | Point buy and random ability generation | Valid SRD methods but outside the first supported slice | Expanding character creation beyond M1 |
 | RUL-012 | Deferred | Custom backgrounds | Official SRD customization, not inherently a house rule | Enabling background creation/customization |
-| RUL-013 | Proposed | Solo companions | Companion presence materially changes action economy and ally-dependent class features | Designing recurring companions or solo-balance policies |
+| RUL-013 | Deferred | Exact companion autonomy and player-override policy | Companion presence is accepted after Party Commander, but delegation granularity, personality influence, consent, and override timing still affect agency and action economy | Scoping Protagonist with Companions after Party Commander combat is proven |
 | RUL-014 | Proposed | Default-world firearms | Rules content availability is separate from whether a campaign setting exposes it | Equipment/world content expansion |
 | RUL-015 | Proposed | Improvised-action DC/ability/skill selection | The SRD intentionally requires GM adjudication | M2/M3 improvised-action support |
 | RUL-016 | Proposed | Narrative and mechanical curses | Descriptive curses may be narrative; active mechanics require versioned effects | Curse feature implementation |
@@ -82,3 +83,4 @@ Revisit condition:
 | --- | --- |
 | 2026-08-30 | Created the register from the accepted RES-001 review; recorded M1 scope and foundational boundaries while preserving unresolved policies as open/deferred. |
 | 2026-08-31 | Recorded the accepted M1.2 feat, Skilled, equipment/mastery, and immutable data-catalog support policies with source pages and regression requirements. |
+| 2026-08-31 | Accepted party-mode sequencing in RUL-025, revised the M1 content slice to support multiple Party Commander characters, and narrowed RUL-013 to the later unresolved companion-autonomy policy. |

@@ -1,6 +1,8 @@
 # GandalfDnD
 
-GandalfDnD is a persistent solo D&D engine with an AI dungeon-master boundary. Phase 0 proves the
+GandalfDnD is a persistent D&D engine for a solo player, with an AI dungeon-master boundary. The
+product direction is party-first: the player will initially command every party character, with
+AI-assisted companions and a specially balanced lone-hero mode following later. Phase 0 proves the
 smallest trustworthy loop: campaign state enters the model as data, the model returns typed
 proposals, application code validates those proposals, dice are rolled by code, and the accepted
 result is committed to PostgreSQL with an append-only event trail.

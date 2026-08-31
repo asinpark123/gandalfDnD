@@ -3,7 +3,8 @@
 - **Document status:** Active
 - **Last updated:** 2026-08-31
 - **Rules baseline:** SRD 5.2.1 (pinned; M1.2 character-creation catalog verified)
-- **Current delivery stage:** Milestone 1 implementation — M1.3 complete Phase 1 character state
+- **Current delivery stage:** Milestone 1 implementation — M1.3 Party Commander and complete Phase
+  1 character state
 - **Canonical repository:** `~/Git/gandalfDnD`
 
 ## 1. Purpose of this document
@@ -91,7 +92,8 @@ Current documentation index:
 
 ## 2. Product objective
 
-GandalfDnD will provide a persistent solo D&D experience with two eventually distinct AI roles:
+GandalfDnD will provide a persistent D&D experience for one human player, initially commanding an
+adventuring party, with two eventually distinct AI roles:
 
 1. A campaign-stateful Dungeon Master that conducts fair, coherent play over long campaigns.
 2. A spoiler-safe Guide that teaches rules and explains player options without receiving hidden
@@ -103,8 +105,9 @@ resolve rules, dice, resources, and allowed state transitions.
 
 ## 3. Success criteria
 
-The project succeeds when a solo player can create a legal character, play a long campaign, restart
-the application, and continue with mechanically correct state and narratively coherent recall.
+The project succeeds when a solo player can create a legal adventuring party, play a long campaign,
+restart the application, and continue with mechanically correct state and narratively coherent
+recall.
 
 The player must be able to trust that:
 
@@ -265,12 +268,14 @@ results, known limitations, and where observations will be recorded.
 | Checkpoint | Owner input required | Owner testing expectation |
 | --- | --- | --- |
 | M1.2 guided creation | None; the supported slice and deferrals are already accepted | Optional API/Swagger review of valid creation, rejected invalid choices, finalized sheet, and provenance |
-| M1.3 complete character state | No blocking input unless a new rules/product ambiguity appears; clarity feedback is welcome | Short acceptance review of AC, initiative, speed, proficiencies, equipment, HP/Hit Dice, features/resources, and beginner readability |
+| M1.3 Party Commander and complete character state | No blocking input unless a new rules/product ambiguity appears; clarity feedback is welcome | Short acceptance review of party/character selection, isolated state, AC, initiative, speed, proficiencies, equipment, HP/Hit Dice, features/resources, and beginner readability |
 | M1.4 deterministic resolution | Decide only genuinely ambiguous adjudication/product policies that cannot be resolved from the pinned SRD and accepted rulings | Important acceptance test proving saved character choices change checks/saves and model-supplied modifiers cannot override canonical results |
 | M2 live AI feasibility | Approve any paid live-model evaluation and provide desired narrative tone/content boundaries | Critical Lantern Test covering dialogue, movement, inventory, check, damage, restart, resume, and narration/mechanics agreement |
 | M3 persistent world | Provide campaign-structure preferences when they affect consequence and quest design | Multi-session play test confirming decisions, NPC relationships, quests, and revealed facts persist coherently across restarts |
 | M1.5 content expansion | Prioritize desired species, backgrounds, classes, feats, equipment routes, spellcasting, and play styles | Create contrasting supported characters and confirm their choices produce understandable, distinct state and later gameplay |
-| M5 combat and solo balance | Choose difficulty/lethality goals, companion policy, and whether measured solo adjustments may become explicit house rules | Repeated combat tests across favorable, difficult, defeat, recovery, and restart scenarios |
+| M5 party combat | Provide difficulty/lethality feedback for standard party play; companion autonomy and lone-hero compensation remain later decisions | Repeated Party Commander combat tests across favorable, difficult, defeat, recovery, and restart scenarios |
+| Protagonist with Companions | Choose desired companion autonomy, instruction granularity, personality influence, and player override behavior after Party Commander is proven | Compare delegated companion proposals with direct Party Commander control and verify the same deterministic rules constrain both |
+| Lone Hero | Choose desired difficulty and whether measured compensation options should be offered as explicit house rules after the two party modes work | Run single-character benchmarks against the established party baseline; verify every adjustment is visible, optional, and versioned |
 | M6 spoiler-safe Guide | Choose preferred guidance depth and proactive-versus-requested help | Ask campaign-sensitive questions and verify useful guidance never reveals DM-only facts |
 | M7 player interface | Provide strong layout, accessibility, workflow, and usability feedback | Full ordinary-player journey without relying on direct API knowledge |
 | M8 deployment | Choose availability, privacy, hosting-cost, backup, and recovery expectations | Operational acceptance covering access, restart, backup/restore, failure reporting, and recovery |
@@ -301,7 +306,7 @@ Use these values consistently:
 | ID | Milestone | Status | Primary outcome |
 | --- | --- | --- | --- |
 | M0 | Persistence and safety foundation | Done | Canonical state and auditable turn skeleton |
-| M1 | Character creation and deterministic mechanics | In progress | Character choices drive calculated outcomes |
+| M1 | Party character creation and deterministic mechanics | In progress | The selected acting character's choices drive calculated outcomes |
 | M2 | Two-stage AI turn and live feasibility | Proposed | Real DM uses recorded dice results safely |
 | M3 | Persistent world model | Proposed | NPCs, quests, scenes, clues, time, and visibility |
 | M4 | Long-term memory and retrieval | Proposed | Coherent recall without full history in context |
@@ -310,6 +315,26 @@ Use these values consistently:
 | M7 | Play interface and campaign administration | Proposed | Usable play, recap, correction, and export workflows |
 | M8 | Deployment and operations | Deferred | Dedicated reliable service with backups and monitoring |
 | M9 | Optional Clawvis integration | Deferred | Clawvis acts only as an API client/interface |
+
+### 9.1 Party-mode delivery sequence
+
+Gandalf supports one human player through three modes, delivered in this order:
+
+1. **Party Commander:** the player creates and directly decides actions for every player character.
+   This most closely preserves ordinary party-oriented D&D rules and becomes the foundation of
+   M1.3 character state, M1.4 resolution, M2 turns, M3 world consequences, and M5 combat.
+2. **Protagonist with Companions:** the player directly controls a primary character and delegates
+   bounded decisions for companions. Companion AI proposes intentions/actions, but canonical rules,
+   resources, targets, dice, and consequences use the same deterministic party engine and remain
+   subject to explicit player direction/override policies.
+3. **Lone Hero:** a single-character campaign is productized only after both party modes and
+   standard party combat are proven. Strict unmodified rules are measured first; any recovery,
+   action-economy, encounter, or survivability compensation is optional, visible, versioned, and
+   classified as a house rule rather than silently changing SRD behavior.
+
+This sequence separates “one human player” from “one player character.” It avoids designing the
+canonical mechanics around exceptional solo compensation and ensures later modes reuse—not fork—the
+same character, action, event, and rules-resolution foundations.
 
 ## 10. Milestone specifications
 
@@ -367,8 +392,9 @@ and deterministic mechanics are therefore promoted ahead of broader live-model t
 - **Status:** In progress
 - **Priority:** Immediate
 
-Player outcome: a beginner can create a rules-valid level-one character, understand their choices,
-and receive mechanically reproducible checks derived from the saved character sheet.
+Player outcome: a beginner can create multiple rules-valid level-one characters, understand their
+choices, command the party directly, and receive mechanically reproducible checks derived from the
+selected acting character's saved state.
 
 Planning basis:
 
@@ -380,10 +406,13 @@ Planning basis:
   [`rules/RULINGS.md`](rules/RULINGS.md);
 - research adoption is planning evidence only and does not change M1 implementation status.
 
-Initial supported slice: one level-one Human with the Soldier background and Fighter class using
-standard-array ability generation. All mandatory choices for that path must be genuinely rules-valid;
-unsupported options must be rejected rather than partially implemented. This exact slice is a
-delivery constraint, not a claim that other SRD options are invalid.
+Initial supported content slice: every M1 character is a level-one Human with the Soldier background
+and Fighter class using standard-array ability generation. M1.2 proved the complete lifecycle for
+one character; M1.3 removes the campaign singleton assumption and establishes Party Commander with
+multiple independently persisted characters. All mandatory choices for that path must be genuinely
+rules-valid; unsupported options must be rejected rather than partially implemented. Reusing this
+content slice across the initial party is a delivery constraint, not a claim that other SRD options
+are invalid or a long-term requirement that party members share one build.
 
 Planned slices:
 
@@ -546,8 +575,11 @@ M1.2 milestone review:
 - **Go / rework / stop decision:** Go. Build M1.3 from the saved source facts and grants; do not
   expand character breadth before the deterministic M1.4 exit gate.
 
-#### M1.3 Complete Phase 1 character state
+#### M1.3 Party Commander and complete Phase 1 character state
 
+- campaign-level party identity and multiple independently addressable player characters;
+- explicit `party_commander` campaign mode and player-controlled character ownership/control state;
+- removal of singleton persistence/API assumptions without weakening per-character provenance;
 - ability scores and modifiers;
 - proficiency bonus, skills, and saving throws;
 - armor class, initiative, speed, hit dice, and level;
@@ -555,15 +587,17 @@ M1.2 milestone review:
 - supported Fighter/Human/background features and expendable resources;
 - eligible alternative base calculations remain distinct rather than being added together;
 - derived values remain reproducible projections of versioned source choices and grants;
+- commands, state changes, events, and later resolutions identify the acting/affected character;
 - no spellcasting fields are required by the initial supported slice.
 
 Owner checkpoint: no input is required to begin implementation. At `Verification`, provide a short
-sheet-readability and state-correctness checklist covering every field above; record feedback before
-M1.3 is closed.
+party/character selection, sheet-readability, state-isolation, and correctness checklist covering
+every field above; record feedback before M1.3 is closed.
 
 #### M1.4 Deterministic resolution service
 
 - calculate modifiers from canonical state rather than model-provided numbers;
+- require an acting character ID and derive only from that character's state;
 - resolve ability checks and saving throws first;
 - record rule/definition versions, formula and provenance inputs, exact dice faces, RNG/resolver
   versions, total, and typed outcome in a rule-resolution record;
@@ -579,11 +613,12 @@ Add other species, backgrounds, ability-generation methods, feats, classes, equi
 level-one spellcasting in complete vertical slices. Later advancement, multiclassing, spell and
 combat interactions must use equivalence-class and boundary fixtures rather than an exhaustive
 species × background × class × feat × spell matrix. This expansion does not block M2's feasibility
-proof with the initial supported character.
+proof with the initial supported party content slice.
 
 M1.1–M1.4 acceptance gates (M1.5 is not required):
 
-- one complete supported level-one character can be created through the API without manual DB edits;
+- a Party Commander campaign can create and independently address at least two complete supported
+  level-one characters through the API without manual DB edits;
 - all derived values match golden test fixtures;
 - invalid option combinations and illegal standard-array assignments are rejected;
 - every consequential choice and derived component retains source provenance;
@@ -594,7 +629,9 @@ M1.1–M1.4 acceptance gates (M1.5 is not required):
   or item change;
 - a command referencing another rules release is rejected outside an explicit migration workflow;
 - a beginner-facing explanation exists for each creation choice in the supported slice;
-- every rule-derived value identifies the immutable ruleset and normalized rule-data version used.
+- every rule-derived value identifies the immutable ruleset and normalized rule-data version used;
+- one character's choices, damage, resources, inventory, and events cannot mutate or be attributed to
+  another character without an explicit typed multi-character effect.
 
 Golden fixtures and requirement-to-source/implementation/test traceability are maintained in
 [`rules/CHARACTER_AND_RULES_SPEC.md`](rules/CHARACTER_AND_RULES_SPEC.md). Update that matrix in the
@@ -624,7 +661,8 @@ Planned work:
 - handle provider timeout, retry, refusal, malformed output, and cancellation safely;
 - record provider, model, prompt version, latency, and token usage;
 - ensure a provider failure never partially changes canonical state;
-- run the real-model Lantern Test: dialogue, movement, inventory use, check, damage, restart, resume;
+- run the real-model Lantern Test with at least two player-controlled characters: dialogue,
+  movement, inventory use, check, damage, character switching, restart, and resume;
 - compare model narration with the recorded mechanical outcome.
 
 Exit gate: ten consecutive Lantern Test runs complete without impossible state, invented dice,
@@ -662,8 +700,8 @@ Add encounters, combatants, initiative, rounds/turn order, action economy, attac
 conditions, defeat, and encounter completion. Start with a deliberately small supported rules
 subset.
 
-Exit gate: fixed combat fixtures replay to identical results, illegal actions are rejected, and a
-restart during combat resumes the exact initiative and resource state.
+Exit gate: fixed Party Commander combat fixtures replay to identical results, illegal actions are
+rejected, and a restart during combat resumes the exact per-character initiative and resource state.
 
 ### M6 — Spoiler-safe Guide
 
@@ -709,7 +747,7 @@ deployable if Clawvis is offline.
 | ISSUE-001 | Environment | Resolved | VM template revoked `CREATE` on `public`, initially blocking Alembic | Tests/migrations failed | Granted each restricted role schema creation only in its own DB; M0 |
 | DEBT-001 | Architecture | Open | Model requests its own dice modifier | Fairness and correctness are incomplete | Calculate from character/rules state; M1.4 |
 | DEBT-002 | Architecture | Open | Narration is generated before dice results | Narration may contradict outcome | Two-stage turn flow; M2 |
-| GAP-001 | Product | In progress | M1.2 now creates one complete legal Human/Soldier/Fighter and preserves its grants, but full Phase 1 equipment/defense/resource state is not complete | Character breadth and some playable state remain limited | Complete the initial state projection in M1.3; expand breadth only in M1.5 |
+| GAP-001 | Product | In progress | M1.2 creates one complete legal Human/Soldier/Fighter and preserves its grants, but the API/schema still enforce one character per campaign and full Phase 1 equipment/defense/resource state is incomplete | Party Commander cannot yet exist and character breadth remains limited | Remove singleton assumptions and complete isolated per-character state in M1.3; expand content breadth only in M1.5 |
 | GAP-002 | Product | Open | No deterministic quest/world decision model | Decisions have limited lasting effects | M3 |
 | TEST-001 | Validation | Open | OpenAI provider has no paid live evaluation | Real structured behavior unproven | Lantern Test; M2 |
 | WARN-001 | Dependency | Monitoring | Current TestClient emits an `httpx` deprecation warning | No functional failure today | Reassess FastAPI/Starlette test client during dependency maintenance |
@@ -743,9 +781,10 @@ because a workaround exists; record both the workaround and the permanent resolu
 | RISK-013 | A generic rules DSL is designed before concrete semantics are proven | Medium | High | Start with typed data and pure functions; generalize only repeated rules; permit focused versioned resolvers |
 | RISK-014 | Natural-language SRD exceptions are translated silently or incorrectly | High | High | Durable source/page citations, explicit rulings, specialized fixtures, and “specific beats general” review |
 | RISK-015 | Narration creates hidden mechanical effects | High | High | Mechanical write boundary, typed commands/events, world-fact namespace, and rejection fixture |
-| RISK-016 | Party-oriented encounter guidance is treated as a solo safety guarantee | High | High | Strict single-PC benchmarks, action-economy metrics, seeded simulations, and labelled house-rule comparisons |
+| RISK-016 | Party-oriented encounter guidance is treated as a lone-hero safety guarantee | High | High | Prove Party Commander first; later run strict single-character benchmarks, action-economy metrics, seeded simulations, and labelled house-rule comparisons |
 | RISK-017 | Gandalf additions are mistaken for official SRD rules | Medium | High | Separate versioned house-rule packages, UI labels, source/rationale, tests, and migration identity |
 | RISK-018 | Research recommendations drift from code or are mistaken for implemented behavior | Medium | Medium | Research index/reviews, traceability matrix, implementation-status labels, and milestone evidence gates |
+| RISK-019 | Multi-character state or action attribution leaks across party members | Medium | High | Explicit actor/target IDs, per-character revisions and provenance, isolation/rollback tests, and GF-015 at every party-aware boundary |
 
 ## 13. Architectural decision log
 
@@ -766,6 +805,7 @@ because a workaround exists; record both the workaround and the permanent resolu
 | ADR-013 | 2026-08-30 | Measure strict SRD solo behavior before adding separately versioned solo house rules | Party-dependent features and encounter action economy cannot be corrected safely through invisible exceptions | After supported combat produces balance evidence |
 | ADR-014 | 2026-08-30 | Introduce structured rule operators incrementally from proven semantics, with versioned specialized resolvers for exceptions | Avoid both feature-specific subclass sprawl and a premature universal rules language | When repeated implemented rules justify a new operator |
 | ADR-015 | 2026-08-31 | Give normalized data catalogs immutable identities separate from source releases and pin every record to both | The official artifact can remain unchanged while supported machine-readable subsets evolve; old campaigns must not silently adopt later semantics | When an explicit catalog/ruleset conversion workflow is implemented |
+| ADR-016 | 2026-08-31 | Deliver solo-player control modes in the order Party Commander, Protagonist with Companions, then Lone Hero | Direct control of a normal adventuring party aligns most closely with D&D's party mechanics; delegated companions can then reuse that trusted foundation, while exceptional single-character balance should be designed last from measured party and companion evidence | Revisit sequencing only if executable evidence shows Party Commander cannot establish the common mechanical foundation |
 
 ## 14. Milestone review template
 
@@ -854,17 +894,20 @@ Destination milestone:
 
 ## 17. Immediate next actions
 
-1. Specify the M1.3 canonical/projection boundary for equipment state, AC alternatives, Hit Dice,
-   initiative, speed, passive Perception, and current/max feature resources.
-2. Extend the pure derivation kernel so every M1.3 value is reproducible from the pinned catalog and
-   immutable character choices/grants, completing GF-003, GF-004, and GF-007.
-3. Add only the schema/migration/API fields required by that state slice, with restart and
-   reconstruction tests; do not duplicate derivable facts as independently editable inputs.
-4. Begin M1.4 only after the M1.3 golden sheet and provenance gates pass; then implement
-   authoritative check/save resolution, fixed-dice replay, and model-modifier rejection.
-5. Review complete M1 evidence and documentation freshness before M2; move broader character options
+1. Specify the M1.3 Party Commander aggregate, character addressing/control state, play-readiness
+   rule, and safe migration away from the current one-character-per-campaign constraint.
+2. Specify the per-character canonical/projection boundary for equipment state, AC alternatives, Hit
+   Dice, initiative, speed, passive Perception, and current/max feature resources.
+3. Extend the pure derivation kernel so every M1.3 value is reproducible from each character's pinned
+   catalog and immutable choices/grants, completing GF-003, GF-004, GF-007, and GF-015.
+4. Add only the schema/migration/API fields required by that party/state slice, with multi-character
+   isolation, actor attribution, restart, and reconstruction tests; do not duplicate derivable facts
+   as independently editable inputs.
+5. Begin M1.4 only after the M1.3 party, golden-sheet, isolation, and provenance gates pass; then
+   implement authoritative check/save resolution, fixed-dice replay, and model-modifier rejection.
+6. Review complete M1 evidence and documentation freshness before M2; move broader character options
    to M1.5 rather than expanding the exit gate during implementation.
-6. At each `Verification` gate, issue the owner checklist defined in section 7.6 and route every
+7. At each `Verification` gate, issue the owner checklist defined in section 7.6 and route every
    observation to evidence, defects, rulings, scope, or an explicitly accepted limitation.
 
 ## 18. Documentation change log
@@ -881,3 +924,4 @@ Destination milestone:
 | 2026-08-30 | DOC-008 | Closed M1.1 and advanced current delivery to M1.2 | Commit `bada61c`, migration `0002_ruleset_releases`, the official artifact, and the published project release all passed the recorded integrity, migration, API, schema, lint, runtime, and regression gates | Implement the source-cited Human/Soldier/Fighter guided-creation slice |
 | 2026-08-31 | DOC-009 | Closed M1.2, added the player character-creation guide, and advanced current delivery to M1.3 | Commit `ba7bca8`, 38 tests, 91% coverage, migration `0003`, immutable source-linked grants, schema/catalog integrity checks, zero Alembic drift, and development health all passed | Complete reproducible Phase 1 character state without expanding the supported creation slice |
 | 2026-08-31 | DOC-010 | Added project-owner decision gates and milestone-specific player acceptance checkpoints | The owner requested a durable record of when input is required and when hands-on testing is useful; M1.3 has no blocking input and receives a verification-stage sheet review | Provide a concise setup/actions/expected-results checklist at every applicable verification gate and record all outcomes |
+| 2026-08-31 | DOC-011 | Adopted party-first solo-player architecture and sequenced Party Commander, Protagonist with Companions, then Lone Hero | The owner selected standard party play as the mechanical foundation so delegated companions reuse proven rules and exceptional single-character compensation is designed last from evidence | Make M1.3 party-aware before adding further deterministic state; retain the fixed Human/Soldier/Fighter content slice until M1.4 passes |

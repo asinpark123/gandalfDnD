@@ -74,9 +74,11 @@ facts but are mechanically inert unless an accepted rule maps them to a typed ef
 
 ## 3. M1 supported vertical slice
 
-M1.2–M1.4 initially support exactly:
+M1.2 verified the complete lifecycle for one level-one player character. M1.3–M1.4 expand the same
+content slice into Party Commander: one human player directly controls multiple independently
+addressable characters. Every initial party character supports exactly:
 
-- one level-one player character;
+- level one;
 - Human species;
 - Soldier background;
 - Fighter class;
@@ -94,6 +96,11 @@ Combat execution, attack resolution, rests, broad conditions, spellcasting, leve
 backgrounds, other species/classes, and arbitrary equipment shopping do not belong to the M1 exit
 gate. Rule records may include prerequisites needed to explain the supported choices, but unsupported
 options must be rejected rather than partially accepted.
+
+Party Commander must not merge character sheets into one aggregate mechanical actor. Each command,
+roll, event, state transition, resource, inventory record, and effect identifies its acting or
+affected character. Supporting multiple characters from the same initial content slice proves party
+state and action boundaries without prematurely expanding class/species breadth.
 
 ## 4. Character creation lifecycle
 
@@ -118,12 +125,14 @@ Requirements:
 - Finalized creation choices are immutable except through a defined advancement, replacement,
   migration, correction, or administrative workflow.
 - Finalization records the exact ruleset, normalized-data schema, and resolver versions.
+- Creation/finalization is per character; a Party Commander campaign becomes play-ready only when
+  its required party members are finalized and no incomplete draft is being treated as an actor.
 
 ## 5. Canonical character-state families
 
 | State family | Canonical source facts | Examples of derived output |
 | --- | --- | --- |
-| Identity and provenance | campaign, name, player-visible description, ruleset release, revision | completion status |
+| Identity and provenance | campaign, party membership/order, control mode, name, player-visible description, ruleset release, revision | completion and party-play readiness |
 | Origin | species, background, languages, Origin feats, source choices | speed and granted proficiencies/features |
 | Class progression | ordered class-level events, class choices, feature grants | total level, class level, proficiency bonus |
 | Abilities | base assignments and source adjustment components | modifiers, save/check inputs |
@@ -187,7 +196,7 @@ An ability-check or saving-throw resolution records:
 
 ```text
 command_id and idempotency key
-campaign/character ID and pre-state revision
+campaign ID, acting character ID, affected/target character IDs, and relevant pre-state revisions
 ruleset release and definition IDs
 typed check/save context
 selected ability and optional skill
@@ -220,12 +229,17 @@ states, and other consequences. A world fact with mechanical semantics must cite
 or house-rule definition. Open-ended oath, curse, improvised-action, or similar cases create an
 `adjudication_required` result rather than an invented automatic mutation.
 
-## 10. House rules and solo play
+## 10. Party modes, house rules, and solo play
 
 - Strict SRD behavior is the measurement baseline.
 - A feature that targets “another creature” does not silently self-target in solo play.
-- Companions, solo recovery, encounter scaling, reputation mechanics, milestone levelling,
-  signature mechanical rewards, and ultimate abilities require explicit product decisions.
+- Party Commander is implemented first: the one human player directly decides every player
+  character's actions using ordinary party mechanics.
+- Protagonist with Companions follows only after Party Commander mechanics work. Delegated companion
+  intent never bypasses the canonical actor/target, validation, resource, dice, or event pipeline.
+- Lone Hero follows both party modes and strict party baselines. Solo recovery, encounter scaling,
+  action-economy compensation, reputation mechanics, milestone levelling, signature mechanical
+  rewards, and ultimate abilities require explicit product decisions.
 - Every mechanical house rule has its own package/release identity, source/rationale, UI label,
   golden tests, and migration compatibility policy.
 - Narrative milestones and signature moments are mechanically inert unless a selected house-rule
@@ -260,6 +274,7 @@ migrations.
 | GF-012 | Narrative write rejection | Prose alone cannot apply damage, healing, conditions, resources, items, or bonuses | Planned |
 | GF-013 | Cross-release rejection | A command using definitions from another rules release is rejected | Planned |
 | GF-014 | Ruleset coexistence | Adding a mock later release does not alter an existing campaign or fixture | Planned |
+| GF-015 | Party character isolation and attribution | A command for character A derives from and mutates only A unless an explicit typed effect names another target; every roll/event identifies the actor and affected character(s) | Planned M1.3–M1.4 |
 
 Later combat, spellcasting, rests, advancement, multiclassing, and solo-balance slices must append
 their report-identified fixtures rather than weakening these contracts.
@@ -272,6 +287,7 @@ their report-identified fixtures rather than weakening these contracts.
 | Character source provenance | RES-001 canonical-state model; ADR-010 | `CharacterGrant`; `app/character_creation.py`; `app/services.py`; grants API | `0003_guided_character_creation` | creation/grant immutability tests; GF-004 creation portion | Partial verified M1.2; derived components M1.3 |
 | Human/Soldier/Fighter creation | SRD 5.2.1 character creation pp. 19–23; Fighter pp. 47–48; Soldier p. 83; Human p. 86; feats pp. 87–88; equipment pp. 91–97 | character-creation catalog, validator, options/draft/finalize APIs, player guide | `0003_guided_character_creation` | GF-001–GF-003 creation tests and API golden workflow | Verified M1.2 |
 | Pure derived statistics | SRD formulas; ADR-011 | M1.2 ability modifiers and level-one HP in `app/character_creation.py`; remaining kernel pending M1.3 | `0003_guided_character_creation` stores the reproducible creation sheet and grants | GF-002 and GF-003 HP/modifier portion pass | Partial verified M1.2 |
+| Party Commander state and actor attribution | Owner-approved mode sequence; ADR-016; RUL-025 | Pending M1.3 party aggregate/addressing and M1.4 actor-aware resolution | Pending safe removal of the character campaign singleton | GF-015 plus multi-character restart/isolation API tests | Planned M1.3–M1.4 |
 | Deterministic check/save resolution | SRD D20 tests; ADR-007/ADR-012 | Pending M1.4 | Pending | GF-006, GF-010–GF-011 | Planned |
 | Narrative/mechanical separation | Product trust boundary; ADR-012 | Existing M0 boundary, M1 extension pending | As required | GF-012 | Partial foundation only |
 | Explicit ruleset compatibility | RES-001 versioning; ADR-009/ADR-015 | Dynamic/cross-release rejection, coexistence, and exact release/catalog pins implemented; conversion execution intentionally deferred | `0002_ruleset_releases`; `0003` preserves legacy foundation pins | GF-013–GF-014 foundation/catalog tests pass | Partial foundation verified; conversion deferred |
@@ -290,5 +306,8 @@ After M1 evidence:
 3. add level-one spell access and execution as a separate spell-engine slice;
 4. add advancement and straight-class higher levels;
 5. add multiclassing and interaction-boundary suites;
-6. measure solo behavior with exact probabilities and seeded simulation;
-7. introduce optional solo/character-development house-rule packages only from measured needs.
+6. prove Party Commander combat and persistent-world play;
+7. add Protagonist with Companions by delegating bounded intent through the same party engine;
+8. measure Lone Hero behavior against the party baseline with exact probabilities and seeded
+   simulation;
+9. introduce optional solo/character-development house-rule packages only from measured needs.

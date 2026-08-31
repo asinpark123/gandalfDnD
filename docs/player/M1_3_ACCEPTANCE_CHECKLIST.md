@@ -70,7 +70,9 @@ databases or Clawvis.
 6. Confirm character 1 shows HP 12; Strength save +5; Constitution save +4; initiative +4; passive
    Perception 12; Speed 30; worn Chain Mail plus Defense AC 17; two Second Wind uses; one d10 Hit
    Die; and one Heroic Inspiration. Open a few `provenance` objects and confirm the formula and
-   source/acquisition IDs are understandable. Party readiness should still be false.
+   source/acquisition IDs are understandable. Confirm every equipment row—including `Dice Set` and
+   `GP`—has non-empty `provenance_definition_keys`, `source_ids`, and `acquisition_event_ids`.
+   Party readiness should still be false.
 7. Finalize character 2 with the same fixture. Confirm `party_ready` becomes true and both character
    sheets remain independently addressable.
 8. Change only character 1's loadout with
@@ -82,9 +84,10 @@ databases or Clawvis.
 
    Confirm character 1 becomes AC 12 and state revision 2, while character 2 remains AC 17 with
    Chain Mail. Confirm the Greatsword is `held` and other owned equipment remains `carried`.
-9. Try a turn without `actor_character_id`; expect HTTP 409. Repeat with character 1's ID; expect
-   HTTP 201 and the same actor ID on the turn. In `GET /campaigns/{campaign_id}/events`, confirm the
-   player action and response identify character 1.
+9. Try a turn without `actor_character_id`; remove the property from the JSON entirely rather than
+   sending an empty string. Expect HTTP 409. Repeat with character 1's ID; expect HTTP 201 and the
+   same actor ID on the turn. In `GET /campaigns/{campaign_id}/events`, confirm the player action and
+   response identify character 1.
 10. Restart the API, read campaign state again, and confirm the party order, both sheets, character
     1's AC/loadout revision, and character 2's unchanged state survived.
 
@@ -98,3 +101,25 @@ databases or Clawvis.
 
 Record the result as pass, defect, documentation clarification, or accepted limitation in
 [`../PROJECT_PLAN.md`](../PROJECT_PLAN.md) before closing M1.3.
+
+## Targeted retest after the first owner run
+
+The first owner run passed the party, sheet, loadout, actor-attributed turn, and restart checks. It
+exposed missing projected provenance for the dynamically selected Dice Set and aggregated GP; it
+also sent an empty UUID rather than omitting the actor property and did not record the events read.
+After updating to the correction commit, only these checks need repeating:
+
+1. Restart/reload the API and call `GET /campaigns/{campaign_id}/state` for the existing campaign.
+   Under both characters' `mechanical_state.equipment`, confirm `Dice Set` and `GP` now have non-empty
+   `provenance_definition_keys`, `source_ids`, and `acquisition_event_ids`.
+2. Call `POST /campaigns/{campaign_id}/turns` with exactly this body and expect HTTP 409 with
+   `Party Commander turns require actor_character_id`:
+
+```json
+{"action": "Someone scouts ahead."}
+```
+
+3. Call `GET /campaigns/{campaign_id}/events`. Confirm the successful turn's `player_action` and
+   `dm_response` events both identify character 1 in `actor_character_id`.
+
+Then answer the five subjective feedback questions above. No other M1.3 action needs repeating.

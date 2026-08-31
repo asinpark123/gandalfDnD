@@ -3,8 +3,8 @@
 - **Document status:** Active
 - **Last updated:** 2026-08-31
 - **Rules baseline:** SRD 5.2.1 (pinned; M1.3 character-state catalog automated verification passed)
-- **Current delivery stage:** M1.3 Verification — automated gates passed; owner acceptance checkpoint
-  pending before M1.4 begins
+- **Current delivery stage:** M1.3 Verification — first owner run completed; provenance correction
+  passed automated gates; targeted owner retest and subjective feedback pending
 - **Canonical repository:** `~/Git/gandalfDnD`
 
 ## 1. Purpose of this document
@@ -577,7 +577,8 @@ M1.2 milestone review:
 
 #### M1.3 Party Commander and complete Phase 1 character state
 
-**Status:** Verification — automated gates passed 2026-08-31; owner checkpoint pending
+**Status:** Verification — automated gates and first owner run completed 2026-08-31; targeted retest
+and subjective feedback pending
 
 - campaign-level party identity and multiple independently addressable player characters;
 - explicit `party_commander` campaign mode and player-controlled character ownership/control state;
@@ -628,6 +629,23 @@ Automated verification evidence recorded 2026-08-31:
   tests; it applied to `gandalfdnd_dev`, Alembic reports head with zero drift, development health is
   HTTP 200, and the empty development database remains at zero campaigns/characters;
 - Clawvis and unrelated PostgreSQL databases/services were not accessed or changed.
+
+First owner acceptance run and correction, 2026-08-31:
+
+- the owner completed the ten-action workflow and confirmed campaign/party setup, two finalized
+  sheets, golden values, party readiness, loadout isolation, a valid actor-attributed turn, and
+  post-restart state persistence;
+- the captured response exposed that the dynamically selected Dice Set and aggregated GP projected
+  empty source/acquisition provenance even though their canonical grants existed; the projection now
+  maps Dice Set to its gaming-set and package definitions and GP to both contributing equipment
+  packages;
+- the regression requires every projected starting-equipment row to carry non-empty contributing
+  definition keys, source IDs, and acquisition-event IDs; the full 39-test suite and all schema,
+  ruleset, lint, formatting, and diff gates pass;
+- the first actor-omission attempt sent `actor_character_id: ""`, correctly producing schema-level
+  HTTP 422 rather than exercising the intended domain-level HTTP 409, and the event read was not
+  recorded. Only the provenance, omitted-property, and event-attribution checks must be repeated;
+  the owner will then provide the five subjective answers.
 
 Known non-blocking limitation: the existing Starlette/httpx TestClient deprecation warning remains
 under `WARN-001`. Resource expenditure/recovery and authoritative check/save resolution belong to
@@ -798,6 +816,7 @@ deployable if Clawvis is offline.
 | DEBT-003 | Architecture | Open | The research proposes greenfield service/table boundaries that have not been reconciled with Phase 0 models | Premature adoption could create redundant schema or services | Reconcile per vertical slice; do not bulk-create the proposed model; M1 onward |
 | ISSUE-002 | Migration/test fixture | Resolved | Synthetic M1.2 migration tests could begin after isolated cleanup had removed the M1.1 seed row | The new foreign-key-backed catalog seed could not be installed from that test baseline | `0003` inserts the exact immutable M1.1 release with `ON CONFLICT DO NOTHING`; transactional migration tests and the full suite pass |
 | ISSUE-003 | Migration/test fixture | Resolved | The first M1.3 run found the isolated test DB at migration `0003` after fixture cleanup had removed immutable seed rows | `0004` initially could not insert its state catalog because the known release FK row was absent | `0004` idempotently restores only the exact pinned release before inserting the new catalog; focused migration smoke, full-chain tests, and 39-test suite pass |
+| ISSUE-004 | Character-state provenance | Resolved; owner confirmation pending | The first M1.3 owner run showed empty projected source/acquisition provenance for Dice Set and GP; ordinary package items were unaffected | The visible equipment projection did not meet GF-004 even though canonical grants remained intact | Resolve selected gaming-set provenance from its option plus package and aggregate GP provenance from both packages; require non-empty definition/source/acquisition fields for every starting item; full 39-test suite passes; run the targeted owner retest |
 
 New entries must include reproduction steps or evidence when applicable. Do not close an issue only
 because a workaround exists; record both the workaround and the permanent resolution.
@@ -934,11 +953,10 @@ Destination milestone:
 
 ## 17. Immediate next actions
 
-1. Run the M1.3 owner checkpoint using the supplied two-character party, sheet readability,
-   loadout, actor selection, and state-isolation checklist; record all feedback here before closure.
-2. Correct any M1.3 acceptance defect and rerun the automated gate, or record owner acceptance and
-   mark M1.3 Done with the implementation commit.
-3. Begin M1.4 only after the M1.3 owner checkpoint passes; then
+1. Run only the targeted M1.3 retest: confirm Dice Set/GP provenance, omit the actor property to
+   receive domain HTTP 409, and read actor attribution from the event log.
+2. Record the owner's five subjective answers; correct any remaining defect or mark M1.3 Done.
+3. Begin M1.4 only after the targeted M1.3 owner checkpoint passes; then
    implement authoritative check/save resolution, fixed-dice replay, and model-modifier rejection.
 4. Review complete M1 evidence and documentation freshness before M2; move broader character options
    to M1.5 rather than expanding the exit gate during implementation.
@@ -961,3 +979,4 @@ Destination milestone:
 | 2026-08-31 | DOC-010 | Added project-owner decision gates and milestone-specific player acceptance checkpoints | The owner requested a durable record of when input is required and when hands-on testing is useful; M1.3 has no blocking input and receives a verification-stage sheet review | Provide a concise setup/actions/expected-results checklist at every applicable verification gate and record all outcomes |
 | 2026-08-31 | DOC-011 | Adopted party-first solo-player architecture and sequenced Party Commander, Protagonist with Companions, then Lone Hero | The owner selected standard party play as the mechanical foundation so delegated companions reuse proven rules and exceptional single-character compensation is designed last from evidence | Make M1.3 party-aware before adding further deterministic state; retain the fixed Human/Soldier/Fighter content slice until M1.4 passes |
 | 2026-08-31 | DOC-012 | Advanced M1.3 to Verification and recorded Party Commander/state implementation, corrected Alert initiative, migration/runtime evidence, limitations, and owner gate | Migration `0004`, immutable state catalog, 39 tests, 92% coverage, zero Alembic drift, dev health 200, and actor-isolation/loadout fixtures passed | Complete the owner checklist, record feedback, then either fix defects or close M1.3 and begin M1.4 |
+| 2026-08-31 | DOC-013 | Recorded the first owner acceptance run, resolved its Dice Set/GP projection-provenance defect, and narrowed the remaining gate to three targeted checks plus subjective feedback | Owner evidence confirmed the main workflow and exposed ISSUE-004; the corrected projection and exhaustive equipment-provenance regression pass the full 39-test suite | Run the targeted retest, record subjective answers, and close or rework M1.3 from that evidence |

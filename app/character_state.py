@@ -177,6 +177,7 @@ class EquipmentState(StrictModel):
     equipped_quantity: int = Field(ge=0)
     position: EquipmentPosition
     definition_key: str | None
+    provenance_definition_keys: list[str] = Field(min_length=1)
     source_ids: list[str]
     acquisition_event_ids: list[str]
 
@@ -237,6 +238,54 @@ def _inventory_item_ids(
         for item in package.items:
             items[item.item_id] = (item.name, package.definition_key)
     return items
+
+
+def _inventory_provenance(
+    character_creation: CharacterCreationCatalog,
+    sheet: CharacterSheet,
+) -> dict[str, tuple[str, str | None, list[str]]]:
+    """Map projected inventory names to IDs and every definition that supplied them."""
+    selected_package_keys = {
+        character_creation.background.equipment_package_definition_key,
+        character_creation.character_class.equipment_package_definition_key,
+    }
+    selected_packages = [
+        package
+        for package in character_creation.equipment_packages
+        if package.definition_key in selected_package_keys
+    ]
+    gaming_set = next(
+        option
+        for option in character_creation.gaming_sets
+        if option.id == sheet.gaming_set_proficiency
+    )
+    metadata: dict[str, tuple[str, str | None, list[str]]] = {}
+    gold_definition_keys: list[str] = []
+    for package in selected_packages:
+        if package.gold_pieces:
+            gold_definition_keys.append(package.definition_key)
+        for item in package.items:
+            if item.item_id == "chosen_gaming_set":
+                item_id = gaming_set.name.lower().replace(" ", "_")
+                item_name = gaming_set.name
+                specific_definition_key: str | None = gaming_set.definition_key
+                definition_keys = [gaming_set.definition_key, package.definition_key]
+            else:
+                item_id = item.item_id
+                item_name = item.name
+                specific_definition_key = None
+                definition_keys = [package.definition_key]
+            existing = metadata.get(item_name)
+            if existing is not None:
+                definition_keys = _unique([*existing[2], *definition_keys])
+            metadata[item_name] = (
+                item_id,
+                specific_definition_key,
+                definition_keys,
+            )
+    if gold_definition_keys:
+        metadata["GP"] = ("gp", None, _unique(gold_definition_keys))
+    return metadata
 
 
 def validate_loadout(
@@ -522,24 +571,19 @@ def derive_character_state(
         ),
     )
 
-    inventory_ids = _inventory_item_ids(character_creation)
+    inventory_metadata = _inventory_provenance(character_creation, sheet)
     equippable_by_name = {item.item_name: item for item in state_catalog.equipment}
     held_ids = set(loadout.held_item_ids)
     equipment: list[EquipmentState] = []
     for item_name, quantity in sorted(inventory.items()):
         item_rule = equippable_by_name.get(item_name)
-        item_id = (
-            item_rule.item_id
-            if item_rule
-            else next(
-                (
-                    key
-                    for key, (name, _source_definition) in inventory_ids.items()
-                    if name == item_name
-                ),
-                item_name.lower().replace(" ", "_"),
+        projected_item_id, specific_definition_key, inventory_definition_keys = (
+            inventory_metadata.get(
+                item_name,
+                (item_name.lower().replace(" ", "_"), None, []),
             )
         )
+        item_id = item_rule.item_id if item_rule else projected_item_id
         if item_id == loadout.worn_armor_item_id:
             position: EquipmentPosition = "worn"
             equipped_quantity = 1
@@ -549,14 +593,29 @@ def derive_character_state(
         else:
             position = "carried"
             equipped_quantity = 0
-        source_definition = inventory_ids.get(item_id, (item_name, ""))[1]
-        source_ids = source_map.get(source_definition, [])
+        provenance_definition_keys = _unique(
+            [
+                item_rule.definition_key if item_rule else "",
+                *inventory_definition_keys,
+            ]
+        )
+        if not provenance_definition_keys:
+            raise CharacterStateError(f"inventory item {item_name!r} has no source definition")
+        source_ids = _unique(
+            source_id
+            for definition_key in provenance_definition_keys
+            for source_id in source_map.get(definition_key, [])
+        )
+        if not source_ids:
+            raise CharacterStateError(f"inventory item {item_name!r} has no source citation")
         acquisition_event_ids = _unique(
             grant.acquisition_event_id
             for grant in grants
-            if grant.definition_key == source_definition
-            or grant.source_definition_key == source_definition
+            if grant.definition_key in provenance_definition_keys
+            or grant.source_definition_key in provenance_definition_keys
         )
+        if not acquisition_event_ids:
+            raise CharacterStateError(f"inventory item {item_name!r} has no acquisition event")
         equipment.append(
             EquipmentState(
                 item_id=item_id,
@@ -564,7 +623,8 @@ def derive_character_state(
                 quantity=quantity,
                 equipped_quantity=equipped_quantity,
                 position=position,
-                definition_key=item_rule.definition_key if item_rule else None,
+                definition_key=(item_rule.definition_key if item_rule else specific_definition_key),
+                provenance_definition_keys=provenance_definition_keys,
                 source_ids=source_ids,
                 acquisition_event_ids=acquisition_event_ids,
             )

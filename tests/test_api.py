@@ -160,6 +160,15 @@ def test_guided_character_creation_persists_state_turns_and_events(client: TestC
     assert mechanics["resources"]["second_wind"]["current"] == 2
     assert mechanics["resources"]["heroic_inspiration"]["long_rest_recovery"] == "none"
     assert mechanics["saving_throws"]["strength"]["provenance"]["acquisition_event_ids"]
+    assert all(item["provenance_definition_keys"] for item in mechanics["equipment"])
+    assert all(item["source_ids"] for item in mechanics["equipment"])
+    assert all(item["acquisition_event_ids"] for item in mechanics["equipment"])
+    equipment_by_name = {item["name"]: item for item in mechanics["equipment"]}
+    assert equipment_by_name["Dice Set"]["definition_key"] == ("srd-5.2.1:tool.gaming_set.dice")
+    assert set(equipment_by_name["GP"]["provenance_definition_keys"]) == {
+        "srd-5.2.1:equipment_package.soldier.a",
+        "srd-5.2.1:equipment_package.fighter.a",
+    }
 
     still_blocked = client.post(
         f"/campaigns/{campaign_id}/turns",

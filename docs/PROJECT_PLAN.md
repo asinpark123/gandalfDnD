@@ -1,10 +1,10 @@
 # GandalfDnD Development Strategy and Living Project Plan
 
 - **Document status:** Active
-- **Last updated:** 2026-08-31
+- **Last updated:** 2026-09-01
 - **Rules baseline:** SRD 5.2.1 (pinned; M1.3 character-state catalog automated verification passed)
-- **Current delivery stage:** M1.3 Verification — first owner run completed; provenance correction
-  passed automated gates; targeted owner retest and subjective feedback pending
+- **Current delivery stage:** M1.3 Verification — automated and targeted owner retest gates passed;
+  subjective owner feedback pending
 - **Canonical repository:** `~/Git/gandalfDnD`
 
 ## 1. Purpose of this document
@@ -577,8 +577,8 @@ M1.2 milestone review:
 
 #### M1.3 Party Commander and complete Phase 1 character state
 
-**Status:** Verification — automated gates and first owner run completed 2026-08-31; targeted retest
-and subjective feedback pending
+**Status:** Verification — automated gates and targeted owner retest passed; subjective feedback
+pending
 
 - campaign-level party identity and multiple independently addressable player characters;
 - explicit `party_commander` campaign mode and player-controlled character ownership/control state;
@@ -646,6 +646,18 @@ First owner acceptance run and correction, 2026-08-31:
   HTTP 422 rather than exercising the intended domain-level HTTP 409, and the event read was not
   recorded. Only the provenance, omitted-property, and event-attribution checks must be repeated;
   the owner will then provide the five subjective answers.
+
+Targeted owner retest, 2026-09-01:
+
+- the existing two-character campaign projected non-empty definition, source, and acquisition-event
+  provenance for every Dice Set and GP row on both characters; Dice Set identifies its selected
+  gaming-set definition and Soldier package, while GP identifies both Soldier and Fighter packages;
+- omitting `actor_character_id` entirely produced domain HTTP 409 with the corrective detail
+  `Party Commander turns require actor_character_id`;
+- the event log returned HTTP 200 and both the successful `player_action` and corresponding
+  `dm_response` identify SugarHigh (`2039690f-15ca-4154-8822-1fbd4190daf1`) as actor;
+- all three targeted technical checks passed. No further API rerun is required; only the five
+  subjective readability and usability answers remain before the owner gate can close.
 
 Known non-blocking limitation: the existing Starlette/httpx TestClient deprecation warning remains
 under `WARN-001`. Resource expenditure/recovery and authoritative check/save resolution belong to
@@ -816,7 +828,7 @@ deployable if Clawvis is offline.
 | DEBT-003 | Architecture | Open | The research proposes greenfield service/table boundaries that have not been reconciled with Phase 0 models | Premature adoption could create redundant schema or services | Reconcile per vertical slice; do not bulk-create the proposed model; M1 onward |
 | ISSUE-002 | Migration/test fixture | Resolved | Synthetic M1.2 migration tests could begin after isolated cleanup had removed the M1.1 seed row | The new foreign-key-backed catalog seed could not be installed from that test baseline | `0003` inserts the exact immutable M1.1 release with `ON CONFLICT DO NOTHING`; transactional migration tests and the full suite pass |
 | ISSUE-003 | Migration/test fixture | Resolved | The first M1.3 run found the isolated test DB at migration `0003` after fixture cleanup had removed immutable seed rows | `0004` initially could not insert its state catalog because the known release FK row was absent | `0004` idempotently restores only the exact pinned release before inserting the new catalog; focused migration smoke, full-chain tests, and 39-test suite pass |
-| ISSUE-004 | Character-state provenance | Resolved; owner confirmation pending | The first M1.3 owner run showed empty projected source/acquisition provenance for Dice Set and GP; ordinary package items were unaffected | The visible equipment projection did not meet GF-004 even though canonical grants remained intact | Resolve selected gaming-set provenance from its option plus package and aggregate GP provenance from both packages; require non-empty definition/source/acquisition fields for every starting item; full 39-test suite passes; run the targeted owner retest |
+| ISSUE-004 | Character-state provenance | Resolved | The first M1.3 owner run showed empty projected source/acquisition provenance for Dice Set and GP; ordinary package items were unaffected | The visible equipment projection did not meet GF-004 even though canonical grants remained intact | The corrected projection and exhaustive regression passed 39 automated tests; the 2026-09-01 owner retest confirmed complete Dice Set/GP definition, source, and acquisition-event provenance for both existing characters |
 
 New entries must include reproduction steps or evidence when applicable. Do not close an issue only
 because a workaround exists; record both the workaround and the permanent resolution.
@@ -953,14 +965,13 @@ Destination milestone:
 
 ## 17. Immediate next actions
 
-1. Run only the targeted M1.3 retest: confirm Dice Set/GP provenance, omit the actor property to
-   receive domain HTTP 409, and read actor attribution from the event log.
-2. Record the owner's five subjective answers; correct any remaining defect or mark M1.3 Done.
-3. Begin M1.4 only after the targeted M1.3 owner checkpoint passes; then
+1. Record the owner's five M1.3 subjective usability answers; correct any reported defect or mark
+   M1.3 Done. No further technical API rerun is currently required.
+2. Begin M1.4 only after the remaining M1.3 owner checkpoint passes; then
    implement authoritative check/save resolution, fixed-dice replay, and model-modifier rejection.
-4. Review complete M1 evidence and documentation freshness before M2; move broader character options
+3. Review complete M1 evidence and documentation freshness before M2; move broader character options
    to M1.5 rather than expanding the exit gate during implementation.
-5. At each `Verification` gate, issue the owner checklist defined in section 7.6 and route every
+4. At each `Verification` gate, issue the owner checklist defined in section 7.6 and route every
    observation to evidence, defects, rulings, scope, or an explicitly accepted limitation.
 
 ## 18. Documentation change log
@@ -980,3 +991,4 @@ Destination milestone:
 | 2026-08-31 | DOC-011 | Adopted party-first solo-player architecture and sequenced Party Commander, Protagonist with Companions, then Lone Hero | The owner selected standard party play as the mechanical foundation so delegated companions reuse proven rules and exceptional single-character compensation is designed last from evidence | Make M1.3 party-aware before adding further deterministic state; retain the fixed Human/Soldier/Fighter content slice until M1.4 passes |
 | 2026-08-31 | DOC-012 | Advanced M1.3 to Verification and recorded Party Commander/state implementation, corrected Alert initiative, migration/runtime evidence, limitations, and owner gate | Migration `0004`, immutable state catalog, 39 tests, 92% coverage, zero Alembic drift, dev health 200, and actor-isolation/loadout fixtures passed | Complete the owner checklist, record feedback, then either fix defects or close M1.3 and begin M1.4 |
 | 2026-08-31 | DOC-013 | Recorded the first owner acceptance run, resolved its Dice Set/GP projection-provenance defect, and narrowed the remaining gate to three targeted checks plus subjective feedback | Owner evidence confirmed the main workflow and exposed ISSUE-004; the corrected projection and exhaustive equipment-provenance regression pass the full 39-test suite | Run the targeted retest, record subjective answers, and close or rework M1.3 from that evidence |
+| 2026-09-01 | DOC-014 | Recorded the successful targeted M1.3 owner retest and closed ISSUE-004 | Both characters now expose complete Dice Set/GP provenance, omitted actor selection returns the intended domain 409, and both successful turn events retain SugarHigh's actor ID | Record the five subjective answers, then close or rework M1.3 without repeating the technical workflow |

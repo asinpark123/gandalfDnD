@@ -16,7 +16,7 @@ REPOSITORY_ROOT = Path(__file__).parents[1]
 
 def _catalog() -> CharacterCreationCatalog:
     loaded = RulesetRegistry.load(REPOSITORY_ROOT / "rulesets/registry.json").get_data_catalog(
-        "srd-5.2.1"
+        "srd-5.2.1", "srd-5.2.1-character-creation-v1"
     )
     assert isinstance(loaded.document, CharacterCreationCatalog)
     return loaded.document

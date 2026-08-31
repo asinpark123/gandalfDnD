@@ -2,9 +2,9 @@
 
 - **Document status:** Active
 - **Last updated:** 2026-08-31
-- **Rules baseline:** SRD 5.2.1 (pinned; M1.2 character-creation catalog verified)
-- **Current delivery stage:** Milestone 1 implementation — M1.3 Party Commander and complete Phase
-  1 character state
+- **Rules baseline:** SRD 5.2.1 (pinned; M1.3 character-state catalog automated verification passed)
+- **Current delivery stage:** M1.3 Verification — automated gates passed; owner acceptance checkpoint
+  pending before M1.4 begins
 - **Canonical repository:** `~/Git/gandalfDnD`
 
 ## 1. Purpose of this document
@@ -408,7 +408,7 @@ Planning basis:
 
 Initial supported content slice: every M1 character is a level-one Human with the Soldier background
 and Fighter class using standard-array ability generation. M1.2 proved the complete lifecycle for
-one character; M1.3 removes the campaign singleton assumption and establishes Party Commander with
+one character; M1.3 removed the campaign singleton assumption and established Party Commander with
 multiple independently persisted characters. All mandatory choices for that path must be genuinely
 rules-valid; unsupported options must be rejected rather than partially implemented. Reusing this
 content slice across the initial party is a delivery constraint, not a claim that other SRD options
@@ -577,6 +577,8 @@ M1.2 milestone review:
 
 #### M1.3 Party Commander and complete Phase 1 character state
 
+**Status:** Verification — automated gates passed 2026-08-31; owner checkpoint pending
+
 - campaign-level party identity and multiple independently addressable player characters;
 - explicit `party_commander` campaign mode and player-controlled character ownership/control state;
 - removal of singleton persistence/API assumptions without weakening per-character provenance;
@@ -593,6 +595,43 @@ M1.2 milestone review:
 Owner checkpoint: no input is required to begin implementation. At `Verification`, provide a short
 party/character selection, sheet-readability, state-isolation, and correctness checklist covering
 every field above; record feedback before M1.3 is closed.
+
+Implemented:
+
+- new campaigns pin immutable `srd-5.2.1-party-state-v1` and explicit `party_commander` mode with
+  two required and four maximum active, player-controlled characters;
+- ordered, ID-addressable draft/finalize/grants/loadout APIs remove the singleton assumption while
+  legacy foundation records remain pinned and are not silently upgraded;
+- the versioned pure character-state kernel derives every ability/save/skill modifier, PB, AC
+  candidate and selected AC, Alert-aware initiative, passive Perception, Speed, level-one HP, Hit
+  Die, carried/worn/held equipment, and current/maximum supported resources;
+- every derived number records formula, definition/source IDs, relevant acquisition-event IDs,
+  character/state revisions, and resolver version;
+- party play is blocked until two active characters are finalized; drafts cannot act; turns require
+  an in-campaign acting character and attribute turns, dice, events, and affected character IDs;
+- state changes apply only to the selected actor in this slice, and equipped items cannot be removed
+  from inventory until loadout is changed.
+
+Automated verification evidence recorded 2026-08-31:
+
+- 39 tests passed with 92% total statement coverage; the new state kernel measured 95% and services
+  92%; Ruff lint/format, JSON Schema freshness, registry/catalog checksums, and `git diff --check`
+  passed;
+- GF-003 now correctly records initiative +4 for the golden Alert Fighter (Dexterity +2 and PB +2),
+  correcting the earlier research-derived +2 expectation that omitted Alert's Initiative
+  proficiency; Strength save +5, Constitution save +4, HP 12, Chain Mail plus Defense AC 17, and
+  passive Perception 12 pass;
+- multi-character creation, the two-character readiness boundary, four-character maximum, draft
+  exclusion, actor requirement, cross-campaign actor rejection, isolated HP/inventory mutation,
+  actor-attributed dice/events, legal loadout changes, hand limits, and AC recomputation pass;
+- migration `0004_party_commander_state` passed legacy backfill, guarded downgrade, and full-chain
+  tests; it applied to `gandalfdnd_dev`, Alembic reports head with zero drift, development health is
+  HTTP 200, and the empty development database remains at zero campaigns/characters;
+- Clawvis and unrelated PostgreSQL databases/services were not accessed or changed.
+
+Known non-blocking limitation: the existing Starlette/httpx TestClient deprecation warning remains
+under `WARN-001`. Resource expenditure/recovery and authoritative check/save resolution belong to
+M1.4 or later and are not implied by exposing their current/max state.
 
 #### M1.4 Deterministic resolution service
 
@@ -747,17 +786,18 @@ deployable if Clawvis is offline.
 | ISSUE-001 | Environment | Resolved | VM template revoked `CREATE` on `public`, initially blocking Alembic | Tests/migrations failed | Granted each restricted role schema creation only in its own DB; M0 |
 | DEBT-001 | Architecture | Open | Model requests its own dice modifier | Fairness and correctness are incomplete | Calculate from character/rules state; M1.4 |
 | DEBT-002 | Architecture | Open | Narration is generated before dice results | Narration may contradict outcome | Two-stage turn flow; M2 |
-| GAP-001 | Product | In progress | M1.2 creates one complete legal Human/Soldier/Fighter and preserves its grants, but the API/schema still enforce one character per campaign and full Phase 1 equipment/defense/resource state is incomplete | Party Commander cannot yet exist and character breadth remains limited | Remove singleton assumptions and complete isolated per-character state in M1.3; expand content breadth only in M1.5 |
+| GAP-001 | Product | Resolved | M1.3 supports an ordered 2–4 character Party Commander party with independently derived equipment/defense/resource state and actor isolation | Party Commander foundation now exists; character content breadth remains intentionally narrow | Automated evidence passed in migration `0004` and 39-test suite; record owner checkpoint, then expand breadth only in M1.5 |
 | GAP-002 | Product | Open | No deterministic quest/world decision model | Decisions have limited lasting effects | M3 |
 | TEST-001 | Validation | Open | OpenAI provider has no paid live evaluation | Real structured behavior unproven | Lantern Test; M2 |
 | WARN-001 | Dependency | Monitoring | Current TestClient emits an `httpx` deprecation warning | No functional failure today | Reassess FastAPI/Starlette test client during dependency maintenance |
 | OPS-001 | Source control | Resolved | Initial push was blocked because HTTPS lacked credentials and Git did not automatically select the nonstandard SSH key filename | GitHub was temporarily behind local `main` | Registered the existing Ed25519 key, verified GitHub's host fingerprint, configured this repository's SSH command, and synchronized `main`; 2026-08-30 |
 | OPS-002 | Infrastructure | Deferred | pgvector is unavailable on `postgresvm` | No semantic memory yet | Evaluate/install only at M4 |
 | DOC-001 | Documentation | Open | RES-001's verbatim export contains temporary Deep Research citation tokens | Tokens are not durable implementation citations | Preserve the source unchanged; use official URLs and SRD pages in specifications and rule definitions; M1.1 onward |
-| GAP-003 | Rules | In progress | M1.2 provides immutable source-cited character definitions and per-grant provenance, but not every M1.3 derived component or M1.4 resolution input is reconstructible yet | Creation is authoritative; live check/save mechanics are not | Complete reproducible state derivations in M1.3 and authoritative resolution in M1.4 |
+| GAP-003 | Rules | In progress | M1.3 character-state projections are reproducible and provenance-linked, but no authoritative check/save resolution record exists yet | Character state is authoritative; live check/save outcomes are not | Complete authoritative resolution, fixed-dice replay, and model-modifier rejection in M1.4 |
 | GAP-004 | Product | Open | Solo balance has a research framework but no measured product results | Encounter/class support cannot yet claim solo balance | Establish strict-SRD baselines in M5; build balance harness after supported combat |
 | DEBT-003 | Architecture | Open | The research proposes greenfield service/table boundaries that have not been reconciled with Phase 0 models | Premature adoption could create redundant schema or services | Reconcile per vertical slice; do not bulk-create the proposed model; M1 onward |
 | ISSUE-002 | Migration/test fixture | Resolved | Synthetic M1.2 migration tests could begin after isolated cleanup had removed the M1.1 seed row | The new foreign-key-backed catalog seed could not be installed from that test baseline | `0003` inserts the exact immutable M1.1 release with `ON CONFLICT DO NOTHING`; transactional migration tests and the full suite pass |
+| ISSUE-003 | Migration/test fixture | Resolved | The first M1.3 run found the isolated test DB at migration `0003` after fixture cleanup had removed immutable seed rows | `0004` initially could not insert its state catalog because the known release FK row was absent | `0004` idempotently restores only the exact pinned release before inserting the new catalog; focused migration smoke, full-chain tests, and 39-test suite pass |
 
 New entries must include reproduction steps or evidence when applicable. Do not close an issue only
 because a workaround exists; record both the workaround and the permanent resolution.
@@ -894,20 +934,15 @@ Destination milestone:
 
 ## 17. Immediate next actions
 
-1. Specify the M1.3 Party Commander aggregate, character addressing/control state, play-readiness
-   rule, and safe migration away from the current one-character-per-campaign constraint.
-2. Specify the per-character canonical/projection boundary for equipment state, AC alternatives, Hit
-   Dice, initiative, speed, passive Perception, and current/max feature resources.
-3. Extend the pure derivation kernel so every M1.3 value is reproducible from each character's pinned
-   catalog and immutable choices/grants, completing GF-003, GF-004, GF-007, and GF-015.
-4. Add only the schema/migration/API fields required by that party/state slice, with multi-character
-   isolation, actor attribution, restart, and reconstruction tests; do not duplicate derivable facts
-   as independently editable inputs.
-5. Begin M1.4 only after the M1.3 party, golden-sheet, isolation, and provenance gates pass; then
+1. Run the M1.3 owner checkpoint using the supplied two-character party, sheet readability,
+   loadout, actor selection, and state-isolation checklist; record all feedback here before closure.
+2. Correct any M1.3 acceptance defect and rerun the automated gate, or record owner acceptance and
+   mark M1.3 Done with the implementation commit.
+3. Begin M1.4 only after the M1.3 owner checkpoint passes; then
    implement authoritative check/save resolution, fixed-dice replay, and model-modifier rejection.
-6. Review complete M1 evidence and documentation freshness before M2; move broader character options
+4. Review complete M1 evidence and documentation freshness before M2; move broader character options
    to M1.5 rather than expanding the exit gate during implementation.
-7. At each `Verification` gate, issue the owner checklist defined in section 7.6 and route every
+5. At each `Verification` gate, issue the owner checklist defined in section 7.6 and route every
    observation to evidence, defects, rulings, scope, or an explicitly accepted limitation.
 
 ## 18. Documentation change log
@@ -925,3 +960,4 @@ Destination milestone:
 | 2026-08-31 | DOC-009 | Closed M1.2, added the player character-creation guide, and advanced current delivery to M1.3 | Commit `ba7bca8`, 38 tests, 91% coverage, migration `0003`, immutable source-linked grants, schema/catalog integrity checks, zero Alembic drift, and development health all passed | Complete reproducible Phase 1 character state without expanding the supported creation slice |
 | 2026-08-31 | DOC-010 | Added project-owner decision gates and milestone-specific player acceptance checkpoints | The owner requested a durable record of when input is required and when hands-on testing is useful; M1.3 has no blocking input and receives a verification-stage sheet review | Provide a concise setup/actions/expected-results checklist at every applicable verification gate and record all outcomes |
 | 2026-08-31 | DOC-011 | Adopted party-first solo-player architecture and sequenced Party Commander, Protagonist with Companions, then Lone Hero | The owner selected standard party play as the mechanical foundation so delegated companions reuse proven rules and exceptional single-character compensation is designed last from evidence | Make M1.3 party-aware before adding further deterministic state; retain the fixed Human/Soldier/Fighter content slice until M1.4 passes |
+| 2026-08-31 | DOC-012 | Advanced M1.3 to Verification and recorded Party Commander/state implementation, corrected Alert initiative, migration/runtime evidence, limitations, and owner gate | Migration `0004`, immutable state catalog, 39 tests, 92% coverage, zero Alembic drift, dev health 200, and actor-isolation/loadout fixtures passed | Complete the owner checklist, record feedback, then either fix defects or close M1.3 and begin M1.4 |

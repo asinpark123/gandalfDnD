@@ -45,11 +45,11 @@ def test_checked_in_registry_and_generated_schemas_are_valid() -> None:
     assert release.manifest.artifact.size_bytes == 6031375
     assert release.data_index.definition_files == []
     assert release.data_index.support_status == "foundation_only"
-    assert release.default_data_catalog_id == "srd-5.2.1-character-creation-v1"
+    assert release.default_data_catalog_id == "srd-5.2.1-party-state-v1"
     character_catalog = registry.get_data_catalog("srd-5.2.1")
-    assert character_catalog.kind == "character_creation"
+    assert character_catalog.kind == "character_state"
     assert character_catalog.sha256 == (
-        "ddbd172feeeb191789f1b95f93762c661dda06888dad067e28c7fc6ffda391cb"
+        "aba4fcdbffb037eece88c862c76be988ffc60808b46361cc9a9dda0730fe763b"
     )
 
     result = subprocess.run(
@@ -235,7 +235,7 @@ def test_database_data_catalog_and_campaign_pins_are_immutable(client: TestClien
             )
         )
     with (
-        pytest.raises(DBAPIError, match="campaign ruleset pins are immutable"),
+        pytest.raises(DBAPIError, match="campaign ruleset and play-mode pins are immutable"),
         get_engine().begin() as connection,
     ):
         connection.execute(
@@ -360,6 +360,7 @@ def test_migration_backfills_legacy_mechanical_records() -> None:
             ).scalars().all() == [
                 "srd-5.2.1-character-creation-v1",
                 "srd-5.2.1-foundation-v1",
+                "srd-5.2.1-party-state-v1",
             ]
     finally:
         command.upgrade(_alembic_config(), "head")

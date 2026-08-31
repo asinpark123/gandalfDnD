@@ -11,7 +11,8 @@
         "kind": {
           "enum": [
             "foundation",
-            "character_creation"
+            "character_creation",
+            "character_state"
           ],
           "title": "Kind",
           "type": "string"
@@ -99,7 +100,7 @@
       "type": "array"
     },
     "schema_version": {
-      "const": "1.1.0",
+      "const": "1.2.0",
       "title": "Schema Version",
       "type": "string"
     }

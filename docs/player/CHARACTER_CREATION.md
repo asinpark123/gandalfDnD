@@ -24,18 +24,24 @@ This is a supported-content boundary, not a claim that other SRD choices are inv
 The options endpoint supplies the actual allowed identifiers and beginner descriptions. A client
 should build its form from that response instead of hard-coding or accepting free-form rules data.
 
-## Creation flow
+## Party Commander creation flow
 
 1. Create a campaign with `POST /campaigns`.
 2. Fetch `GET /rulesets/srd-5.2.1/character-creation/options`.
-3. Create a name-only draft with `POST /campaigns/{campaign_id}/character`.
-4. Submit all catalog-backed choices to
-   `POST /campaigns/{campaign_id}/character/finalize`.
-5. Read the saved sheet from `GET /campaigns/{campaign_id}/state` and its source-linked grants from
-   `GET /campaigns/{campaign_id}/character/grants`.
+3. Create two to four name-only drafts with `POST /campaigns/{campaign_id}/characters`.
+4. Submit each character's catalog-backed choices to
+   `POST /campaigns/{campaign_id}/characters/{character_id}/finalize`.
+5. Read the ordered party and calculated sheets from `GET /campaigns/{campaign_id}/state`; read one
+   character's source-linked grants from
+   `GET /campaigns/{campaign_id}/characters/{character_id}/grants`.
+6. Optionally change worn/held equipment with
+   `PUT /campaigns/{campaign_id}/characters/{character_id}/loadout`.
+7. Once at least two active characters are finalized, submit a turn with that turn's
+   `actor_character_id`. Draft characters cannot act.
 
-A draft may be read, but gameplay turns are blocked until finalization. Finalization validates all
-choices together and either commits the complete character or changes nothing. Once finalized, the
+A draft may be read, but it cannot act, and gameplay turns are blocked until at least two active
+characters are finalized. Finalization validates all choices together and either commits the
+complete character or changes nothing. Once finalized, the
 creation facts and grants cannot be edited directly; future changes require an explicit advancement,
 correction, administrative, or ruleset-migration workflow.
 
@@ -45,9 +51,16 @@ catalog.
 ## What the game calculates
 
 The finalized sheet contains the base, background increase, final score, and modifier for every
-ability; proficiency bonus; skill and saving-throw proficiencies; maximum/current HP; armor and
-weapon training; Origin feat, Fighting Style, weapon masteries, class/species features, Second Wind
-maximum uses, and starting inventory.
+ability; proficiency bonus; every skill and saving-throw modifier; maximum/current HP; AC and its
+eligible alternatives; initiative; passive Perception; Speed; Hit Die; carried, worn, and held
+equipment; armor and weapon training; Origin feat, Fighting Style, weapon masteries, class/species
+features; current/maximum Second Wind, Heroic Inspiration, and Hit Dice; and starting inventory.
+Calculated values include their formula, rule definitions, source citations, acquisition events,
+character revision, state revision, and resolver version.
+
+In the loadout response, `held` means readied for mechanical use and consumes the weapon's required
+hands; otherwise an owned item remains `carried`. Heroic Inspiration begins at one for the supported
+Human but is not marked as Long-Rest recovery: Resourceful applies when a day starts.
 
 Each campaign, character, event, dice roll, and character grant is pinned to both the immutable SRD
 release and the exact normalized data catalog used. The grants endpoint exposes the definition,
@@ -55,15 +68,15 @@ source definition, acquisition event, choice slot, and cited source IDs for audi
 
 ## Current limitations
 
-- M1.2 currently permits one character per campaign. M1.3 will introduce Party Commander so one
-  human player can create and directly control multiple independently persisted party characters;
-  Protagonist with Companions and Lone Hero modes follow later in that order.
+- Party Commander currently requires at least two and supports at most four active characters. The
+  human player directly controls all of them; Protagonist with Companions and Lone Hero modes follow
+  later in that order.
 - Other species, backgrounds, classes, ability-generation methods, equipment routes, and most feats
   are deferred until after the initial deterministic-mechanics milestone.
 - Magic Initiate is deferred because the first slice has no spellcasting engine.
 - Skilled currently supports skill selections only; tool selections are deferred.
-- Combat execution, rests, levelling, shopping, and authoritative ability-check/save resolution are
-  not part of M1.2.
+- Combat execution, resource spending/recovery, rests, levelling, shopping, and authoritative
+  ability-check/save resolution are not part of M1.3.
 - The current turn skeleton still accepts its Phase 0 dice modifier contract. M1.4 will replace that
   with modifiers derived authoritatively from the saved character and rules state.
 

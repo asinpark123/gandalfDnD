@@ -8,7 +8,17 @@ from sqlalchemy.orm import Session
 from app.character_creation import (
     CharacterCreationCatalog,
     CharacterFinalizeRequest,
+    CharacterSheet,
     finalize_character_choices,
+)
+from app.character_state import (
+    CharacterStateCatalog,
+    GrantProvenanceFact,
+    Loadout,
+    derive_character_state,
+    initial_loadout,
+    initial_resources,
+    validate_loadout,
 )
 from app.dice import DiceService
 from app.llm.base import DMProvider
@@ -23,13 +33,20 @@ from app.models import (
     RulesetRelease,
     Turn,
 )
-from app.rulesets import LoadedRulesetDataCatalog, LoadedRulesetRelease, get_ruleset_registry
+from app.rulesets import (
+    LoadedRulesetDataCatalog,
+    LoadedRulesetRelease,
+    UnknownRulesetDataCatalogError,
+    get_ruleset_registry,
+)
 from app.schemas import (
     CampaignCreate,
     CampaignState,
     CharacterCreate,
+    CharacterRead,
     HPDelta,
     InventoryChange,
+    LoadoutUpdate,
     MoveLocation,
     TurnRead,
 )
@@ -66,6 +83,7 @@ def _add_event(
     *,
     turn_id: uuid.UUID | None = None,
     visibility: str = "player",
+    actor_character_id: uuid.UUID | None = None,
 ) -> CampaignEvent:
     pin = session.execute(
         select(Campaign.ruleset_release_id, Campaign.ruleset_data_catalog_id).where(
@@ -84,6 +102,7 @@ def _add_event(
         event_type=event_type,
         visibility=visibility,
         payload=payload,
+        actor_character_id=actor_character_id,
     )
     session.add(event)
     session.flush()
@@ -125,9 +144,7 @@ def _ensure_ruleset_data_catalog(
 ) -> RulesetDataCatalog:
     document = loaded_catalog.document
     schema_version = document.schema_version
-    support_status = (
-        document.support_status if hasattr(document, "support_status") else "character_creation"
-    )
+    support_status = getattr(document, "support_status", "character_creation")
     expected = {
         "ruleset_release_id": ruleset_release_id,
         "kind": loaded_catalog.kind,
@@ -153,10 +170,19 @@ def create_campaign(session: Session, data: CampaignCreate) -> Campaign:
     loaded_catalog = registry.get_data_catalog(data.ruleset_release_id)
     _ensure_ruleset_release(session, loaded_release)
     _ensure_ruleset_data_catalog(session, loaded_catalog, loaded_release.manifest.id)
+    party_mode = isinstance(loaded_catalog.document, CharacterStateCatalog)
+    if party_mode:
+        catalogs = registry.get_character_catalogs(data.ruleset_release_id, loaded_catalog.id)
+        base_catalog = loaded_release.data_catalogs.get(catalogs.character_creation.id)
+        if base_catalog is not None:
+            _ensure_ruleset_data_catalog(session, base_catalog, loaded_release.manifest.id)
     campaign = Campaign(
         name=data.name,
         ruleset_release_id=loaded_release.manifest.id,
         ruleset_data_catalog_id=loaded_catalog.id,
+        play_mode="party_commander" if party_mode else "legacy_single",
+        party_min_active=2 if party_mode else 1,
+        party_max_active=4 if party_mode else 1,
     )
     session.add(campaign)
     session.flush()
@@ -176,6 +202,11 @@ def create_campaign(session: Session, data: CampaignCreate) -> Campaign:
             "starting_location": location.name,
             "ruleset_release_id": campaign.ruleset_release_id,
             "ruleset_data_catalog_id": campaign.ruleset_data_catalog_id,
+            "play_mode": campaign.play_mode,
+            "party_size": {
+                "minimum": campaign.party_min_active,
+                "maximum": campaign.party_max_active,
+            },
         },
     )
     session.commit()
@@ -184,14 +215,28 @@ def create_campaign(session: Session, data: CampaignCreate) -> Campaign:
 
 def add_character(session: Session, campaign_id: uuid.UUID, data: CharacterCreate) -> Character:
     campaign = _campaign_for_update(session, campaign_id)
-    existing = session.scalar(select(Character).where(Character.campaign_id == campaign_id))
-    if existing is not None:
-        raise ConflictError("A campaign supports one player character")
-    loaded_catalog = get_ruleset_registry().get_data_catalog(
-        campaign.ruleset_release_id, campaign.ruleset_data_catalog_id
+    characters = list(
+        session.scalars(
+            select(Character)
+            .where(Character.campaign_id == campaign_id)
+            .order_by(Character.party_position)
+            .with_for_update()
+        )
     )
-    if loaded_catalog.kind != "character_creation":
+    if len(characters) >= campaign.party_max_active:
+        raise ConflictError(f"A campaign supports at most {campaign.party_max_active} characters")
+    try:
+        catalogs = get_ruleset_registry().get_character_catalogs(
+            campaign.ruleset_release_id, campaign.ruleset_data_catalog_id
+        )
+    except UnknownRulesetDataCatalogError:
+        raise ConflictError(
+            "Campaign data catalog does not support guided character creation"
+        ) from None
+    if campaign.play_mode != "party_commander" or catalogs.character_state is None:
         raise ConflictError("Campaign data catalog does not support guided character creation")
+    occupied = {character.party_position for character in characters}
+    party_position = next(position for position in range(1, 5) if position not in occupied)
     character = Character(
         campaign_id=campaign_id,
         ruleset_release_id=campaign.ruleset_release_id,
@@ -202,6 +247,12 @@ def add_character(session: Session, campaign_id: uuid.UUID, data: CharacterCreat
         max_hp=None,
         hp=None,
         inventory={},
+        party_position=party_position,
+        control_mode="player",
+        party_status="active",
+        state_revision=0,
+        equipped_items=Loadout().model_dump(mode="json"),
+        resources={},
     )
     session.add(character)
     session.flush()
@@ -213,6 +264,8 @@ def add_character(session: Session, campaign_id: uuid.UUID, data: CharacterCreat
             "character_id": str(character.id),
             "name": character.name,
             "ruleset_data_catalog_id": character.ruleset_data_catalog_id,
+            "party_position": character.party_position,
+            "control_mode": character.control_mode,
         },
     )
     session.commit()
@@ -454,24 +507,37 @@ def _build_character_grants(
 
 
 def finalize_character(
-    session: Session, campaign_id: uuid.UUID, data: CharacterFinalizeRequest
+    session: Session,
+    campaign_id: uuid.UUID,
+    data: CharacterFinalizeRequest,
+    character_id: uuid.UUID | None = None,
 ) -> Character:
     campaign = _campaign_for_update(session, campaign_id)
-    character = session.scalar(
-        select(Character).where(Character.campaign_id == campaign_id).with_for_update()
-    )
+    query = select(Character).where(Character.campaign_id == campaign_id)
+    if character_id is not None:
+        query = query.where(Character.id == character_id)
+    else:
+        query = query.where(Character.creation_status == "draft").order_by(Character.party_position)
+    character = session.scalar(query.with_for_update())
     if character is None:
+        if character_id is None and session.scalar(
+            select(Character.id).where(Character.campaign_id == campaign_id).limit(1)
+        ):
+            raise ConflictError("No character draft is available to finalize")
         raise NotFoundError("Character draft not found")
     if character.creation_status != "draft":
         raise ConflictError("Character has already been finalized")
-    loaded_catalog = get_ruleset_registry().get_data_catalog(
-        campaign.ruleset_release_id, campaign.ruleset_data_catalog_id
-    )
-    if loaded_catalog.kind != "character_creation" or not isinstance(
-        loaded_catalog.document, CharacterCreationCatalog
-    ):
+    try:
+        catalogs = get_ruleset_registry().get_character_catalogs(
+            campaign.ruleset_release_id, campaign.ruleset_data_catalog_id
+        )
+    except UnknownRulesetDataCatalogError:
+        raise ConflictError(
+            "Campaign data catalog does not support guided character creation"
+        ) from None
+    if catalogs.character_state is None:
         raise ConflictError("Campaign data catalog does not support guided character creation")
-    sheet = finalize_character_choices(loaded_catalog.document, data)
+    sheet = finalize_character_choices(catalogs.character_creation, data)
 
     character.creation_status = "finalized"
     character.revision = 1
@@ -480,6 +546,9 @@ def finalize_character(
     character.inventory = sheet.starting_inventory
     character.character_sheet = sheet.model_dump(mode="json")
     character.finalized_at = datetime.now(UTC)
+    character.equipped_items = initial_loadout(catalogs.character_state).model_dump(mode="json")
+    character.resources = initial_resources(catalogs.character_state)
+    character.state_revision = 1
     session.flush()
     event = _add_event(
         session,
@@ -490,22 +559,33 @@ def finalize_character(
             "revision": character.revision,
             "choices": data.model_dump(mode="json"),
             "sheet": sheet.model_dump(mode="json"),
+            "party_position": character.party_position,
+            "loadout": character.equipped_items,
+            "resources": character.resources,
         },
+        actor_character_id=character.id,
     )
     session.add_all(
         _build_character_grants(
             character,
             event,
             data,
-            loaded_catalog.document,
+            catalogs.character_creation,
         )
     )
     session.commit()
     return character
 
 
-def list_character_grants(session: Session, campaign_id: uuid.UUID) -> list[CharacterGrant]:
-    character = session.scalar(select(Character).where(Character.campaign_id == campaign_id))
+def list_character_grants(
+    session: Session, campaign_id: uuid.UUID, character_id: uuid.UUID | None = None
+) -> list[CharacterGrant]:
+    query = select(Character).where(Character.campaign_id == campaign_id)
+    if character_id is not None:
+        query = query.where(Character.id == character_id)
+    else:
+        query = query.order_by(Character.party_position)
+    character = session.scalar(query)
     if character is None:
         raise NotFoundError("Character not found")
     return list(
@@ -517,11 +597,108 @@ def list_character_grants(session: Session, campaign_id: uuid.UUID) -> list[Char
     )
 
 
+def list_characters(session: Session, campaign_id: uuid.UUID) -> list[Character]:
+    if session.get(Campaign, campaign_id) is None:
+        raise NotFoundError("Campaign not found")
+    return list(
+        session.scalars(
+            select(Character)
+            .where(Character.campaign_id == campaign_id)
+            .order_by(Character.party_position)
+        )
+    )
+
+
+def get_character_read(
+    session: Session, campaign_id: uuid.UUID, character_id: uuid.UUID
+) -> CharacterRead:
+    campaign = session.get(Campaign, campaign_id)
+    character = session.scalar(
+        select(Character).where(Character.campaign_id == campaign_id, Character.id == character_id)
+    )
+    if campaign is None or character is None:
+        raise NotFoundError("Character not found")
+    try:
+        catalogs = get_ruleset_registry().get_character_catalogs(
+            campaign.ruleset_release_id, campaign.ruleset_data_catalog_id
+        )
+    except UnknownRulesetDataCatalogError:
+        return CharacterRead.model_validate(character)
+    return _character_read(
+        session, character, catalogs.character_creation, catalogs.character_state
+    )
+
+
+def _character_read(
+    session: Session,
+    character: Character,
+    creation_catalog: CharacterCreationCatalog,
+    state_catalog: CharacterStateCatalog | None,
+) -> CharacterRead:
+    mechanical_state = None
+    if character.creation_status == "finalized" and state_catalog is not None:
+        sheet = CharacterSheet.model_validate(character.character_sheet)
+        grants = list(
+            session.scalars(
+                select(CharacterGrant)
+                .where(CharacterGrant.character_id == character.id, CharacterGrant.active.is_(True))
+                .order_by(CharacterGrant.choice_slot, CharacterGrant.definition_key)
+            )
+        )
+        grant_facts = [
+            GrantProvenanceFact(
+                choice_slot=grant.choice_slot,
+                definition_key=grant.definition_key,
+                source_definition_key=grant.source_definition_key,
+                source_ids=list(grant.value.get("source_ids", [])),
+                acquisition_event_id=str(grant.acquisition_event_id),
+            )
+            for grant in grants
+        ]
+        mechanical_state = derive_character_state(
+            creation_catalog,
+            state_catalog,
+            sheet,
+            hp=character.hp or 0,
+            inventory=dict(character.inventory),
+            loadout=Loadout.model_validate(character.equipped_items),
+            resource_values=dict(character.resources),
+            grants=grant_facts,
+            character_revision=character.revision,
+            state_revision=character.state_revision,
+        )
+    return CharacterRead.model_validate(character).model_copy(
+        update={"mechanical_state": mechanical_state}
+    )
+
+
 def get_campaign_state(session: Session, campaign_id: uuid.UUID) -> CampaignState:
     campaign = session.get(Campaign, campaign_id)
     if campaign is None:
         raise NotFoundError("Campaign not found")
-    character = session.scalar(select(Character).where(Character.campaign_id == campaign_id))
+    characters = list(
+        session.scalars(
+            select(Character)
+            .where(Character.campaign_id == campaign_id)
+            .order_by(Character.party_position)
+        )
+    )
+    try:
+        catalogs = get_ruleset_registry().get_character_catalogs(
+            campaign.ruleset_release_id, campaign.ruleset_data_catalog_id
+        )
+    except UnknownRulesetDataCatalogError:
+        character_reads = [CharacterRead.model_validate(character) for character in characters]
+    else:
+        character_reads = [
+            _character_read(
+                session,
+                character,
+                catalogs.character_creation,
+                catalogs.character_state,
+            )
+            for character in characters
+        ]
     location = session.scalar(
         select(Location).where(Location.campaign_id == campaign_id, Location.is_current.is_(True))
     )
@@ -532,9 +709,64 @@ def get_campaign_state(session: Session, campaign_id: uuid.UUID) -> CampaignStat
     )
     return CampaignState(
         campaign=campaign,
-        character=character,
+        character=character_reads[0] if len(character_reads) == 1 else None,
+        characters=character_reads,
+        party_ready=sum(
+            character.creation_status == "finalized" and character.party_status == "active"
+            for character in characters
+        )
+        >= campaign.party_min_active,
         location=location,
         turn_count=turn_count or 0,
+    )
+
+
+def update_character_loadout(
+    session: Session,
+    campaign_id: uuid.UUID,
+    character_id: uuid.UUID,
+    data: LoadoutUpdate,
+) -> CharacterRead:
+    campaign = _campaign_for_update(session, campaign_id)
+    character = session.scalar(
+        select(Character)
+        .where(Character.campaign_id == campaign_id, Character.id == character_id)
+        .with_for_update()
+    )
+    if character is None:
+        raise NotFoundError("Character not found")
+    if character.creation_status != "finalized":
+        raise ConflictError("Character must be finalized before changing loadout")
+    catalogs = get_ruleset_registry().get_character_catalogs(
+        campaign.ruleset_release_id, campaign.ruleset_data_catalog_id
+    )
+    if catalogs.character_state is None:
+        raise ConflictError("Campaign does not support equipment state")
+    loadout = validate_loadout(
+        catalogs.character_creation,
+        catalogs.character_state,
+        dict(character.inventory),
+        Loadout.model_validate(data.model_dump()),
+    )
+    character.equipped_items = loadout.model_dump(mode="json")
+    character.state_revision += 1
+    _add_event(
+        session,
+        campaign_id,
+        "character_loadout_changed",
+        {
+            "character_id": str(character.id),
+            "state_revision": character.state_revision,
+            "loadout": character.equipped_items,
+        },
+        actor_character_id=character.id,
+    )
+    session.commit()
+    return _character_read(
+        session,
+        character,
+        catalogs.character_creation,
+        catalogs.character_state,
     )
 
 
@@ -548,10 +780,12 @@ def _apply_state_changes(
     character: Character | None,
     changes: list,
 ) -> None:
+    character_changed = False
     for change in changes:
         if isinstance(change, HPDelta):
             assert character is not None
-            character.hp += change.amount
+            character.hp = (character.hp or 0) + change.amount
+            character_changed = True
         elif isinstance(change, InventoryChange):
             assert character is not None
             inventory = dict(character.inventory)
@@ -561,6 +795,7 @@ def _apply_state_changes(
             else:
                 inventory.pop(change.item_name, None)
             character.inventory = inventory
+            character_changed = True
         elif isinstance(change, MoveLocation):
             current = session.scalar(
                 select(Location).where(
@@ -585,6 +820,8 @@ def _apply_state_changes(
                 session.add(destination)
             else:
                 destination.is_current = True
+    if character_changed and character is not None:
+        character.state_revision += 1
 
 
 def process_turn(
@@ -592,18 +829,58 @@ def process_turn(
     campaign_id: uuid.UUID,
     player_action: str,
     provider: DMProvider,
+    actor_character_id: uuid.UUID | None = None,
     dice_service: DiceService | None = None,
 ) -> TurnRead:
     campaign = _campaign_for_update(session, campaign_id)
-    character = session.scalar(select(Character).where(Character.campaign_id == campaign_id))
-    if character is not None and character.creation_status == "draft":
-        raise ConflictError("Character must be finalized before play begins")
     state_before = get_campaign_state(session, campaign_id)
+    if campaign.play_mode == "party_commander":
+        if not state_before.party_ready:
+            raise ConflictError(
+                f"At least {campaign.party_min_active} finalized active characters are required"
+            )
+        if actor_character_id is None:
+            raise ConflictError("Party Commander turns require actor_character_id")
+    character = None
+    if actor_character_id is not None:
+        character = session.scalar(
+            select(Character).where(
+                Character.campaign_id == campaign_id,
+                Character.id == actor_character_id,
+            )
+        )
+        if character is None:
+            raise NotFoundError("Acting character not found in campaign")
+        if character.creation_status != "finalized" or character.party_status != "active":
+            raise ConflictError("Acting character must be finalized and active")
+    elif len(state_before.characters) == 1:
+        character = session.get(Character, state_before.characters[0].id)
     output = provider.generate_turn(_provider_context(state_before), player_action)
 
     snapshot = None
     if character is not None:
-        snapshot = CharacterSnapshot(character.hp, character.max_hp, dict(character.inventory))
+        equipped_ids = {
+            item_id
+            for item_id in [
+                character.equipped_items.get("worn_armor_item_id"),
+                *character.equipped_items.get("held_item_ids", []),
+            ]
+            if item_id
+        }
+        catalogs = get_ruleset_registry().get_character_catalogs(
+            campaign.ruleset_release_id, campaign.ruleset_data_catalog_id
+        )
+        equipped_names = frozenset(
+            item.item_name
+            for item in (catalogs.character_state.equipment if catalogs.character_state else [])
+            if item.item_id in equipped_ids
+        )
+        snapshot = CharacterSnapshot(
+            character.hp or 0,
+            character.max_hp or 0,
+            dict(character.inventory),
+            equipped_names,
+        )
     StateChangeValidator().validate(snapshot, output.state_changes)
 
     turn_sequence = (
@@ -617,6 +894,7 @@ def process_turn(
         provider=provider.provider_name,
         model=provider.model_name,
         structured_output=output.model_dump(mode="json"),
+        actor_character_id=character.id if character else None,
     )
     session.add(turn)
     session.flush()
@@ -625,8 +903,12 @@ def process_turn(
         session,
         campaign_id,
         "player_action",
-        {"action": player_action},
+        {
+            "action": player_action,
+            "actor_character_id": str(character.id) if character else None,
+        },
         turn_id=turn.id,
+        actor_character_id=character.id if character else None,
     )
 
     roller = dice_service or DiceService()
@@ -644,6 +926,7 @@ def process_turn(
             total=result.total,
             purpose=request.purpose,
             hidden=request.hidden,
+            actor_character_id=character.id if character else None,
         )
         session.add(roll_model)
         session.flush()
@@ -662,6 +945,7 @@ def process_turn(
             },
             turn_id=turn.id,
             visibility="dm_only" if request.hidden else "player",
+            actor_character_id=character.id if character else None,
         )
 
     _apply_state_changes(session, campaign_id, character, output.state_changes)
@@ -671,14 +955,19 @@ def process_turn(
         "dm_response",
         {"narration": output.narration},
         turn_id=turn.id,
+        actor_character_id=character.id if character else None,
     )
     if output.state_changes:
         _add_event(
             session,
             campaign_id,
             "state_changed",
-            {"changes": [change.model_dump(mode="json") for change in output.state_changes]},
+            {
+                "changes": [change.model_dump(mode="json") for change in output.state_changes],
+                "affected_character_ids": [str(character.id)] if character else [],
+            },
             turn_id=turn.id,
+            actor_character_id=character.id if character else None,
         )
     session.commit()
     state_after = get_campaign_state(session, campaign_id)
@@ -687,6 +976,7 @@ def process_turn(
         sequence=turn.sequence,
         player_action=turn.player_action,
         narration=turn.dm_narration,
+        actor_character_id=turn.actor_character_id,
         dice_rolls=roll_models,
         state=state_after,
     )

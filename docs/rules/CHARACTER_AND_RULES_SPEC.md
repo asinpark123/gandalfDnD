@@ -1,6 +1,7 @@
 # Character and Deterministic Rules Specification
 
-- **Status:** Active; M1.1–M1.2 verified, M1.3–M1.4 implementation pending
+- **Status:** Active; M1.1–M1.2 verified, M1.3 automated verification complete with owner checkpoint
+  pending, M1.4 implementation pending
 - **Rules baseline:** SRD 5.2.1
 - **Initial delivery scope:** M1.1–M1.4
 - **Research basis:** [RES-001 review](../research/2026-08-30-character-system-adoption.md)
@@ -74,9 +75,10 @@ facts but are mechanically inert unless an accepted rule maps them to a typed ef
 
 ## 3. M1 supported vertical slice
 
-M1.2 verified the complete lifecycle for one level-one player character. M1.3–M1.4 expand the same
+M1.2 verified the complete lifecycle for one level-one player character. M1.3 expanded the same
 content slice into Party Commander: one human player directly controls multiple independently
-addressable characters. Every initial party character supports exactly:
+addressable characters; M1.4 adds authoritative check/save resolution. Every initial party
+character supports exactly:
 
 - level one;
 - Human species;
@@ -262,11 +264,11 @@ migrations.
 | --- | --- | --- | --- |
 | GF-001 | Creation completeness | Finalization rejects every missing or unsupported required choice | Verified M1.2 |
 | GF-002 | Soldier Fighter abilities | Standard array Str 15/Dex 14/Con 13 with Soldier +2 Str/+1 Con gives 17/14/14 and modifiers +3/+2/+2 | Verified M1.2 |
-| GF-003 | Level-one Fighter derivation | GF-002 produces HP 12 before any additional source grant, Strength save +5, Constitution save +4, initiative +2 | Partial: HP/ability modifiers verified M1.2; saves/initiative projection M1.3 |
-| GF-004 | Provenance | Every value in GF-002/GF-003 identifies all contributing definitions and acquisition events | Partial: choices/grants verified M1.2; complete derived-component provenance M1.3 |
+| GF-003 | Level-one Fighter derivation | GF-002 with the selected Alert feat produces HP 12, Strength save +5, Constitution save +4, and initiative +4 (Dexterity +2 plus PB +2 from Initiative proficiency) | Verified M1.3 |
+| GF-004 | Provenance | Every value in GF-002/GF-003 identifies all contributing definitions and acquisition events | Verified for M1.3 character state; extend to M1.4 resolution records |
 | GF-005 | Skill and tool interaction | When both legitimately apply, PB is added once and Advantage is granted | Deferred to tool-enabled slice |
 | GF-006 | Advantage cancellation | Any Advantage and any Disadvantage sources cancel to one d20 | Planned |
-| GF-007 | Alternative base AC | Eligible base calculations are selected, never summed | Planned |
+| GF-007 | Alternative base AC | Eligible base calculations are selected, never summed | Verified M1.3 for unarmored versus worn Chain Mail; future alternatives append fixtures |
 | GF-008 | Temporary HP | A new pool may replace or be declined; pools never add | Deferred to combat/resource slice |
 | GF-009 | Condition stacking | Duplicate conditions do not stack; Exhaustion uses levelled state | Deferred to combat/effect slice |
 | GF-010 | Fixed-dice replay | Same pre-state, command, dice and definitions produce equivalent events after restart | Planned |
@@ -274,7 +276,7 @@ migrations.
 | GF-012 | Narrative write rejection | Prose alone cannot apply damage, healing, conditions, resources, items, or bonuses | Planned |
 | GF-013 | Cross-release rejection | A command using definitions from another rules release is rejected | Planned |
 | GF-014 | Ruleset coexistence | Adding a mock later release does not alter an existing campaign or fixture | Planned |
-| GF-015 | Party character isolation and attribution | A command for character A derives from and mutates only A unless an explicit typed effect names another target; every roll/event identifies the actor and affected character(s) | Planned M1.3–M1.4 |
+| GF-015 | Party character isolation and attribution | A command for character A derives from and mutates only A unless an explicit typed effect names another target; every roll/event identifies the actor and affected character(s) | M1.3 party state, turn/dice/event attribution, and isolation verified; M1.4 rule-resolution attribution pending |
 
 Later combat, spellcasting, rests, advancement, multiclassing, and solo-balance slices must append
 their report-identified fixtures rather than weakening these contracts.
@@ -283,11 +285,11 @@ their report-identified fixtures rather than weakening these contracts.
 
 | Requirement | Normative/design source | Implementation | Migration | Verification | Status |
 | --- | --- | --- | --- | --- | --- |
-| Immutable rules release and definitions | SRD legal/source artifact; RES-001; ADR-009/ADR-015 | `app/rulesets.py`; `rulesets/`; versioned source release and separately hashed data catalogs | `0002_ruleset_releases`; `0003_guided_character_creation` | 38-test suite, schema freshness, catalog and source-artifact checksums | Verified through M1.2 |
-| Character source provenance | RES-001 canonical-state model; ADR-010 | `CharacterGrant`; `app/character_creation.py`; `app/services.py`; grants API | `0003_guided_character_creation` | creation/grant immutability tests; GF-004 creation portion | Partial verified M1.2; derived components M1.3 |
+| Immutable rules release and definitions | SRD legal/source artifact; RES-001; ADR-009/ADR-015 | `app/rulesets.py`; `rulesets/`; versioned source release and separately hashed data catalogs | `0002_ruleset_releases`; `0003_guided_character_creation`; `0004_party_commander_state` | 39-test suite, schema freshness, catalog and source-artifact checksums | Verified through M1.3 automated gate |
+| Character source provenance | RES-001 canonical-state model; ADR-010 | `CharacterGrant`; `app/character_creation.py`; `app/character_state.py`; `app/services.py`; grants/state APIs | `0003_guided_character_creation`; `0004_party_commander_state` | creation/grant immutability tests; GF-004 state projections | Verified through M1.3 character state |
 | Human/Soldier/Fighter creation | SRD 5.2.1 character creation pp. 19–23; Fighter pp. 47–48; Soldier p. 83; Human p. 86; feats pp. 87–88; equipment pp. 91–97 | character-creation catalog, validator, options/draft/finalize APIs, player guide | `0003_guided_character_creation` | GF-001–GF-003 creation tests and API golden workflow | Verified M1.2 |
-| Pure derived statistics | SRD formulas; ADR-011 | M1.2 ability modifiers and level-one HP in `app/character_creation.py`; remaining kernel pending M1.3 | `0003_guided_character_creation` stores the reproducible creation sheet and grants | GF-002 and GF-003 HP/modifier portion pass | Partial verified M1.2 |
-| Party Commander state and actor attribution | Owner-approved mode sequence; ADR-016; RUL-025 | Pending M1.3 party aggregate/addressing and M1.4 actor-aware resolution | Pending safe removal of the character campaign singleton | GF-015 plus multi-character restart/isolation API tests | Planned M1.3–M1.4 |
+| Pure derived statistics | SRD formulas; ADR-011 | `app/character_creation.py`; pure `app/character_state.py` derivation kernel and versioned state catalog | `0003` stores creation facts; `0004` stores only mutable loadout/resources and revisions | GF-002–GF-004 and GF-007 API fixtures pass | Verified M1.3; resolution use pending M1.4 |
+| Party Commander state and actor attribution | Owner-approved mode sequence; ADR-016; RUL-025 | 2–4 ordered player-controlled characters, readiness gate, ID-based APIs, isolated actor state, and actor-attributed turns/dice/events | `0004_party_commander_state` safely removes the singleton and backfills legacy attribution when unambiguous | GF-015 multi-character isolation/API tests | Verified M1.3 state boundary; M1.4 resolution pending |
 | Deterministic check/save resolution | SRD D20 tests; ADR-007/ADR-012 | Pending M1.4 | Pending | GF-006, GF-010–GF-011 | Planned |
 | Narrative/mechanical separation | Product trust boundary; ADR-012 | Existing M0 boundary, M1 extension pending | As required | GF-012 | Partial foundation only |
 | Explicit ruleset compatibility | RES-001 versioning; ADR-009/ADR-015 | Dynamic/cross-release rejection, coexistence, and exact release/catalog pins implemented; conversion execution intentionally deferred | `0002_ruleset_releases`; `0003` preserves legacy foundation pins | GF-013–GF-014 foundation/catalog tests pass | Partial foundation verified; conversion deferred |

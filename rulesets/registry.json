@@ -1,12 +1,12 @@
 {
   "$schema": "./schema/registry.schema.json",
-  "schema_version": "1.1.0",
+  "schema_version": "1.2.0",
   "default_release_id": "srd-5.2.1",
   "releases": [
     {
       "id": "srd-5.2.1",
       "manifest": "srd-5.2.1/manifest.json",
-      "default_data_catalog_id": "srd-5.2.1-character-creation-v1",
+      "default_data_catalog_id": "srd-5.2.1-party-state-v1",
       "data_catalogs": [
         {
           "id": "srd-5.2.1-foundation-v1",
@@ -19,6 +19,12 @@
           "kind": "character_creation",
           "path": "data/character-creation-v1.json",
           "sha256": "ddbd172feeeb191789f1b95f93762c661dda06888dad067e28c7fc6ffda391cb"
+        },
+        {
+          "id": "srd-5.2.1-party-state-v1",
+          "kind": "character_state",
+          "path": "data/party-state-v1.json",
+          "sha256": "aba4fcdbffb037eece88c862c76be988ffc60808b46361cc9a9dda0730fe763b"
         }
       ]
     }

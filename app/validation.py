@@ -12,6 +12,7 @@ class CharacterSnapshot:
     hp: int
     max_hp: int
     inventory: dict[str, int]
+    equipped_item_names: frozenset[str] = frozenset()
 
 
 class StateChangeValidator:
@@ -30,7 +31,12 @@ class StateChangeValidator:
                     raise InvalidStateChange(
                         f"HP change would leave allowed range 0..{current.max_hp}"
                     )
-                current = CharacterSnapshot(new_hp, current.max_hp, current.inventory.copy())
+                current = CharacterSnapshot(
+                    new_hp,
+                    current.max_hp,
+                    current.inventory.copy(),
+                    current.equipped_item_names,
+                )
             elif isinstance(change, InventoryChange):
                 inventory = current.inventory.copy()
                 item_key = change.item_name.strip()
@@ -39,9 +45,18 @@ class StateChangeValidator:
                     raise InvalidStateChange(
                         f"Cannot remove more {item_key} than the character has"
                     )
+                if new_quantity < 1 and item_key in current.equipped_item_names:
+                    raise InvalidStateChange(
+                        f"Cannot remove equipped {item_key}; change loadout first"
+                    )
                 if new_quantity == 0:
                     inventory.pop(item_key, None)
                 else:
                     inventory[item_key] = new_quantity
-                current = CharacterSnapshot(current.hp, current.max_hp, inventory)
+                current = CharacterSnapshot(
+                    current.hp,
+                    current.max_hp,
+                    inventory,
+                    current.equipped_item_names,
+                )
         return current

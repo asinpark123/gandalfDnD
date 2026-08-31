@@ -16,6 +16,7 @@ from urllib.request import urlopen
 from pydantic import AnyHttpUrl, BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.character_creation import CharacterCreationCatalog
+from app.character_state import CharacterStateCatalog
 from app.config import get_settings
 
 ReleaseId = str
@@ -44,7 +45,7 @@ class StrictModel(BaseModel):
 
 class DataCatalogEntry(StrictModel):
     id: str = Field(pattern=r"^[a-z0-9][a-z0-9.-]{2,99}$")
-    kind: Literal["foundation", "character_creation"]
+    kind: Literal["foundation", "character_creation", "character_state"]
     path: str = Field(pattern=r"^[a-z0-9][a-z0-9./_-]*\.json$")
     sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
 
@@ -67,7 +68,7 @@ class RegistryEntry(StrictModel):
 
 class RegistryDocument(StrictModel):
     schema_uri: str | None = Field(default=None, alias="$schema")
-    schema_version: Literal["1.1.0"]
+    schema_version: Literal["1.2.0"]
     default_release_id: str
     releases: list[RegistryEntry] = Field(min_length=1)
 
@@ -150,10 +151,17 @@ class NormalizedDataIndex(StrictModel):
 @dataclass(frozen=True)
 class LoadedRulesetDataCatalog:
     id: str
-    kind: Literal["foundation", "character_creation"]
+    kind: Literal["foundation", "character_creation", "character_state"]
     path: Path
     sha256: Sha256
-    document: NormalizedDataIndex | CharacterCreationCatalog
+    document: NormalizedDataIndex | CharacterCreationCatalog | CharacterStateCatalog
+
+
+@dataclass(frozen=True)
+class LoadedCharacterCatalogs:
+    selected: LoadedRulesetDataCatalog
+    character_creation: CharacterCreationCatalog
+    character_state: CharacterStateCatalog | None
 
 
 @dataclass(frozen=True)
@@ -238,11 +246,13 @@ class RulesetRegistry:
                     )
                 try:
                     if catalog_entry.kind == "foundation":
-                        catalog_document: NormalizedDataIndex | CharacterCreationCatalog = (
-                            NormalizedDataIndex.model_validate(catalog_data)
-                        )
-                    else:
+                        catalog_document: (
+                            NormalizedDataIndex | CharacterCreationCatalog | CharacterStateCatalog
+                        ) = NormalizedDataIndex.model_validate(catalog_data)
+                    elif catalog_entry.kind == "character_creation":
                         catalog_document = CharacterCreationCatalog.model_validate(catalog_data)
+                    else:
+                        catalog_document = CharacterStateCatalog.model_validate(catalog_data)
                 except ValueError as exc:
                     raise RulesetRegistryError(
                         f"Invalid ruleset data catalog: {catalog_path}"
@@ -263,6 +273,19 @@ class RulesetRegistry:
                     sha256=actual_sha256,
                     document=catalog_document,
                 )
+
+            for catalog in data_catalogs.values():
+                if not isinstance(catalog.document, CharacterStateCatalog):
+                    continue
+                base = data_catalogs.get(catalog.document.base_character_creation_catalog_id)
+                if base is None or not isinstance(base.document, CharacterCreationCatalog):
+                    raise RulesetRegistryError(
+                        f"Character state catalog {catalog.id!r} has no creation base"
+                    )
+                if base.sha256 != catalog.document.base_character_creation_catalog_sha256:
+                    raise RulesetRegistryError(
+                        f"Character state catalog {catalog.id!r} base checksum does not match"
+                    )
 
             releases[entry.id] = LoadedRulesetRelease(
                 manifest=manifest,
@@ -301,6 +324,32 @@ class RulesetRegistry:
             raise UnknownRulesetDataCatalogError(
                 f"Unknown data catalog for {release_id}: {selected_id}"
             ) from exc
+
+    def get_character_catalogs(
+        self, release_id: str, data_catalog_id: str | None = None
+    ) -> LoadedCharacterCatalogs:
+        selected = self.get_data_catalog(release_id, data_catalog_id)
+        if isinstance(selected.document, CharacterCreationCatalog):
+            return LoadedCharacterCatalogs(
+                selected=selected,
+                character_creation=selected.document,
+                character_state=None,
+            )
+        if isinstance(selected.document, CharacterStateCatalog):
+            release = self.get(release_id)
+            base = release.data_catalogs.get(selected.document.base_character_creation_catalog_id)
+            if base is None or not isinstance(base.document, CharacterCreationCatalog):
+                raise UnknownRulesetDataCatalogError(
+                    f"Character state catalog {selected.id!r} has no creation base"
+                )
+            return LoadedCharacterCatalogs(
+                selected=selected,
+                character_creation=base.document,
+                character_state=selected.document,
+            )
+        raise UnknownRulesetDataCatalogError(
+            f"Data catalog {selected.id!r} does not support character creation"
+        )
 
 
 @lru_cache

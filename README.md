@@ -22,10 +22,12 @@ maintained in the [living development plan](docs/PROJECT_PLAN.md).
   policies, adjudications, house rules, and unresolved decisions
 - [Player character-creation guide](docs/player/CHARACTER_CREATION.md) — supported choices,
   step-by-step API workflow, limitations, and rules-source notes
+- [M1.3 owner acceptance checklist](docs/player/M1_3_ACCEPTANCE_CHECKLIST.md) — hands-on Party
+  Commander verification and feedback record
 
-Documentation distinguishes planned behavior from verified implementation. M1.2 guided character
-creation is now executable and verified; complete derived state and authoritative check/save
-resolution remain M1.3 and M1.4 work.
+Documentation distinguishes planned behavior from verified implementation. M1.3 Party Commander
+and complete level-one character state have passed automated verification and await the recorded
+owner checkpoint; authoritative check/save resolution remains M1.4 work.
 
 ## Versioned rulesets
 
@@ -53,12 +55,15 @@ checksum, size, license, attribution, normalized-data catalogs, and schema versi
 
 ## Current verified scope
 
-- FastAPI API with health, campaigns, one character, locations, turns, and player-visible events
+- FastAPI API with health, campaigns, ordered parties, locations, turns, and player-visible events
 - PostgreSQL as the canonical source of truth through SQLAlchemy 2 and Alembic
-- guided draft/finalize creation for one level-one Human/Soldier/Fighter using the standard array
+- guided draft/finalize creation for two to four independently persisted level-one
+  Human/Soldier/Fighters using the standard array
 - source-cited, immutable character choices and grants pinned to a normalized data catalog
 - calculated ability scores/modifiers, level-one HP, proficiency bonus, skill and saving-throw
-  proficiencies, features, equipment, and selected character options
+  modifiers, AC alternatives, initiative, passive Perception, Speed, features/resources, equipment
+  positions, and source/acquisition provenance
+- acting-character attribution on turns, dice, player-visible events, and isolated state changes
 - HP, inventory, and current-location state changes with pre-commit validation
 - auditable application dice rolls, including internally logged hidden rolls
 - provider-neutral DM interface
@@ -117,11 +122,13 @@ canonical state: all proposed changes pass through `StateChangeValidator` first.
 | `GET` | `/health` | Confirm the API can reach its configured database |
 | `POST` | `/campaigns` | Create a campaign and starting location |
 | `GET` | `/rulesets/{release}/character-creation/options` | Read supported choices and beginner explanations |
-| `POST` | `/campaigns/{id}/character` | Create the solo character draft |
-| `POST` | `/campaigns/{id}/character/finalize` | Validate and finalize all required character choices |
-| `GET` | `/campaigns/{id}/character/grants` | Read immutable choice/grant provenance |
-| `GET` | `/campaigns/{id}/state` | Read canonical campaign, character, and location state |
-| `POST` | `/campaigns/{id}/turns` | Process and persist one player action |
+| `POST` | `/campaigns/{id}/characters` | Create an ordered Party Commander character draft |
+| `GET` | `/campaigns/{id}/characters` | Read the ordered party and calculated sheets |
+| `POST` | `/campaigns/{id}/characters/{character_id}/finalize` | Validate and finalize one character's required choices |
+| `GET` | `/campaigns/{id}/characters/{character_id}/grants` | Read one character's immutable choice/grant provenance |
+| `PUT` | `/campaigns/{id}/characters/{character_id}/loadout` | Select worn armor and held/readied weapons |
+| `GET` | `/campaigns/{id}/state` | Read canonical campaign, party, character, and location state |
+| `POST` | `/campaigns/{id}/turns` | Process one actor-attributed player action after party readiness |
 | `GET` | `/campaigns/{id}/events` | Read the ordered player-visible event trail |
 
 ## Verification

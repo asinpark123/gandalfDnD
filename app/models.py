@@ -73,7 +73,8 @@ class RulesetDataCatalog(TimestampMixin, Base):
 
     __table_args__ = (
         CheckConstraint(
-            "kind IN ('foundation', 'character_creation')", name="ruleset_data_catalog_kind"
+            "kind IN ('foundation', 'character_creation', 'character_state')",
+            name="ruleset_data_catalog_kind",
         ),
         CheckConstraint(
             "support_status IN ('foundation_only', 'character_creation', 'complete')",
@@ -95,12 +96,25 @@ class Campaign(TimestampMixin, Base):
     )
     legacy_ruleset_label: Mapped[str | None] = mapped_column(String(40))
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="active")
+    play_mode: Mapped[str] = mapped_column(String(30), nullable=False, default="party_commander")
+    party_min_active: Mapped[int] = mapped_column(Integer, nullable=False, default=2)
+    party_max_active: Mapped[int] = mapped_column(Integer, nullable=False, default=4)
 
     ruleset_release: Mapped[RulesetRelease] = relationship(back_populates="campaigns")
     characters: Mapped[list["Character"]] = relationship(back_populates="campaign")
     locations: Mapped[list["Location"]] = relationship(back_populates="campaign")
 
-    __table_args__ = (CheckConstraint("status IN ('active', 'archived')", name="campaign_status"),)
+    __table_args__ = (
+        CheckConstraint("status IN ('active', 'archived')", name="campaign_status"),
+        CheckConstraint(
+            "play_mode IN ('legacy_single', 'party_commander')", name="campaign_play_mode"
+        ),
+        CheckConstraint(
+            "party_min_active >= 1 AND party_max_active >= party_min_active "
+            "AND party_max_active <= 4",
+            name="campaign_party_size_bounds",
+        ),
+    )
 
 
 class Location(TimestampMixin, Base):
@@ -132,7 +146,7 @@ class Character(TimestampMixin, Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     campaign_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("campaigns.id", ondelete="CASCADE"), nullable=False, unique=True
+        ForeignKey("campaigns.id", ondelete="CASCADE"), nullable=False, index=True
     )
     ruleset_release_id: Mapped[str] = mapped_column(
         ForeignKey("ruleset_releases.id", ondelete="RESTRICT"), nullable=False, index=True
@@ -148,6 +162,12 @@ class Character(TimestampMixin, Base):
     inventory: Mapped[dict[str, int]] = mapped_column(JSONB, nullable=False, default=dict)
     character_sheet: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     finalized_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    party_position: Mapped[int] = mapped_column(Integer, nullable=False)
+    control_mode: Mapped[str] = mapped_column(String(20), nullable=False, default="player")
+    party_status: Mapped[str] = mapped_column(String(20), nullable=False, default="active")
+    state_revision: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    equipped_items: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
+    resources: Mapped[dict[str, int]] = mapped_column(JSONB, nullable=False, default=dict)
 
     campaign: Mapped[Campaign] = relationship(back_populates="characters")
     grants: Mapped[list["CharacterGrant"]] = relationship(back_populates="character")
@@ -157,6 +177,11 @@ class Character(TimestampMixin, Base):
             "creation_status IN ('legacy', 'draft', 'finalized')", name="character_creation_status"
         ),
         CheckConstraint("revision >= 0", name="character_revision_nonnegative"),
+        CheckConstraint("party_position BETWEEN 1 AND 4", name="character_party_position"),
+        CheckConstraint("control_mode = 'player'", name="character_control_mode"),
+        CheckConstraint("party_status = 'active'", name="character_party_status"),
+        CheckConstraint("state_revision >= 0", name="character_state_revision_nonnegative"),
+        UniqueConstraint("campaign_id", "party_position", name="uq_characters_campaign_position"),
         CheckConstraint("max_hp IS NULL OR max_hp > 0", name="character_max_hp_positive"),
         CheckConstraint(
             "(hp IS NULL AND max_hp IS NULL) OR "
@@ -179,6 +204,9 @@ class Turn(TimestampMixin, Base):
     provider: Mapped[str] = mapped_column(String(40), nullable=False)
     model: Mapped[str | None] = mapped_column(String(80))
     structured_output: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    actor_character_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("characters.id", ondelete="SET NULL"), index=True
+    )
 
     __table_args__ = (
         UniqueConstraint("campaign_id", "sequence", name="uq_turns_campaign_sequence"),
@@ -206,6 +234,9 @@ class CampaignEvent(TimestampMixin, Base):
     event_type: Mapped[str] = mapped_column(String(60), nullable=False)
     visibility: Mapped[str] = mapped_column(String(20), nullable=False, default="player")
     payload: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    actor_character_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("characters.id", ondelete="SET NULL"), index=True
+    )
 
     __table_args__ = (
         UniqueConstraint("campaign_id", "sequence", name="uq_events_campaign_sequence"),
@@ -236,6 +267,9 @@ class DiceRoll(TimestampMixin, Base):
     total: Mapped[int] = mapped_column(Integer, nullable=False)
     purpose: Mapped[str] = mapped_column(String(160), nullable=False)
     hidden: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    actor_character_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("characters.id", ondelete="SET NULL"), index=True
+    )
 
 
 class CharacterGrant(TimestampMixin, Base):

@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 from app.character_creation import CharacterCreationCatalog
+from app.character_state import CharacterStateCatalog
 from app.rulesets import NormalizedDataIndex, RegistryDocument, RulesetManifest
 
 REPOSITORY_ROOT = Path(__file__).parents[1]
@@ -13,6 +14,8 @@ SCHEMAS = {
     REPOSITORY_ROOT / "rulesets/srd-5.2.1/schema/data-index.schema.json": NormalizedDataIndex,
     REPOSITORY_ROOT
     / "rulesets/srd-5.2.1/schema/character-creation.schema.json": CharacterCreationCatalog,
+    REPOSITORY_ROOT
+    / "rulesets/srd-5.2.1/schema/character-state.schema.json": CharacterStateCatalog,
 }
 
 

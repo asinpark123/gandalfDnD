@@ -1,0 +1,218 @@
+{
+  "$schema": "../schema/character-state.schema.json",
+  "schema_version": "1.0.0",
+  "id": "srd-5.2.1-party-state-v1",
+  "ruleset_release_id": "srd-5.2.1",
+  "base_character_creation_catalog_id": "srd-5.2.1-character-creation-v1",
+  "base_character_creation_catalog_sha256": "ddbd172feeeb191789f1b95f93762c661dda06888dad067e28c7fc6ffda391cb",
+  "resolver_version": "character-state-1.0.0",
+  "party": {
+    "mode": "party_commander",
+    "minimum_active_characters": 2,
+    "maximum_active_characters": 4,
+    "control_mode": "player"
+  },
+  "sources": [
+    {
+      "id": "srd-d20",
+      "title": "System Reference Document 5.2.1",
+      "section": "Playing the Game: D20 Tests and Heroic Inspiration",
+      "printed_pages": [8],
+      "url": "https://www.dndbeyond.com/srd"
+    },
+    {
+      "id": "srd-character-details",
+      "title": "System Reference Document 5.2.1",
+      "section": "Character Creation: Step 5 Character Creation Details",
+      "printed_pages": [22],
+      "url": "https://www.dndbeyond.com/srd"
+    },
+    {
+      "id": "srd-fighter-state",
+      "title": "System Reference Document 5.2.1",
+      "section": "Fighter: Core Traits and Level 1 Features",
+      "printed_pages": [47, 48],
+      "url": "https://www.dndbeyond.com/srd"
+    },
+    {
+      "id": "srd-human-state",
+      "title": "System Reference Document 5.2.1",
+      "section": "Character Origins: Human",
+      "printed_pages": [86],
+      "url": "https://www.dndbeyond.com/srd"
+    },
+    {
+      "id": "srd-feat-state",
+      "title": "System Reference Document 5.2.1",
+      "section": "Feats: Alert and Defense",
+      "printed_pages": [87, 88],
+      "url": "https://www.dndbeyond.com/srd"
+    },
+    {
+      "id": "srd-equipment-state",
+      "title": "System Reference Document 5.2.1",
+      "section": "Equipment: Weapons and Armor",
+      "printed_pages": [91, 92],
+      "url": "https://www.dndbeyond.com/srd"
+    }
+  ],
+  "rules": [
+    {
+      "id": "ability_modifier",
+      "definition_key": "srd-5.2.1:rule.ability_modifier",
+      "name": "Ability Modifier",
+      "beginner_description": "Convert an ability score to the modifier added to relevant D20 Tests and other calculations.",
+      "source_ids": ["srd-character-details"]
+    },
+    {
+      "id": "proficiency_bonus",
+      "definition_key": "srd-5.2.1:rule.proficiency_bonus",
+      "name": "Proficiency Bonus",
+      "beginner_description": "A level-one character adds +2 when a rule says the character is proficient.",
+      "source_ids": ["srd-d20", "srd-character-details"]
+    },
+    {
+      "id": "saving_throw_modifier",
+      "definition_key": "srd-5.2.1:rule.saving_throw_modifier",
+      "name": "Saving Throw Modifier",
+      "beginner_description": "Use the relevant ability modifier and add Proficiency Bonus only for proficient saving throws.",
+      "source_ids": ["srd-character-details"]
+    },
+    {
+      "id": "skill_modifier",
+      "definition_key": "srd-5.2.1:rule.skill_modifier",
+      "name": "Skill Modifier",
+      "beginner_description": "Use the relevant ability modifier and add Proficiency Bonus only when proficient in the skill.",
+      "source_ids": ["srd-character-details"]
+    },
+    {
+      "id": "passive_perception",
+      "definition_key": "srd-5.2.1:rule.passive_perception",
+      "name": "Passive Perception",
+      "beginner_description": "Passive Perception equals 10 plus the complete Wisdom (Perception) check modifier.",
+      "source_ids": ["srd-character-details"]
+    },
+    {
+      "id": "initiative",
+      "definition_key": "srd-5.2.1:rule.initiative",
+      "name": "Initiative Modifier",
+      "beginner_description": "Initiative normally uses Dexterity; Alert adds Proficiency Bonus because it grants Initiative proficiency.",
+      "source_ids": ["srd-character-details", "srd-feat-state"]
+    },
+    {
+      "id": "level_one_hit_points",
+      "definition_key": "srd-5.2.1:rule.hit_points.level_one",
+      "name": "Level-One Hit Points",
+      "beginner_description": "A level-one Fighter's Hit Point maximum equals 10 plus Constitution modifier.",
+      "source_ids": ["srd-character-details", "srd-fighter-state"]
+    },
+    {
+      "id": "speed",
+      "definition_key": "srd-5.2.1:rule.speed",
+      "name": "Speed",
+      "beginner_description": "Human base Speed is 30 feet; armor can reduce it when its Strength requirement is not met.",
+      "source_ids": ["srd-human-state", "srd-equipment-state"]
+    },
+    {
+      "id": "unarmored_armor_class",
+      "definition_key": "srd-5.2.1:rule.armor_class.unarmored",
+      "name": "Unarmored Armor Class",
+      "beginner_description": "Without armor or a Shield, base Armor Class equals 10 plus Dexterity modifier.",
+      "source_ids": ["srd-character-details"]
+    }
+  ],
+  "equipment": [
+    {
+      "id": "chain_mail",
+      "definition_key": "srd-5.2.1:equipment.chain_mail",
+      "name": "Chain Mail State",
+      "beginner_description": "Chain Mail provides base Armor Class 16, requires Strength 13 to avoid a Speed penalty, and imposes Disadvantage on Stealth checks.",
+      "source_ids": ["srd-equipment-state"],
+      "item_id": "chain_mail",
+      "item_name": "Chain Mail",
+      "item_type": "armor",
+      "hands_required": 0,
+      "default_position": "worn",
+      "armor_category": "heavy",
+      "base_armor_class": 16,
+      "minimum_strength": 13,
+      "stealth_disadvantage": true
+    },
+    {
+      "id": "greatsword",
+      "definition_key": "srd-5.2.1:equipment.greatsword.state",
+      "name": "Greatsword Equipment State",
+      "beginner_description": "A Greatsword requires two hands when readied for mechanical use and begins carried until selected as held/readied.",
+      "source_ids": ["srd-equipment-state"],
+      "item_id": "greatsword",
+      "item_name": "Greatsword",
+      "item_type": "weapon",
+      "hands_required": 2,
+      "default_position": "carried",
+      "stealth_disadvantage": false
+    },
+    {
+      "id": "flail",
+      "definition_key": "srd-5.2.1:equipment.flail.state",
+      "name": "Flail Equipment State",
+      "beginner_description": "A Flail is a one-handed weapon and begins carried until selected as held.",
+      "source_ids": ["srd-equipment-state"],
+      "item_id": "flail",
+      "item_name": "Flail",
+      "item_type": "weapon",
+      "hands_required": 1,
+      "default_position": "carried",
+      "stealth_disadvantage": false
+    },
+    {
+      "id": "javelin",
+      "definition_key": "srd-5.2.1:equipment.javelin.state",
+      "name": "Javelin Equipment State",
+      "beginner_description": "A Javelin is a one-handed weapon and begins carried until selected as held.",
+      "source_ids": ["srd-equipment-state"],
+      "item_id": "javelin",
+      "item_name": "Javelin",
+      "item_type": "weapon",
+      "hands_required": 1,
+      "default_position": "carried",
+      "stealth_disadvantage": false
+    }
+  ],
+  "resources": [
+    {
+      "id": "second_wind",
+      "definition_key": "srd-5.2.1:resource.fighter.second_wind",
+      "name": "Second Wind Uses",
+      "beginner_description": "A level-one Fighter begins with two uses; a Short Rest restores one and a Long Rest restores all.",
+      "source_ids": ["srd-fighter-state"],
+      "maximum": 2,
+      "initial_current": 2,
+      "die": "d10",
+      "short_rest_recovery": "one",
+      "long_rest_recovery": "all"
+    },
+    {
+      "id": "heroic_inspiration",
+      "definition_key": "srd-5.2.1:resource.human.heroic_inspiration",
+      "name": "Heroic Inspiration",
+      "beginner_description": "A Human starts the day with one Heroic Inspiration and can never hold more than one.",
+      "source_ids": ["srd-d20", "srd-human-state"],
+      "maximum": 1,
+      "initial_current": 1,
+      "short_rest_recovery": "none",
+      "long_rest_recovery": "none"
+    },
+    {
+      "id": "hit_dice",
+      "definition_key": "srd-5.2.1:resource.fighter.hit_dice",
+      "name": "Fighter Hit Dice",
+      "beginner_description": "A level-one Fighter has one d10 Hit Die, which can be spent during a Short Rest and is restored by a Long Rest.",
+      "source_ids": ["srd-character-details", "srd-fighter-state"],
+      "maximum": 1,
+      "initial_current": 1,
+      "die": "d10",
+      "short_rest_recovery": "none",
+      "long_rest_recovery": "all"
+    }
+  ]
+}

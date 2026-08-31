@@ -8,9 +8,9 @@ from sqlalchemy.orm import Session
 
 from app.character_creation import (
     CharacterChoiceError,
-    CharacterCreationCatalog,
     CharacterFinalizeRequest,
 )
+from app.character_state import CharacterCreationOptions, CharacterStateError
 from app.config import Settings, get_settings
 from app.db import get_session
 from app.llm.base import DMProvider
@@ -25,6 +25,7 @@ from app.schemas import (
     CharacterRead,
     EventRead,
     HealthRead,
+    LoadoutUpdate,
     TurnCreate,
     TurnRead,
 )
@@ -35,9 +36,12 @@ from app.services import (
     create_campaign,
     finalize_character,
     get_campaign_state,
+    get_character_read,
     list_character_grants,
+    list_characters,
     list_events,
     process_turn,
+    update_character_loadout,
 )
 from app.validation import InvalidStateChange
 
@@ -84,21 +88,40 @@ def create_app() -> FastAPI:
             session.rollback()
             raise HTTPException(status_code=409, detail=str(exc)) from exc
 
+    @app.post(
+        "/campaigns/{campaign_id}/characters",
+        response_model=CharacterRead,
+        status_code=status.HTTP_201_CREATED,
+    )
+    def party_characters_create(
+        campaign_id: uuid.UUID, data: CharacterCreate, session: SessionDep
+    ) -> CharacterRead:
+        return characters_create(campaign_id, data, session)
+
+    @app.get("/campaigns/{campaign_id}/characters", response_model=list[CharacterRead])
+    def party_characters_list(campaign_id: uuid.UUID, session: SessionDep) -> list[CharacterRead]:
+        try:
+            return [
+                get_character_read(session, campaign_id, character.id)
+                for character in list_characters(session, campaign_id)
+            ]
+        except NotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+
     @app.get(
         "/rulesets/{ruleset_release_id}/character-creation/options",
-        response_model=CharacterCreationCatalog,
+        response_model=CharacterCreationOptions,
     )
-    def character_creation_options(ruleset_release_id: str) -> CharacterCreationCatalog:
+    def character_creation_options(ruleset_release_id: str) -> CharacterCreationOptions:
         try:
-            loaded_catalog = get_ruleset_registry().get_data_catalog(ruleset_release_id)
+            catalogs = get_ruleset_registry().get_character_catalogs(ruleset_release_id)
         except (UnknownRulesetError, UnknownRulesetDataCatalogError) as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
-        if not isinstance(loaded_catalog.document, CharacterCreationCatalog):
-            raise HTTPException(
-                status_code=409,
-                detail="The selected data catalog does not support guided character creation",
-            )
-        return loaded_catalog.document
+        return CharacterCreationOptions(
+            selected_ruleset_data_catalog_id=catalogs.selected.id,
+            character_creation=catalogs.character_creation,
+            party=catalogs.character_state.party if catalogs.character_state else None,
+        )
 
     @app.post(
         "/campaigns/{campaign_id}/character/finalize",
@@ -110,10 +133,54 @@ def create_app() -> FastAPI:
         session: SessionDep,
     ) -> CharacterRead:
         try:
-            return CharacterRead.model_validate(finalize_character(session, campaign_id, data))
+            character = finalize_character(session, campaign_id, data)
+            return get_character_read(session, campaign_id, character.id)
         except NotFoundError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
         except CharacterChoiceError as exc:
+            session.rollback()
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        except ConflictError as exc:
+            session.rollback()
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+    @app.post(
+        "/campaigns/{campaign_id}/characters/{character_id}/finalize",
+        response_model=CharacterRead,
+    )
+    def party_characters_finalize(
+        campaign_id: uuid.UUID,
+        character_id: uuid.UUID,
+        data: CharacterFinalizeRequest,
+        session: SessionDep,
+    ) -> CharacterRead:
+        try:
+            character = finalize_character(session, campaign_id, data, character_id)
+            return get_character_read(session, campaign_id, character.id)
+        except NotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except CharacterChoiceError as exc:
+            session.rollback()
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        except ConflictError as exc:
+            session.rollback()
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+    @app.put(
+        "/campaigns/{campaign_id}/characters/{character_id}/loadout",
+        response_model=CharacterRead,
+    )
+    def party_character_loadout(
+        campaign_id: uuid.UUID,
+        character_id: uuid.UUID,
+        data: LoadoutUpdate,
+        session: SessionDep,
+    ) -> CharacterRead:
+        try:
+            return update_character_loadout(session, campaign_id, character_id, data)
+        except NotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except CharacterStateError as exc:
             session.rollback()
             raise HTTPException(status_code=422, detail=str(exc)) from exc
         except ConflictError as exc:
@@ -129,6 +196,21 @@ def create_app() -> FastAPI:
             return [
                 CharacterGrantRead.model_validate(grant)
                 for grant in list_character_grants(session, campaign_id)
+            ]
+        except NotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    @app.get(
+        "/campaigns/{campaign_id}/characters/{character_id}/grants",
+        response_model=list[CharacterGrantRead],
+    )
+    def party_character_grants(
+        campaign_id: uuid.UUID, character_id: uuid.UUID, session: SessionDep
+    ) -> list[CharacterGrantRead]:
+        try:
+            return [
+                CharacterGrantRead.model_validate(grant)
+                for grant in list_character_grants(session, campaign_id, character_id)
             ]
         except NotFoundError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
@@ -152,7 +234,13 @@ def create_app() -> FastAPI:
         provider: ProviderDep,
     ) -> TurnRead:
         try:
-            return process_turn(session, campaign_id, data.action, provider)
+            return process_turn(
+                session,
+                campaign_id,
+                data.action,
+                provider,
+                actor_character_id=data.actor_character_id,
+            )
         except NotFoundError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
         except InvalidStateChange as exc:

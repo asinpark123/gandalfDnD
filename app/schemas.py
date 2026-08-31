@@ -5,6 +5,7 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 from app.character_creation import CharacterSheet
+from app.character_state import CharacterMechanicalState, Loadout
 
 ShortText = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=160)]
 
@@ -25,6 +26,9 @@ class CampaignRead(BaseModel):
     ruleset_release_id: str
     ruleset_data_catalog_id: str
     status: str
+    play_mode: str
+    party_min_active: int
+    party_max_active: int
     created_at: datetime
 
 
@@ -48,6 +52,20 @@ class CharacterRead(BaseModel):
     inventory: dict[str, int]
     character_sheet: CharacterSheet | None
     finalized_at: datetime | None
+    party_position: int
+    control_mode: str
+    party_status: str
+    state_revision: int
+    equipped_items: Loadout
+    resources: dict[str, int]
+    mechanical_state: CharacterMechanicalState | None = None
+
+
+class LoadoutUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    worn_armor_item_id: str | None = None
+    held_item_ids: list[str] = Field(default_factory=list, max_length=2)
 
 
 class CharacterGrantRead(BaseModel):
@@ -114,6 +132,7 @@ class DMTurnOutput(BaseModel):
 
 class TurnCreate(BaseModel):
     action: str = Field(min_length=1, max_length=4000)
+    actor_character_id: uuid.UUID | None = None
 
 
 class DiceRollRead(BaseModel):
@@ -128,11 +147,14 @@ class DiceRollRead(BaseModel):
     total: int
     purpose: str
     hidden: bool
+    actor_character_id: uuid.UUID | None
 
 
 class CampaignState(BaseModel):
     campaign: CampaignRead
     character: CharacterRead | None
+    characters: list[CharacterRead]
+    party_ready: bool
     location: LocationRead
     turn_count: int
 
@@ -142,6 +164,7 @@ class TurnRead(BaseModel):
     sequence: int
     player_action: str
     narration: str
+    actor_character_id: uuid.UUID | None
     dice_rolls: list[DiceRollRead]
     state: CampaignState
 
@@ -156,6 +179,7 @@ class EventRead(BaseModel):
     event_type: str
     visibility: str
     payload: dict
+    actor_character_id: uuid.UUID | None
     created_at: datetime
 
 

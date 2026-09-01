@@ -4,8 +4,8 @@
 - **Last updated:** 2026-09-02
 - **Rules baseline:** SRD 5.2.1 (pinned; character-state and check/save-resolution catalogs pass
   integrity and schema verification)
-- **Current delivery stage:** M1 final gate review — M1.1–M1.4 are Done and M1.5 remains deferred;
-  complete the cross-milestone evidence/freshness review before M2
+- **Current delivery stage:** M2 Ready — M1 is Done; begin the local deterministic M2.1 turn
+  lifecycle without paid model calls
 - **Canonical repository:** `~/Git/gandalfDnD`
 
 ## 1. Purpose of this document
@@ -92,6 +92,7 @@ Current documentation index:
 | Supported player character-creation workflow and limitations | [`player/CHARACTER_CREATION.md`](player/CHARACTER_CREATION.md) |
 | M1.4 deterministic-resolution owner verification | [`player/M1_4_ACCEPTANCE_CHECKLIST.md`](player/M1_4_ACCEPTANCE_CHECKLIST.md) |
 | M1.4 raw owner acceptance evidence | [`testM1_4_ACCEPTANCE_CHECKLIST_RESULTS.md`](testM1_4_ACCEPTANCE_CHECKLIST_RESULTS.md) |
+| M2 two-stage turn engineering and acceptance strategy | [`M2_IMPLEMENTATION_STRATEGY.md`](M2_IMPLEMENTATION_STRATEGY.md) |
 
 ## 2. Product objective
 
@@ -309,8 +310,8 @@ Use these values consistently:
 | ID | Milestone | Status | Primary outcome |
 | --- | --- | --- | --- |
 | M0 | Persistence and safety foundation | Done | Canonical state and auditable turn skeleton |
-| M1 | Party character creation and deterministic mechanics | Verification | The selected acting character's choices drive calculated outcomes |
-| M2 | Two-stage AI turn and live feasibility | Proposed | Real DM uses recorded dice results safely |
+| M1 | Party character creation and deterministic mechanics | Done | The selected acting character's choices drive calculated outcomes |
+| M2 | Two-stage AI turn and live feasibility | Ready | Real DM uses recorded dice results safely |
 | M3 | Persistent world model | Proposed | NPCs, quests, scenes, clues, time, and visibility |
 | M4 | Long-term memory and retrieval | Proposed | Coherent recall without full history in context |
 | M5 | Basic deterministic combat | Proposed | Reproducible initiative, actions, attacks, and damage |
@@ -392,8 +393,8 @@ and deterministic mechanics are therefore promoted ahead of broader live-model t
 
 ### M1 — Character creation and deterministic mechanics
 
-- **Status:** In progress
-- **Priority:** Immediate
+- **Status:** Done
+- **Completed:** 2026-09-02
 
 Player outcome: a beginner can create multiple rules-valid level-one characters, understand their
 choices, command the party directly, and receive mechanically reproducible checks derived from the
@@ -417,7 +418,7 @@ rules-valid; unsupported options must be rejected rather than partially implemen
 content slice across the initial party is a delivery constraint, not a claim that other SRD options
 are invalid or a long-term requirement that party members share one build.
 
-Planned slices:
+Delivery slices:
 
 #### M1.1 Versioned rules data
 
@@ -777,10 +778,50 @@ Golden fixtures and requirement-to-source/implementation/test traceability are m
 [`rules/CHARACTER_AND_RULES_SPEC.md`](rules/CHARACTER_AND_RULES_SPEC.md). Update that matrix in the
 same commit as the corresponding code, migration, or verification evidence.
 
+M1 final acceptance review, 2026-09-02:
+
+| Exit criterion | Final evidence | Result |
+| --- | --- | --- |
+| Two complete Party Commander characters | M1.3 API/state workflow, actor guards, and owner acceptance | Passed |
+| Golden derived values | GF-002–GF-004 and GF-007 fixtures plus owner sheet verification | Passed |
+| Invalid creation choices rejected | GF-001 and API standard-array/choice regressions | Passed |
+| Choice and derivation provenance | Immutable grants, exhaustive equipment projection, and M1.4 modifier components | Passed |
+| No supplied check modifier | M1.4 extra-field rejection and authoritative resolver | Passed |
+| Fixed-dice deterministic result | M1.4 fixed-source and immutable replay fixtures | Passed |
+| Restart and event reconstruction | M1.3 restart, M1.4 owner-confirmed post-restart replay, ordered events | Passed |
+| Prose cannot establish mechanics | Final M1 narration-only integration fixture produces no roll, state mutation, or `state_changed` event | Passed |
+| Cross-release commands rejected | Stable-release API and M1.4 resolution rejection fixtures | Passed |
+| Beginner explanations | Every exposed supported definition has a non-empty beginner description and durable source | Passed |
+| Exact rules/catalog identities | Immutable release/catalog pins, checksums, schemas, and record provenance | Passed |
+| Character isolation and attribution | Contrasting-actor tests plus M1.3/M1.4 owner evidence | Passed |
+
+Final technical evidence:
+
+- 46 tests pass with 91% total coverage; the added final-gate fixture closes GF-012 directly;
+- Ruff lint/format, generated-schema freshness, normalized-catalog checksums, and diff checks pass;
+- the cached official SRD and published GitHub Release asset remain 6,031,375 bytes with SHA-256
+  `8974902d109d6e63672d7c490bde9ccf052410503d9cfa768237154fbc5e3d87`;
+- migration `0005_check_save_resolution` remains head with no Alembic drift;
+- the live development API returns HTTP 200 and is connected to `gandalfdnd_dev`; its six
+  `rule_resolutions` rows are the expected M1.4 owner-acceptance records;
+- the existing `WARN-001`, M2-targeted turn debts, and explicitly deferred M1.5 content do not
+  invalidate any M1 exit criterion; Clawvis and unrelated databases/services remain untouched.
+
+Review findings and decision:
+
+- no M1 implementation defect was found;
+- GF-012 lacked a named direct fixture, so the narration-only no-mutation regression was added and
+  passed; this was an evidence gap, not a runtime defect;
+- GF-014 ruleset coexistence was already implemented and passing but its traceability status was
+  stale; documentation is corrected in this transition;
+- all M1.1–M1.4 implementation, automated, runtime, artifact, migration, and owner gates pass.
+  **Decision: Go. M1 is Done and M2 may begin.**
+
 ### M2 — Two-stage AI turn and live feasibility
 
-- **Status:** Proposed
+- **Status:** Ready
 - **Depends on:** M1
+- **Detailed strategy:** [`M2_IMPLEMENTATION_STRATEGY.md`](M2_IMPLEMENTATION_STRATEGY.md)
 
 Target flow:
 
@@ -804,6 +845,11 @@ Planned work:
 - run the real-model Lantern Test with at least two player-controlled characters: dialogue,
   movement, inventory use, check, damage, character switching, restart, and resume;
 - compare model narration with the recorded mechanical outcome.
+
+Delivery sequence: M2.1 persisted lifecycle/idempotency, M2.2 typed interpretation plus M1.4
+resolution, M2.3 outcome narration plus atomic finalization, M2.4 failure/retry/restart hardening,
+then M2.5 owner-approved paid Lantern evaluation. No owner input or paid call is required before
+M2.5.
 
 Exit gate: ten consecutive Lantern Test runs complete without impossible state, invented dice,
 partial commits, or contradictory resume output. Failures are categorized before proceeding.
@@ -893,7 +939,7 @@ deployable if Clawvis is offline.
 | ISSUE-001 | Environment | Resolved | VM template revoked `CREATE` on `public`, initially blocking Alembic | Tests/migrations failed | Granted each restricted role schema creation only in its own DB; M0 |
 | DEBT-001 | Architecture | In progress | The M1.4 authoritative check/save API rejects supplied modifiers and derives them from canonical state, but the legacy Phase 0 turn provider contract still requests a non-authoritative modifier | Direct resolution is protected; live AI turns are not yet routed through it | Replace the legacy turn dice request with M1.4 resolution before narration; M2 |
 | DEBT-002 | Architecture | Open | Narration is generated before dice results | Narration may contradict outcome | Two-stage turn flow; M2 |
-| GAP-001 | Product | Resolved | M1.3 supports an ordered 2–4 character Party Commander party with independently derived equipment/defense/resource state and actor isolation | Party Commander foundation now exists; character content breadth remains intentionally narrow | Automated evidence passed in migration `0004` and 39-test suite; record owner checkpoint, then expand breadth only in M1.5 |
+| GAP-001 | Product | Resolved | M1.3 supports an ordered 2–4 character Party Commander party with independently derived equipment/defense/resource state and actor isolation | Party Commander foundation now exists; character content breadth remains intentionally narrow | Migration `0004`, automated evidence, owner acceptance, and final M1 review passed; broader breadth remains deferred to M1.5 |
 | GAP-002 | Product | Open | No deterministic quest/world decision model | Decisions have limited lasting effects | M3 |
 | TEST-001 | Validation | Open | OpenAI provider has no paid live evaluation | Real structured behavior unproven | Lantern Test; M2 |
 | WARN-001 | Dependency | Monitoring | Current TestClient emits an `httpx` deprecation warning | No functional failure today | Reassess FastAPI/Starlette test client during dependency maintenance |
@@ -902,7 +948,7 @@ deployable if Clawvis is offline.
 | DOC-001 | Documentation | Open | RES-001's verbatim export contains temporary Deep Research citation tokens | Tokens are not durable implementation citations | Preserve the source unchanged; use official URLs and SRD pages in specifications and rule definitions; M1.1 onward |
 | GAP-003 | Rules | Resolved | Authoritative ability checks and saving throws now derive from actor-bound canonical state and preserve exact dice, rules/catalog provenance, typed outcomes, and replay evidence | Character choices now produce reproducible check/save outcomes through the dedicated resolution API | Migration `0005`, 45-test suite, fixed-dice/restart replay, modifier rejection, schema/catalog integrity, development runtime checks, and all nine owner acceptance actions passed |
 | GAP-004 | Product | Open | Solo balance has a research framework but no measured product results | Encounter/class support cannot yet claim solo balance | Establish strict-SRD baselines in M5; build balance harness after supported combat |
-| DEBT-003 | Architecture | Open | The research proposes greenfield service/table boundaries that have not been reconciled with Phase 0 models | Premature adoption could create redundant schema or services | Reconcile per vertical slice; do not bulk-create the proposed model; M1 onward |
+| DEBT-003 | Architecture | Monitoring | The research proposes broader greenfield service/table boundaries than the implemented vertical slices require | Premature adoption could create redundant schema or services | M1 successfully reconciled only required boundaries; continue the same per-slice review in M2 and later milestones |
 | ISSUE-002 | Migration/test fixture | Resolved | Synthetic M1.2 migration tests could begin after isolated cleanup had removed the M1.1 seed row | The new foreign-key-backed catalog seed could not be installed from that test baseline | `0003` inserts the exact immutable M1.1 release with `ON CONFLICT DO NOTHING`; transactional migration tests and the full suite pass |
 | ISSUE-003 | Migration/test fixture | Resolved | The first M1.3 run found the isolated test DB at migration `0003` after fixture cleanup had removed immutable seed rows | `0004` initially could not insert its state catalog because the known release FK row was absent | `0004` idempotently restores only the exact pinned release before inserting the new catalog; focused migration smoke, full-chain tests, and 39-test suite pass |
 | ISSUE-004 | Character-state provenance | Resolved | The first M1.3 owner run showed empty projected source/acquisition provenance for Dice Set and GP; ordinary package items were unaffected | The visible equipment projection did not meet GF-004 even though canonical grants remained intact | The corrected projection and exhaustive regression passed 39 automated tests; the 2026-09-01 owner retest confirmed complete Dice Set/GP definition, source, and acquisition-event provenance for both existing characters |
@@ -1044,14 +1090,15 @@ Destination milestone:
 
 ## 17. Immediate next actions
 
-1. Complete the cross-milestone M1 evidence, issue/debt, traceability, supported-scope, and
-   documentation-freshness review; mark M1 Done if no contradiction or missing exit evidence is
-   found.
-2. Keep broader character options in M1.5 rather than expanding the accepted M1 exit gate.
-3. Prepare M2's implementation strategy and owner decision gate for paid live-model evaluation and
-   narrative tone/content boundaries.
-4. Design M2's two-stage turn so the legacy provider dice request is replaced by the authoritative
-   M1.4 resolver before narration, closing `DEBT-001`.
+1. Implement M2.1's persisted turn lifecycle, idempotency, legacy backfill, provider-call audit, and
+   guarded migration using the deterministic provider only.
+2. Continue through M2.2–M2.4 autonomously while keeping broader character content in M1.5 and all
+   live model calls disabled.
+3. Replace the legacy provider dice-request modifier with M1.4 authoritative resolution in M2.2,
+   closing `DEBT-001`; produce narration only after the recorded outcome in M2.3, closing
+   `DEBT-002`.
+4. At the M2.5 gate, request one combined owner decision on paid evaluation authorization/cap,
+   narrative/content boundaries, and the non-combat environmental-damage fixture.
 
 ## 18. Documentation change log
 
@@ -1074,3 +1121,4 @@ Destination milestone:
 | 2026-09-01 | DOC-015 | Closed M1.3 and converted the owner's backend-versus-frontend usability distinction into explicit M7 acceptance requirements | Structured-value correctness passed; JSON output cannot meaningfully prove visual clarity, and API errors need frontend context before ordinary players can self-correct | Begin M1.4; implement and test UX-001 during M7 rather than treating it as an M1.3 backend defect |
 | 2026-09-01 | DOC-016 | Advanced M1.4 to Verification and recorded the authoritative check/save service, supplemental immutable catalog, migration, automated/runtime evidence, limitations, decision, and owner checklist | Migration `0005`, 45 tests at 91% total coverage and 95% resolution-module coverage, lint/format/schema/catalog/diff checks, zero Alembic drift, development health, modifier rejection, actor isolation, immutable provenance, and restart replay passed | Complete the M1.4 owner checklist; fix defects or close M1.4, then review the complete M1 gate before M2 |
 | 2026-09-02 | DOC-017 | Closed M1.4 after preserving and analysing the complete owner acceptance run | All nine actions passed; the owner confirmed the API restart before replay, no defect or targeted retest was required, and same-build actor evidence was complemented by the automated contrasting-ability fixture | Complete the full M1 gate/freshness review, then either close M1 or correct any cross-milestone gap before M2 |
+| 2026-09-02 | DOC-018 | Closed M1 and advanced M2 to Ready with a dedicated two-stage turn implementation strategy | All twelve M1 exit criteria map to passing evidence; 46 tests at 91% coverage, lint/format/schema/catalog/artifact/release/migration/runtime checks, and owner gates pass. GF-012 received a direct no-mutation fixture and stale GF-014 status was corrected | Implement M2.1–M2.4 locally without paid calls; request owner authorization and content decisions only at M2.5 |

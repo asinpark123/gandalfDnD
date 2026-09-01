@@ -239,6 +239,41 @@ def test_guided_character_creation_persists_state_turns_and_events(client: TestC
     assert {event["actor_character_id"] for event in turn_events} == {first_character_id}
 
 
+def test_narration_alone_cannot_change_mechanical_state(client: TestClient) -> None:
+    campaign_id = _create_campaign(client)
+    character_ids: list[str] = []
+    for name in ("Arin", "Bryn"):
+        draft = client.post(f"/campaigns/{campaign_id}/characters", json={"name": name})
+        assert draft.status_code == 201
+        character_ids.append(draft.json()["id"])
+        finalized = client.post(
+            f"/campaigns/{campaign_id}/characters/{draft.json()['id']}/finalize",
+            json=_finalize_payload(),
+        )
+        assert finalized.status_code == 200
+
+    before = client.get(f"/campaigns/{campaign_id}/state")
+    assert before.status_code == 200
+    response = client.post(
+        f"/campaigns/{campaign_id}/turns",
+        json={
+            "action": "Describe an ominous magical transformation without applying one.",
+            "actor_character_id": character_ids[0],
+        },
+    )
+    assert response.status_code == 201, response.text
+    assert response.json()["dice_rolls"] == []
+    assert response.json()["state"]["characters"] == before.json()["characters"]
+    assert response.json()["state"]["location"] == before.json()["location"]
+
+    events = client.get(f"/campaigns/{campaign_id}/events")
+    assert events.status_code == 200
+    event_types = [event["event_type"] for event in events.json()]
+    assert event_types[-2:] == ["player_action", "dm_response"]
+    assert "state_changed" not in event_types
+    assert "dice_rolled" not in event_types
+
+
 def test_guided_creation_rejects_duplicate_and_legacy_character_input(client: TestClient) -> None:
     campaign_id = _create_campaign(client)
     legacy = client.post(

@@ -28,11 +28,13 @@ maintained in the [living development plan](docs/PROJECT_PLAN.md).
   check/save, rejection, attribution, and replay verification
 - [M1.4 owner acceptance results](docs/testM1_4_ACCEPTANCE_CHECKLIST_RESULTS.md) — preserved
   nine-action runtime evidence
+- [M2 implementation strategy](docs/M2_IMPLEMENTATION_STRATEGY.md) — resumable two-stage turns,
+  authoritative resolution, failure safety, and live-evaluation gates
 
 Documentation distinguishes planned behavior from verified implementation. M1.3 Party Commander
 and complete level-one character state are Done. M1.4 authoritative ability-check and saving-throw
-resolution is also Done after automated and owner runtime verification. The project is completing
-the full M1 evidence/freshness review before M2.
+resolution is also Done after automated and owner runtime verification. The complete M1 gate is
+Done; M2 is Ready for local deterministic implementation without paid model calls.
 
 ## Versioned rulesets
 

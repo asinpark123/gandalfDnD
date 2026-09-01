@@ -1,11 +1,11 @@
 # GandalfDnD Development Strategy and Living Project Plan
 
 - **Document status:** Active
-- **Last updated:** 2026-09-01
+- **Last updated:** 2026-09-02
 - **Rules baseline:** SRD 5.2.1 (pinned; character-state and check/save-resolution catalogs pass
   integrity and schema verification)
-- **Current delivery stage:** M1.4 Verification — implementation and automated/runtime gates passed;
-  owner acceptance remains
+- **Current delivery stage:** M1 final gate review — M1.1–M1.4 are Done and M1.5 remains deferred;
+  complete the cross-milestone evidence/freshness review before M2
 - **Canonical repository:** `~/Git/gandalfDnD`
 
 ## 1. Purpose of this document
@@ -91,6 +91,7 @@ Current documentation index:
 | Rules interpretations, product policies, adjudications, and house rules | [`rules/RULINGS.md`](rules/RULINGS.md) |
 | Supported player character-creation workflow and limitations | [`player/CHARACTER_CREATION.md`](player/CHARACTER_CREATION.md) |
 | M1.4 deterministic-resolution owner verification | [`player/M1_4_ACCEPTANCE_CHECKLIST.md`](player/M1_4_ACCEPTANCE_CHECKLIST.md) |
+| M1.4 raw owner acceptance evidence | [`testM1_4_ACCEPTANCE_CHECKLIST_RESULTS.md`](testM1_4_ACCEPTANCE_CHECKLIST_RESULTS.md) |
 
 ## 2. Product objective
 
@@ -271,7 +272,7 @@ results, known limitations, and where observations will be recorded.
 | --- | --- | --- |
 | M1.2 guided creation | None; the supported slice and deferrals are already accepted | Optional API/Swagger review of valid creation, rejected invalid choices, finalized sheet, and provenance |
 | M1.3 Party Commander and complete character state | Completed 2026-09-01; no further input required | Owner confirmed the API exposes the correct structured values; presentation clarity and end-user corrective guidance are deferred to the M7 interface checkpoint |
-| M1.4 deterministic resolution | Decide only genuinely ambiguous adjudication/product policies that cannot be resolved from the pinned SRD and accepted rulings | Important acceptance test proving saved character choices change checks/saves and model-supplied modifiers cannot override canonical results |
+| M1.4 deterministic resolution | Completed 2026-09-02; no further input required | All nine owner actions passed, including canonical modifiers, modifier rejection, Advantage/Disadvantage, actor attribution, and confirmed post-restart replay |
 | M2 live AI feasibility | Approve any paid live-model evaluation and provide desired narrative tone/content boundaries | Critical Lantern Test covering dialogue, movement, inventory, check, damage, restart, resume, and narration/mechanics agreement |
 | M3 persistent world | Provide campaign-structure preferences when they affect consequence and quest design | Multi-session play test confirming decisions, NPC relationships, quests, and revealed facts persist coherently across restarts |
 | M1.5 content expansion | Prioritize desired species, backgrounds, classes, feats, equipment routes, spellcasting, and play styles | Create contrasting supported characters and confirm their choices produce understandable, distinct state and later gameplay |
@@ -308,7 +309,7 @@ Use these values consistently:
 | ID | Milestone | Status | Primary outcome |
 | --- | --- | --- | --- |
 | M0 | Persistence and safety foundation | Done | Canonical state and auditable turn skeleton |
-| M1 | Party character creation and deterministic mechanics | In progress | The selected acting character's choices drive calculated outcomes |
+| M1 | Party character creation and deterministic mechanics | Verification | The selected acting character's choices drive calculated outcomes |
 | M2 | Two-stage AI turn and live feasibility | Proposed | Real DM uses recorded dice results safely |
 | M3 | Persistent world model | Proposed | NPCs, quests, scenes, clues, time, and visibility |
 | M4 | Long-term memory and retrieval | Proposed | Coherent recall without full history in context |
@@ -681,11 +682,11 @@ M1.4 or later and are not implied by exposing their current/max state.
 
 #### M1.4 Deterministic resolution service
 
-- **Status:** Verification
+- **Status:** Done (accepted 2026-09-02)
 - **Migration:** `0005_check_save_resolution`
-- **Owner gate:** Complete
-  [`player/M1_4_ACCEPTANCE_CHECKLIST.md`](player/M1_4_ACCEPTANCE_CHECKLIST.md), record findings, and
-  either fix defects or accept M1.4 as Done.
+- **Owner gate:** Passed all nine actions recorded in
+  [`testM1_4_ACCEPTANCE_CHECKLIST_RESULTS.md`](testM1_4_ACCEPTANCE_CHECKLIST_RESULTS.md); the owner
+  confirmed the API was restarted immediately before the successful replay check.
 
 Implemented scope:
 
@@ -718,6 +719,22 @@ Automated and runtime evidence, 2026-09-01:
   the new route is loaded, and the pre-acceptance `rule_resolutions` table remains empty;
 - the test database guard remains active and no Clawvis or unrelated database/service was touched.
 
+Owner acceptance evidence, 2026-09-02:
+
+- all nine API actions returned their expected HTTP status and structured contract with no defect;
+- canonical Strength save arithmetic, idempotent repeat, changed-command conflict, and supplied
+  modifier rejection passed;
+- automatic Chain Mail Dexterity (Stealth) Disadvantage, Advantage cancellation, and contextual
+  Strength (Stealth) behavior passed with the correct dice selection and totals;
+- list/read APIs and four corresponding `rule_resolved` events preserved the expected resolution,
+  dice, catalog, actor, and provenance identities;
+- after an owner-confirmed API restart, replay returned `equivalent: true` with identical dice,
+  modifier, selected die, total, and outcome;
+- both same-build characters produced the expected equal Strength-save modifiers while retaining
+  distinct actors, acquisition-event provenance, and state revisions; the automated contrasting
+  ability-array fixture supplies the complementary unequal-modifier isolation evidence;
+- no targeted retest, new ruling, workaround, or M1.4 defect is required.
+
 Known limitations and follow-up boundaries:
 
 - attacks, damage, combat, conditions, tools, Heroic Inspiration expenditure/rerolls, mechanical
@@ -730,7 +747,7 @@ Known limitations and follow-up boundaries:
 
 #### M1.5 Deferred character-content expansion
 
-- **Status:** Deferred until M1.4 evidence is accepted
+- **Status:** Deferred; not required for the M1 exit gate or M2 feasibility work
 
 Add other species, backgrounds, ability-generation methods, feats, classes, equipment routes, and
 level-one spellcasting in complete vertical slices. Later advancement, multiclassing, spell and
@@ -883,7 +900,7 @@ deployable if Clawvis is offline.
 | OPS-001 | Source control | Resolved | Initial push was blocked because HTTPS lacked credentials and Git did not automatically select the nonstandard SSH key filename | GitHub was temporarily behind local `main` | Registered the existing Ed25519 key, verified GitHub's host fingerprint, configured this repository's SSH command, and synchronized `main`; 2026-08-30 |
 | OPS-002 | Infrastructure | Deferred | pgvector is unavailable on `postgresvm` | No semantic memory yet | Evaluate/install only at M4 |
 | DOC-001 | Documentation | Open | RES-001's verbatim export contains temporary Deep Research citation tokens | Tokens are not durable implementation citations | Preserve the source unchanged; use official URLs and SRD pages in specifications and rule definitions; M1.1 onward |
-| GAP-003 | Rules | Resolved | Authoritative ability checks and saving throws now derive from actor-bound canonical state and preserve exact dice, rules/catalog provenance, typed outcomes, and replay evidence | Character choices now produce reproducible check/save outcomes through the dedicated resolution API | Migration `0005`, 45-test suite, fixed-dice/restart replay, modifier rejection, schema/catalog integrity, and development runtime checks passed; owner workflow remains the M1.4 acceptance gate |
+| GAP-003 | Rules | Resolved | Authoritative ability checks and saving throws now derive from actor-bound canonical state and preserve exact dice, rules/catalog provenance, typed outcomes, and replay evidence | Character choices now produce reproducible check/save outcomes through the dedicated resolution API | Migration `0005`, 45-test suite, fixed-dice/restart replay, modifier rejection, schema/catalog integrity, development runtime checks, and all nine owner acceptance actions passed |
 | GAP-004 | Product | Open | Solo balance has a research framework but no measured product results | Encounter/class support cannot yet claim solo balance | Establish strict-SRD baselines in M5; build balance harness after supported combat |
 | DEBT-003 | Architecture | Open | The research proposes greenfield service/table boundaries that have not been reconciled with Phase 0 models | Premature adoption could create redundant schema or services | Reconcile per vertical slice; do not bulk-create the proposed model; M1 onward |
 | ISSUE-002 | Migration/test fixture | Resolved | Synthetic M1.2 migration tests could begin after isolated cleanup had removed the M1.1 seed row | The new foreign-key-backed catalog seed could not be installed from that test baseline | `0003` inserts the exact immutable M1.1 release with `ON CONFLICT DO NOTHING`; transactional migration tests and the full suite pass |
@@ -1027,12 +1044,12 @@ Destination milestone:
 
 ## 17. Immediate next actions
 
-1. Run the M1.4 owner workflow in
-   [`player/M1_4_ACCEPTANCE_CHECKLIST.md`](player/M1_4_ACCEPTANCE_CHECKLIST.md); record every result
-   as evidence, defect, ruling question, documentation clarification, or accepted limitation.
-2. Fix and retest any M1.4 defect, or mark the milestone Done when owner acceptance passes.
-3. Review complete M1 evidence and documentation freshness before M2; keep broader character options
-   in M1.5 rather than expanding the M1 exit gate.
+1. Complete the cross-milestone M1 evidence, issue/debt, traceability, supported-scope, and
+   documentation-freshness review; mark M1 Done if no contradiction or missing exit evidence is
+   found.
+2. Keep broader character options in M1.5 rather than expanding the accepted M1 exit gate.
+3. Prepare M2's implementation strategy and owner decision gate for paid live-model evaluation and
+   narrative tone/content boundaries.
 4. Design M2's two-stage turn so the legacy provider dice request is replaced by the authoritative
    M1.4 resolver before narration, closing `DEBT-001`.
 
@@ -1056,3 +1073,4 @@ Destination milestone:
 | 2026-09-01 | DOC-014 | Recorded the successful targeted M1.3 owner retest and closed ISSUE-004 | Both characters now expose complete Dice Set/GP provenance, omitted actor selection returns the intended domain 409, and both successful turn events retain SugarHigh's actor ID | Record the five subjective answers, then close or rework M1.3 without repeating the technical workflow |
 | 2026-09-01 | DOC-015 | Closed M1.3 and converted the owner's backend-versus-frontend usability distinction into explicit M7 acceptance requirements | Structured-value correctness passed; JSON output cannot meaningfully prove visual clarity, and API errors need frontend context before ordinary players can self-correct | Begin M1.4; implement and test UX-001 during M7 rather than treating it as an M1.3 backend defect |
 | 2026-09-01 | DOC-016 | Advanced M1.4 to Verification and recorded the authoritative check/save service, supplemental immutable catalog, migration, automated/runtime evidence, limitations, decision, and owner checklist | Migration `0005`, 45 tests at 91% total coverage and 95% resolution-module coverage, lint/format/schema/catalog/diff checks, zero Alembic drift, development health, modifier rejection, actor isolation, immutable provenance, and restart replay passed | Complete the M1.4 owner checklist; fix defects or close M1.4, then review the complete M1 gate before M2 |
+| 2026-09-02 | DOC-017 | Closed M1.4 after preserving and analysing the complete owner acceptance run | All nine actions passed; the owner confirmed the API restart before replay, no defect or targeted retest was required, and same-build actor evidence was complemented by the automated contrasting-ability fixture | Complete the full M1 gate/freshness review, then either close M1 or correct any cross-milestone gap before M2 |

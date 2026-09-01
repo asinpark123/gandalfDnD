@@ -1,7 +1,8 @@
 # M1.4 Deterministic Resolution Owner Acceptance Checklist
 
-- **Milestone state:** Verification
+- **Milestone state:** Done (accepted 2026-09-02)
 - **Automated gate:** Passed on 2026-09-01
+- **Owner gate:** All nine actions passed; API restart before replay confirmed on 2026-09-02
 - **Purpose:** Confirm authoritative ability checks and saving throws use the selected character's
   canonical state, reject supplied modifiers, preserve provenance, and replay after restart.
 
@@ -95,6 +96,20 @@ environment; it does not need to force a particular random face.
 
 Save the results in `docs/` and notify Codex. The outcome will be incorporated into
 [`../PROJECT_PLAN.md`](../PROJECT_PLAN.md) before M1.4 is marked Done.
+
+## Final outcome
+
+The complete result is preserved in
+[`../testM1_4_ACCEPTANCE_CHECKLIST_RESULTS.md`](../testM1_4_ACCEPTANCE_CHECKLIST_RESULTS.md). All nine
+actions passed with correct arithmetic, idempotency, modifier rejection, automatic and cancelling
+Advantage/Disadvantage, contextual ability use, persistence, event attribution, actor isolation, and
+post-restart replay. The owner confirmed the API restart occurred before action 8. No defect,
+targeted retest, workaround, or new ruling was required.
+
+Both owner-test characters had the same relevant Strength/save build and therefore correctly
+produced equal modifiers. Their actor IDs, acquisition-event provenance, and state revisions were
+distinct; the automated contrasting-ability fixture separately proves unequal canonical actor
+state produces unequal modifiers. M1.4 is Done.
 
 ## Known limitations
 

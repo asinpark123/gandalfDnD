@@ -26,10 +26,13 @@ maintained in the [living development plan](docs/PROJECT_PLAN.md).
   Commander verification and feedback record
 - [M1.4 owner acceptance checklist](docs/player/M1_4_ACCEPTANCE_CHECKLIST.md) — authoritative
   check/save, rejection, attribution, and replay verification
+- [M1.4 owner acceptance results](docs/testM1_4_ACCEPTANCE_CHECKLIST_RESULTS.md) — preserved
+  nine-action runtime evidence
 
 Documentation distinguishes planned behavior from verified implementation. M1.3 Party Commander
 and complete level-one character state are Done. M1.4 authoritative ability-check and saving-throw
-resolution has passed automated verification and awaits its owner checkpoint.
+resolution is also Done after automated and owner runtime verification. The project is completing
+the full M1 evidence/freshness review before M2.
 
 ## Versioned rulesets
 

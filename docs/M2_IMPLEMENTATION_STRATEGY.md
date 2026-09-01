@@ -1,6 +1,6 @@
 # M2 Two-Stage AI Turn Implementation Strategy
 
-- **Status:** In Progress — M2.1 Done; M2.2 Ready
+- **Status:** In Progress — M2.1–M2.2 Done; M2.3 Ready
 - **Prepared:** 2026-09-02
 - **Depends on:** M1 Party character creation and deterministic mechanics (Done)
 - **Owner input required now:** None
@@ -164,6 +164,8 @@ call was made.
 
 ### M2.2 — Typed interpretation and authoritative resolution
 
+**Status: Done (2026-09-02).**
+
 - introduce the provider-neutral interpretation contract and deterministic fixtures;
 - validate adjudicated check/save requests and route them through M1.4;
 - remove the legacy model-supplied modifier/dice-request path from authoritative turns;
@@ -171,6 +173,33 @@ call was made.
 
 Exit: actor-specific checks/saves use canonical modifiers and exact recorded dice; retries cannot
 reroll or change the command.
+
+Implemented evidence:
+
+- a strict provider-neutral `TurnIntent` discriminated union permits either narrative intent or a
+  check/save request with ability, optional skill, DC, purpose, and adjudicated
+  Advantage/Disadvantage reasons; extra fields such as modifiers and dice results are rejected;
+- deterministic offline interpretation advances persisted turns through `interpreting`,
+  `intent_ready`, `resolving`, and `resolved` without holding a database transaction open during
+  the provider operation;
+- accepted checks and saves are pinned by the application and delegated to the unchanged M1.4
+  resolver; exact dice, actor-derived modifier/provenance, outcome, resolution link, and turn-linked
+  `rule_resolved` event are persisted;
+- retrying a resolved command returns the same resolution and exact dice without invoking the
+  provider or random source again;
+- malformed provider output is audited as a recoverable interpretation failure; unknown skills are
+  rejected before rolling; state changed during interpretation is detected using a forced fresh
+  database read and rejected without resolution;
+- the legacy one-stage endpoint now rejects every provider dice request before any turn, dice,
+  event, or state write, so every accepted new turn roll uses authoritative M1.4 resolution and
+  `DEBT-001` is closed;
+- no schema migration was required beyond M2.1's `0006` lifecycle storage;
+- nine focused M2.2 tests and the full 60-test suite pass at 90% coverage, including a direct
+  assertion that no database transaction is open during interpretation, with lint, catalog
+  validation, zero Alembic drift, and no external or paid model calls.
+
+M2.2 stops at `intent_ready` for no-roll actions and `resolved` for checks/saves. It deliberately
+does not narrate or apply gameplay changes; M2.3 owns that final stage and `DEBT-002` remains open.
 
 ### M2.3 — Outcome narration and atomic finalization
 

@@ -34,8 +34,9 @@ maintained in the [living development plan](docs/PROJECT_PLAN.md).
 Documentation distinguishes planned behavior from verified implementation. M1.3 Party Commander
 and complete level-one character state are Done. M1.4 authoritative ability-check and saving-throw
 resolution is also Done after automated and owner runtime verification. The complete M1 gate is
-Done; M2 is In Progress. M2.1's persisted lifecycle is complete and M2.2 is next. Paid model calls
-remain disabled until the owner-approved M2.5 gate.
+Done; M2 is In Progress. M2.1 lifecycle and M2.2 authoritative interpretation/resolution are
+complete; M2.3 narration and atomic finalization are next. Paid model calls remain disabled until
+the owner-approved M2.5 gate.
 
 ## Versioned rulesets
 

@@ -7,7 +7,7 @@ from sqlalchemy.exc import DBAPIError
 
 from app.db import get_engine
 from app.llm.factory import get_dm_provider
-from app.schemas import DiceRequest, DMTurnOutput, HPDelta, InventoryChange, MoveLocation
+from app.schemas import DMTurnOutput, HPDelta, InventoryChange, MoveLocation
 
 
 class StateChangingProvider:
@@ -26,13 +26,6 @@ class StateChangingProvider:
                     quantity_delta=-1,
                     reason="Dropped and extinguished",
                 ),
-            ],
-            dice_requests=[
-                DiceRequest(
-                    notation="1d20",
-                    modifier=2,
-                    purpose="Check whether Arin lands safely",
-                )
             ],
         )
 
@@ -200,9 +193,7 @@ def test_guided_character_creation_persists_state_turns_and_events(client: TestC
     assert turn.status_code == 201, turn.text
     assert turn.json()["sequence"] == 1
     assert turn.json()["actor_character_id"] == first_character_id
-    assert turn.json()["dice_rolls"][0]["notation"] == "1d20"
-    assert turn.json()["dice_rolls"][0]["ruleset_release_id"] == "srd-5.2.1"
-    assert 3 <= turn.json()["dice_rolls"][0]["total"] <= 22
+    assert turn.json()["dice_rolls"] == []
 
     get_engine().dispose()
     state = client.get(f"/campaigns/{campaign_id}/state")
@@ -226,7 +217,6 @@ def test_guided_character_creation_persists_state_turns_and_events(client: TestC
         "character_finalized",
         "character_finalized",
         "player_action",
-        "dice_rolled",
         "dm_response",
         "state_changed",
     ]
@@ -234,7 +224,7 @@ def test_guided_character_creation_persists_state_turns_and_events(client: TestC
     turn_events = [
         event
         for event in events.json()
-        if event["event_type"] in {"player_action", "dice_rolled", "dm_response", "state_changed"}
+        if event["event_type"] in {"player_action", "dm_response", "state_changed"}
     ]
     assert {event["actor_character_id"] for event in turn_events} == {first_character_id}
 

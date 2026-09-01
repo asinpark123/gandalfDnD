@@ -14,6 +14,7 @@ from app.resolution import (
     ResolutionOutcome,
     ResolutionType,
 )
+from app.turn_interpretation import TurnIntent
 
 ShortText = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=160)]
 
@@ -278,6 +279,12 @@ class RuleResolutionRead(BaseModel):
     resolver_version: str
     rng_version: str
     created_at: datetime
+
+
+class TurnInterpretationRead(BaseModel):
+    turn: TurnExecutionRead
+    intent: TurnIntent
+    resolution: RuleResolutionRead | None
 
 
 class RuleResolutionReplayRead(BaseModel):

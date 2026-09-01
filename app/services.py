@@ -1,7 +1,9 @@
 import uuid
 from datetime import UTC, datetime
+from time import perf_counter
 from typing import Any
 
+from pydantic import ValidationError
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -21,7 +23,7 @@ from app.character_state import (
     validate_loadout,
 )
 from app.dice import DiceService
-from app.llm.base import DMProvider
+from app.llm.base import DMProvider, TurnInterpretationProvider
 from app.models import (
     Campaign,
     CampaignEvent,
@@ -63,7 +65,14 @@ from app.schemas import (
     RuleResolutionReplayRead,
     TurnExecutionCreate,
     TurnExecutionRead,
+    TurnInterpretationRead,
     TurnRead,
+)
+from app.turn_interpretation import (
+    D20TestIntent,
+    TurnIntent,
+    TurnInterpretationError,
+    validate_turn_intent,
 )
 from app.validation import CharacterSnapshot, StateChangeValidator
 
@@ -86,6 +95,7 @@ ACTIVE_TURN_STATUSES = {
     "resolved",
     "narrating",
 }
+RESOLUTION_CATALOG_ID = "srd-5.2.1-check-save-resolution-v1"
 
 
 def _campaign_for_update(session: Session, campaign_id: uuid.UUID) -> Campaign:
@@ -357,6 +367,244 @@ def list_provider_calls(
             .where(ProviderCall.campaign_id == campaign_id, ProviderCall.turn_id == turn_id)
             .order_by(ProviderCall.stage, ProviderCall.attempt)
         )
+    )
+
+
+def _stored_turn_intent(turn: Turn) -> TurnIntent:
+    if turn.intent_output is None:
+        raise ConflictError("Turn has no stored interpretation")
+    try:
+        return validate_turn_intent(turn.intent_output)
+    except ValidationError as exc:
+        raise ConflictError("Stored turn interpretation is invalid") from exc
+
+
+def _next_provider_attempt(session: Session, turn_id: uuid.UUID, stage: str) -> int:
+    current = session.scalar(
+        select(func.max(ProviderCall.attempt)).where(
+            ProviderCall.turn_id == turn_id,
+            ProviderCall.stage == stage,
+        )
+    )
+    return (current or 0) + 1
+
+
+def _turn_interpretation_result(
+    session: Session, turn: Turn, intent: TurnIntent
+) -> TurnInterpretationRead:
+    resolution = (
+        get_rule_resolution(session, turn.campaign_id, turn.resolution_id)
+        if turn.resolution_id is not None
+        else None
+    )
+    return TurnInterpretationRead(
+        turn=TurnExecutionRead.model_validate(turn),
+        intent=intent,
+        resolution=resolution,
+    )
+
+
+def interpret_turn_execution(
+    session: Session,
+    campaign_id: uuid.UUID,
+    turn_id: uuid.UUID,
+    provider: TurnInterpretationProvider,
+    dice_service: DiceService | None = None,
+) -> TurnInterpretationRead:
+    campaign = _campaign_for_update(session, campaign_id)
+    turn = session.scalar(
+        select(Turn).where(Turn.campaign_id == campaign_id, Turn.id == turn_id).with_for_update()
+    )
+    if turn is None or turn.workflow_version != TURN_WORKFLOW_TWO_STAGE:
+        raise NotFoundError("Turn execution not found")
+    if turn.status == "resolved":
+        return _turn_interpretation_result(session, turn, _stored_turn_intent(turn))
+    if turn.status in {"completed", "cancelled", "failed", "narrating"}:
+        raise ConflictError(f"Turn in {turn.status} status cannot be interpreted")
+    if turn.status == "interpreting":
+        raise ConflictError("Turn interpretation is already in progress")
+
+    intent: TurnIntent
+    if turn.status == "received":
+        character = session.get(Character, turn.actor_character_id)
+        if character is None:
+            raise NotFoundError("Acting character not found in campaign")
+        if character.state_revision != turn.state_revision_before:
+            raise ConflictError("Acting character state changed after the turn was received")
+        context = _provider_context(get_campaign_state(session, campaign_id))
+        attempt = _next_provider_attempt(session, turn.id, "interpretation")
+        player_action = turn.player_action
+        turn.status = "interpreting"
+        session.commit()
+
+        started = perf_counter()
+        try:
+            provider_output = provider.interpret_action(context, player_action)
+            intent = validate_turn_intent(provider_output)
+        except Exception as exc:
+            latency_ms = max(0, round((perf_counter() - started) * 1000))
+            if isinstance(exc, ValidationError):
+                error_code = "invalid_structured_output"
+                safe_detail = "Interpretation provider returned invalid structured output"
+            else:
+                error_code = "interpretation_provider_error"
+                safe_detail = "Interpretation provider failed"
+            session.rollback()
+            _campaign_for_update(session, campaign_id)
+            failed_turn = session.scalar(
+                select(Turn)
+                .where(Turn.campaign_id == campaign_id, Turn.id == turn_id)
+                .with_for_update()
+            )
+            assert failed_turn is not None
+            session.add(
+                ProviderCall(
+                    campaign_id=campaign_id,
+                    turn_id=turn_id,
+                    stage="interpretation",
+                    attempt=attempt,
+                    provider=provider.provider_name,
+                    model=provider.model_name,
+                    prompt_version=provider.interpretation_prompt_version,
+                    status="failed",
+                    latency_ms=latency_ms,
+                    error_code=error_code,
+                    error_detail=safe_detail,
+                )
+            )
+            failed_turn.status = "failed"
+            failed_turn.failure_stage = "interpretation"
+            failed_turn.error_code = error_code
+            failed_turn.error_detail = safe_detail
+            failed_turn.resumable = True
+            failed_turn.resume_status = "received"
+            session.commit()
+            raise TurnInterpretationError(safe_detail) from exc
+
+        latency_ms = max(0, round((perf_counter() - started) * 1000))
+        _campaign_for_update(session, campaign_id)
+        turn = session.scalar(
+            select(Turn)
+            .where(Turn.campaign_id == campaign_id, Turn.id == turn_id)
+            .with_for_update()
+        )
+        assert turn is not None
+        if turn.status != "interpreting":
+            raise ConflictError("Turn changed while interpretation was running")
+        character = session.scalar(
+            select(Character)
+            .where(Character.id == turn.actor_character_id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
+        stale_state = character is None or character.state_revision != turn.state_revision_before
+        session.add(
+            ProviderCall(
+                campaign_id=campaign_id,
+                turn_id=turn_id,
+                stage="interpretation",
+                attempt=attempt,
+                provider=provider.provider_name,
+                model=provider.model_name,
+                prompt_version=provider.interpretation_prompt_version,
+                status="succeeded",
+                latency_ms=latency_ms,
+                structured_output=intent.model_dump(mode="json"),
+            )
+        )
+        turn.intent_output = intent.model_dump(mode="json")
+        turn.interpretation_prompt_version = provider.interpretation_prompt_version
+        if stale_state:
+            turn.status = "failed"
+            turn.failure_stage = "interpretation"
+            turn.error_code = "stale_character_state"
+            turn.error_detail = "Acting character state changed during interpretation"
+            turn.resumable = False
+            turn.completed_at = datetime.now(UTC)
+        else:
+            turn.status = "intent_ready"
+        session.commit()
+        session.refresh(turn)
+        if stale_state:
+            raise ConflictError("Acting character state changed during interpretation")
+    elif turn.status in {"intent_ready", "resolving"}:
+        intent = _stored_turn_intent(turn)
+    else:
+        raise ConflictError(f"Turn in {turn.status} status cannot be interpreted")
+
+    if not isinstance(intent, D20TestIntent):
+        return _turn_interpretation_result(session, turn, intent)
+
+    if turn.status == "intent_ready":
+        character = session.get(Character, turn.actor_character_id, populate_existing=True)
+        if character is None or character.state_revision != turn.state_revision_before:
+            mark_turn_execution_failed(
+                session,
+                campaign_id,
+                turn_id,
+                failure_stage="resolution",
+                error_code="stale_character_state",
+                error_detail="Acting character state changed before resolution",
+                resume_status=None,
+            )
+            raise ConflictError("Acting character state changed before resolution")
+        _campaign_for_update(session, campaign_id)
+        turn = session.scalar(
+            select(Turn)
+            .where(Turn.campaign_id == campaign_id, Turn.id == turn_id)
+            .with_for_update()
+        )
+        assert turn is not None
+        turn.status = "resolving"
+        session.commit()
+
+    request = intent.resolution
+    resolution_command = ResolutionCreate(
+        command_id=turn.command_id,
+        actor_character_id=turn.actor_character_id,
+        ruleset_release_id=campaign.ruleset_release_id,
+        character_state_catalog_id=campaign.ruleset_data_catalog_id,
+        resolution_catalog_id=RESOLUTION_CATALOG_ID,
+        resolution_type=request.resolution_type,
+        ability=request.ability,
+        skill=request.skill,
+        difficulty_class=request.difficulty_class,
+        advantage_reasons=request.advantage_reasons,
+        disadvantage_reasons=request.disadvantage_reasons,
+    )
+    try:
+        resolution = create_rule_resolution(
+            session,
+            campaign_id,
+            resolution_command,
+            dice_service,
+            turn_id=turn_id,
+        )
+    except ResolutionError as exc:
+        session.rollback()
+        mark_turn_execution_failed(
+            session,
+            campaign_id,
+            turn_id,
+            failure_stage="resolution",
+            error_code="invalid_resolution_request",
+            error_detail=str(exc),
+            resume_status=None,
+        )
+        raise
+    _campaign_for_update(session, campaign_id)
+    turn = session.scalar(
+        select(Turn).where(Turn.campaign_id == campaign_id, Turn.id == turn_id).with_for_update()
+    )
+    assert turn is not None
+    if turn.resolution_id not in {None, resolution.id}:
+        raise ConflictError("Turn is already linked to a different resolution")
+    turn.resolution_id = resolution.id
+    turn.status = "resolved"
+    session.commit()
+    session.refresh(turn)
+    return TurnInterpretationRead(
+        turn=TurnExecutionRead.model_validate(turn), intent=intent, resolution=resolution
     )
 
 
@@ -1030,8 +1278,13 @@ def create_rule_resolution(
     campaign_id: uuid.UUID,
     data: ResolutionCreate,
     dice_service: DiceService | None = None,
+    *,
+    turn_id: uuid.UUID | None = None,
 ) -> RuleResolutionRead:
     campaign = _campaign_for_update(session, campaign_id)
+    active = _active_turn(session, campaign_id)
+    if active is not None and (turn_id is None or active.id != turn_id):
+        raise ConflictError(f"Campaign already has active turn {active.id}")
     command = data.model_dump(mode="json")
     existing = session.scalar(
         select(RuleResolution).where(
@@ -1042,6 +1295,10 @@ def create_rule_resolution(
     if existing is not None:
         if existing.command != command:
             raise ConflictError("command_id was already used for a different resolution command")
+        if turn_id is not None:
+            existing_roll = session.get(DiceRoll, existing.dice_roll_id)
+            if existing_roll is None or existing_roll.turn_id != turn_id:
+                raise ConflictError("Existing resolution belongs to a different command path")
         return _resolution_read(existing)
 
     if data.ruleset_release_id != campaign.ruleset_release_id:
@@ -1086,6 +1343,10 @@ def create_rule_resolution(
     mechanical_state = character_read.mechanical_state
     if mechanical_state is None:
         raise ConflictError("Acting character has no authoritative mechanical state")
+    if data.resolution_type == "ability_check" and data.skill is not None:
+        known_skills = {skill.id for skill in catalogs.character_creation.skills}
+        if data.skill not in known_skills:
+            raise ResolutionError(f"Unknown skill for this ruleset: {data.skill}")
 
     automatic_disadvantage: list[AppliedAdjustmentSource] = []
     if (
@@ -1133,7 +1394,7 @@ def create_rule_resolution(
         campaign_id=campaign_id,
         ruleset_release_id=campaign.ruleset_release_id,
         ruleset_data_catalog_id=resolution_catalog.id,
-        turn_id=None,
+        turn_id=turn_id,
         notation=resolved.dice_notation,
         rolls=resolved.dice_faces,
         modifier=resolved.modifier,
@@ -1199,6 +1460,7 @@ def create_rule_resolution(
             "dice_roll_id": str(roll.id),
             "rng_version": resolution.rng_version,
         },
+        turn_id=turn_id,
         actor_character_id=character.id,
     )
     session.commit()
@@ -1385,6 +1647,10 @@ def process_turn(
     elif len(state_before.characters) == 1:
         character = session.get(Character, state_before.characters[0].id)
     output = provider.generate_turn(_provider_context(state_before), player_action)
+    if output.dice_requests:
+        raise ConflictError(
+            "Legacy provider dice requests are disabled; use the authoritative turn-execution path"
+        )
 
     snapshot = None
     if character is not None:

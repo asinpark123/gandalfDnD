@@ -1,0 +1,62 @@
+{
+  "$schema": "../schema/check-save-resolution.schema.json",
+  "schema_version": "1.0.0",
+  "id": "srd-5.2.1-check-save-resolution-v1",
+  "ruleset_release_id": "srd-5.2.1",
+  "base_character_state_catalog_id": "srd-5.2.1-party-state-v1",
+  "base_character_state_catalog_sha256": "aba4fcdbffb037eece88c862c76be988ffc60808b46361cc9a9dda0730fe763b",
+  "resolver_version": "check-save-resolution-1.0.0",
+  "sources": [
+    {
+      "id": "srd-check-save-resolution",
+      "title": "System Reference Document 5.2.1",
+      "section": "Playing the Game: D20 Tests, Ability Checks, Saving Throws, Advantage/Disadvantage, and Proficiency",
+      "printed_pages": [6, 7, 8, 9],
+      "url": "https://www.dndbeyond.com/srd"
+    }
+  ],
+  "rules": [
+    {
+      "id": "d20_test",
+      "definition_key": "srd-5.2.1:rule.d20_test",
+      "name": "D20 Test",
+      "beginner_description": "Roll a d20, add the relevant canonical modifiers, and succeed when the total equals or exceeds the target number.",
+      "source_ids": ["srd-check-save-resolution"]
+    },
+    {
+      "id": "ability_check",
+      "definition_key": "srd-5.2.1:rule.ability_check",
+      "name": "Ability Check",
+      "beginner_description": "An ability check tests talent and training against a challenge; the GM selects the relevant ability and any applicable skill or tool.",
+      "source_ids": ["srd-check-save-resolution"]
+    },
+    {
+      "id": "saving_throw",
+      "definition_key": "srd-5.2.1:rule.saving_throw",
+      "name": "Saving Throw",
+      "beginner_description": "A saving throw uses the ability named by the threat and adds Proficiency Bonus only when the character is proficient in that save.",
+      "source_ids": ["srd-check-save-resolution"]
+    },
+    {
+      "id": "difficulty_class",
+      "definition_key": "srd-5.2.1:rule.difficulty_class",
+      "name": "Difficulty Class",
+      "beginner_description": "An ability check or saving throw succeeds when its total equals or exceeds the Difficulty Class set by the rule or GM.",
+      "source_ids": ["srd-check-save-resolution"]
+    },
+    {
+      "id": "advantage",
+      "definition_key": "srd-5.2.1:rule.advantage",
+      "name": "Advantage",
+      "beginner_description": "Roll two d20s and use the higher result; multiple Advantage sources still produce only two dice.",
+      "source_ids": ["srd-check-save-resolution"]
+    },
+    {
+      "id": "disadvantage",
+      "definition_key": "srd-5.2.1:rule.disadvantage",
+      "name": "Disadvantage",
+      "beginner_description": "Roll two d20s and use the lower result; any Advantage and any Disadvantage cancel so only one d20 is rolled.",
+      "source_ids": ["srd-check-save-resolution"]
+    }
+  ]
+}

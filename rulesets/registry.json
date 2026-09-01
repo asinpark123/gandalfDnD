@@ -25,6 +25,12 @@
           "kind": "character_state",
           "path": "data/party-state-v1.json",
           "sha256": "aba4fcdbffb037eece88c862c76be988ffc60808b46361cc9a9dda0730fe763b"
+        },
+        {
+          "id": "srd-5.2.1-check-save-resolution-v1",
+          "kind": "rules_resolution",
+          "path": "data/check-save-resolution-v1.json",
+          "sha256": "09d2b0a963a5fba5c28a0a018b8114bcad25dd65717efcf5e1b791cc4f751448"
         }
       ]
     }

@@ -2,9 +2,10 @@
 
 - **Document status:** Active
 - **Last updated:** 2026-09-01
-- **Rules baseline:** SRD 5.2.1 (pinned; M1.3 character-state catalog automated verification passed)
-- **Current delivery stage:** M1.4 ready to begin — M1.3 backend correctness and owner acceptance
-  gates passed
+- **Rules baseline:** SRD 5.2.1 (pinned; character-state and check/save-resolution catalogs pass
+  integrity and schema verification)
+- **Current delivery stage:** M1.4 Verification — implementation and automated/runtime gates passed;
+  owner acceptance remains
 - **Canonical repository:** `~/Git/gandalfDnD`
 
 ## 1. Purpose of this document
@@ -89,6 +90,7 @@ Current documentation index:
 | Character state and deterministic rules engineering contract | [`rules/CHARACTER_AND_RULES_SPEC.md`](rules/CHARACTER_AND_RULES_SPEC.md) |
 | Rules interpretations, product policies, adjudications, and house rules | [`rules/RULINGS.md`](rules/RULINGS.md) |
 | Supported player character-creation workflow and limitations | [`player/CHARACTER_CREATION.md`](player/CHARACTER_CREATION.md) |
+| M1.4 deterministic-resolution owner verification | [`player/M1_4_ACCEPTANCE_CHECKLIST.md`](player/M1_4_ACCEPTANCE_CHECKLIST.md) |
 
 ## 2. Product objective
 
@@ -679,14 +681,52 @@ M1.4 or later and are not implied by exposing their current/max state.
 
 #### M1.4 Deterministic resolution service
 
-- calculate modifiers from canonical state rather than model-provided numbers;
-- require an acting character ID and derive only from that character's state;
-- resolve ability checks and saving throws first;
-- record rule/definition versions, formula and provenance inputs, exact dice faces, RNG/resolver
-  versions, total, and typed outcome in a rule-resolution record;
-- reject actions blocked by conditions, missing proficiency, or unavailable resources where rules
-  require it;
-- return a typed outcome for later narration.
+- **Status:** Verification
+- **Migration:** `0005_check_save_resolution`
+- **Owner gate:** Complete
+  [`player/M1_4_ACCEPTANCE_CHECKLIST.md`](player/M1_4_ACCEPTANCE_CHECKLIST.md), record findings, and
+  either fix defects or accept M1.4 as Done.
+
+Implemented scope:
+
+- authoritative ability checks and saving throws require an acting character and derive the ability
+  and at-most-once proficiency components only from that character's canonical state;
+- the command schema forbids client/model-supplied modifiers and rejects incompatible releases,
+  catalogs, actors, skills, and saving-throw skill fields;
+- contextual skill abilities are supported; Chain Mail automatically supplies Disadvantage only to
+  Dexterity (Stealth), while already-adjudicated Advantage/Disadvantage reasons support application
+  or GM context and cancel according to SRD 5.2.1;
+- immutable resolution records preserve command identity, actor and state revisions, both catalog
+  identities, formula components and provenance, exact dice faces, selected die, rule/source IDs,
+  resolver/RNG versions, DC, total, and typed outcome;
+- duplicate commands are idempotent, changed reuse of a command ID is rejected, and replay uses the
+  stored dice and pinned definitions to prove the same result after restart;
+- a successful resolution and its actor-attributed `rule_resolved` campaign event commit atomically.
+
+Automated and runtime evidence, 2026-09-01:
+
+- 45 tests pass with 91% total coverage and 95% coverage of the resolution module; deterministic
+  fixtures cover normal, Advantage,
+  Disadvantage, cancellation, contextual abilities, actor isolation, natural 1/20 check behavior,
+  malformed/cross-release commands, idempotency, immutability, restart replay, and guarded downgrade;
+- Ruff lint and format checks, normalized-catalog validation, generated-schema freshness, and the
+  full diff whitespace check pass;
+- catalog `srd-5.2.1-check-save-resolution-v1` has verified SHA-256
+  `09d2b0a963a5fba5c28a0a018b8114bcad25dd65717efcf5e1b791cc4f751448` and explicitly extends the
+  immutable M1.3 state catalog rather than silently changing it;
+- the development database is at migration head with no Alembic drift, `/health` returns HTTP 200,
+  the new route is loaded, and the pre-acceptance `rule_resolutions` table remains empty;
+- the test database guard remains active and no Clawvis or unrelated database/service was touched.
+
+Known limitations and follow-up boundaries:
+
+- attacks, damage, combat, conditions, tools, Heroic Inspiration expenditure/rerolls, mechanical
+  consequences, and narration are not part of M1.4;
+- supplied Advantage/Disadvantage reasons are adjudicated context, not free-form rules inference;
+  additional automatic sources arrive with their concrete rules slices;
+- the legacy Phase 0 turn flow still carries a non-authoritative provider-requested modifier; M2
+  must replace that path with this resolver before final narration. `DEBT-001` therefore remains in
+  progress even though the authoritative API itself is protected.
 
 #### M1.5 Deferred character-content expansion
 
@@ -834,7 +874,7 @@ deployable if Clawvis is offline.
 | ID | Type | Status | Description | Impact | Resolution/owner milestone |
 | --- | --- | --- | --- | --- | --- |
 | ISSUE-001 | Environment | Resolved | VM template revoked `CREATE` on `public`, initially blocking Alembic | Tests/migrations failed | Granted each restricted role schema creation only in its own DB; M0 |
-| DEBT-001 | Architecture | Open | Model requests its own dice modifier | Fairness and correctness are incomplete | Calculate from character/rules state; M1.4 |
+| DEBT-001 | Architecture | In progress | The M1.4 authoritative check/save API rejects supplied modifiers and derives them from canonical state, but the legacy Phase 0 turn provider contract still requests a non-authoritative modifier | Direct resolution is protected; live AI turns are not yet routed through it | Replace the legacy turn dice request with M1.4 resolution before narration; M2 |
 | DEBT-002 | Architecture | Open | Narration is generated before dice results | Narration may contradict outcome | Two-stage turn flow; M2 |
 | GAP-001 | Product | Resolved | M1.3 supports an ordered 2–4 character Party Commander party with independently derived equipment/defense/resource state and actor isolation | Party Commander foundation now exists; character content breadth remains intentionally narrow | Automated evidence passed in migration `0004` and 39-test suite; record owner checkpoint, then expand breadth only in M1.5 |
 | GAP-002 | Product | Open | No deterministic quest/world decision model | Decisions have limited lasting effects | M3 |
@@ -843,7 +883,7 @@ deployable if Clawvis is offline.
 | OPS-001 | Source control | Resolved | Initial push was blocked because HTTPS lacked credentials and Git did not automatically select the nonstandard SSH key filename | GitHub was temporarily behind local `main` | Registered the existing Ed25519 key, verified GitHub's host fingerprint, configured this repository's SSH command, and synchronized `main`; 2026-08-30 |
 | OPS-002 | Infrastructure | Deferred | pgvector is unavailable on `postgresvm` | No semantic memory yet | Evaluate/install only at M4 |
 | DOC-001 | Documentation | Open | RES-001's verbatim export contains temporary Deep Research citation tokens | Tokens are not durable implementation citations | Preserve the source unchanged; use official URLs and SRD pages in specifications and rule definitions; M1.1 onward |
-| GAP-003 | Rules | In progress | M1.3 character-state projections are reproducible and provenance-linked, but no authoritative check/save resolution record exists yet | Character state is authoritative; live check/save outcomes are not | Complete authoritative resolution, fixed-dice replay, and model-modifier rejection in M1.4 |
+| GAP-003 | Rules | Resolved | Authoritative ability checks and saving throws now derive from actor-bound canonical state and preserve exact dice, rules/catalog provenance, typed outcomes, and replay evidence | Character choices now produce reproducible check/save outcomes through the dedicated resolution API | Migration `0005`, 45-test suite, fixed-dice/restart replay, modifier rejection, schema/catalog integrity, and development runtime checks passed; owner workflow remains the M1.4 acceptance gate |
 | GAP-004 | Product | Open | Solo balance has a research framework but no measured product results | Encounter/class support cannot yet claim solo balance | Establish strict-SRD baselines in M5; build balance harness after supported combat |
 | DEBT-003 | Architecture | Open | The research proposes greenfield service/table boundaries that have not been reconciled with Phase 0 models | Premature adoption could create redundant schema or services | Reconcile per vertical slice; do not bulk-create the proposed model; M1 onward |
 | ISSUE-002 | Migration/test fixture | Resolved | Synthetic M1.2 migration tests could begin after isolated cleanup had removed the M1.1 seed row | The new foreign-key-backed catalog seed could not be installed from that test baseline | `0003` inserts the exact immutable M1.1 release with `ON CONFLICT DO NOTHING`; transactional migration tests and the full suite pass |
@@ -898,6 +938,7 @@ because a workaround exists; record both the workaround and the permanent resolu
 | ADR-014 | 2026-08-30 | Introduce structured rule operators incrementally from proven semantics, with versioned specialized resolvers for exceptions | Avoid both feature-specific subclass sprawl and a premature universal rules language | When repeated implemented rules justify a new operator |
 | ADR-015 | 2026-08-31 | Give normalized data catalogs immutable identities separate from source releases and pin every record to both | The official artifact can remain unchanged while supported machine-readable subsets evolve; old campaigns must not silently adopt later semantics | When an explicit catalog/ruleset conversion workflow is implemented |
 | ADR-016 | 2026-08-31 | Deliver solo-player control modes in the order Party Commander, Protagonist with Companions, then Lone Hero | Direct control of a normal adventuring party aligns most closely with D&D's party mechanics; delegated companions can then reuse that trusted foundation, while exceptional single-character balance should be designed last from measured party and companion evidence | Revisit sequencing only if executable evidence shows Party Commander cannot establish the common mechanical foundation |
+| ADR-017 | 2026-09-01 | Add check/save definitions as a separately identified immutable supplemental catalog that explicitly extends the pinned character-state catalog | Existing campaigns must gain a compatible resolver without rewriting their historical catalog identity, while resolution records still need an exact machine-readable rules version | When catalog composition or an explicit campaign conversion workflow is designed |
 
 ## 14. Milestone review template
 
@@ -986,12 +1027,14 @@ Destination milestone:
 
 ## 17. Immediate next actions
 
-1. Begin M1.4: implement authoritative check/save resolution, fixed-dice replay, and
-   model-modifier rejection from the selected acting character's canonical state.
-2. Review complete M1 evidence and documentation freshness before M2; move broader character options
-   to M1.5 rather than expanding the exit gate during implementation.
-3. At each `Verification` gate, issue the owner checklist defined in section 7.6 and route every
-   observation to evidence, defects, rulings, scope, or an explicitly accepted limitation.
+1. Run the M1.4 owner workflow in
+   [`player/M1_4_ACCEPTANCE_CHECKLIST.md`](player/M1_4_ACCEPTANCE_CHECKLIST.md); record every result
+   as evidence, defect, ruling question, documentation clarification, or accepted limitation.
+2. Fix and retest any M1.4 defect, or mark the milestone Done when owner acceptance passes.
+3. Review complete M1 evidence and documentation freshness before M2; keep broader character options
+   in M1.5 rather than expanding the M1 exit gate.
+4. Design M2's two-stage turn so the legacy provider dice request is replaced by the authoritative
+   M1.4 resolver before narration, closing `DEBT-001`.
 
 ## 18. Documentation change log
 
@@ -1012,3 +1055,4 @@ Destination milestone:
 | 2026-08-31 | DOC-013 | Recorded the first owner acceptance run, resolved its Dice Set/GP projection-provenance defect, and narrowed the remaining gate to three targeted checks plus subjective feedback | Owner evidence confirmed the main workflow and exposed ISSUE-004; the corrected projection and exhaustive equipment-provenance regression pass the full 39-test suite | Run the targeted retest, record subjective answers, and close or rework M1.3 from that evidence |
 | 2026-09-01 | DOC-014 | Recorded the successful targeted M1.3 owner retest and closed ISSUE-004 | Both characters now expose complete Dice Set/GP provenance, omitted actor selection returns the intended domain 409, and both successful turn events retain SugarHigh's actor ID | Record the five subjective answers, then close or rework M1.3 without repeating the technical workflow |
 | 2026-09-01 | DOC-015 | Closed M1.3 and converted the owner's backend-versus-frontend usability distinction into explicit M7 acceptance requirements | Structured-value correctness passed; JSON output cannot meaningfully prove visual clarity, and API errors need frontend context before ordinary players can self-correct | Begin M1.4; implement and test UX-001 during M7 rather than treating it as an M1.3 backend defect |
+| 2026-09-01 | DOC-016 | Advanced M1.4 to Verification and recorded the authoritative check/save service, supplemental immutable catalog, migration, automated/runtime evidence, limitations, decision, and owner checklist | Migration `0005`, 45 tests at 91% total coverage and 95% resolution-module coverage, lint/format/schema/catalog/diff checks, zero Alembic drift, development health, modifier rejection, actor isolation, immutable provenance, and restart replay passed | Complete the M1.4 owner checklist; fix defects or close M1.4, then review the complete M1 gate before M2 |

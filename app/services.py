@@ -29,9 +29,19 @@ from app.models import (
     CharacterGrant,
     DiceRoll,
     Location,
+    RuleResolution,
     RulesetDataCatalog,
     RulesetRelease,
     Turn,
+)
+from app.resolution import (
+    AppliedAdjustmentSource,
+    ResolutionCreate,
+    ResolutionError,
+    ResolutionRulesCatalog,
+    determine_advantage_state,
+    replay_d20_values,
+    resolve_d20_test,
 )
 from app.rulesets import (
     LoadedRulesetDataCatalog,
@@ -48,6 +58,8 @@ from app.schemas import (
     InventoryChange,
     LoadoutUpdate,
     MoveLocation,
+    RuleResolutionRead,
+    RuleResolutionReplayRead,
     TurnRead,
 )
 from app.validation import CharacterSnapshot, StateChangeValidator
@@ -767,6 +779,281 @@ def update_character_loadout(
         character,
         catalogs.character_creation,
         catalogs.character_state,
+    )
+
+
+def _resolution_read(resolution: RuleResolution) -> RuleResolutionRead:
+    return RuleResolutionRead.model_validate(resolution)
+
+
+def create_rule_resolution(
+    session: Session,
+    campaign_id: uuid.UUID,
+    data: ResolutionCreate,
+    dice_service: DiceService | None = None,
+) -> RuleResolutionRead:
+    campaign = _campaign_for_update(session, campaign_id)
+    command = data.model_dump(mode="json")
+    existing = session.scalar(
+        select(RuleResolution).where(
+            RuleResolution.campaign_id == campaign_id,
+            RuleResolution.command_id == data.command_id,
+        )
+    )
+    if existing is not None:
+        if existing.command != command:
+            raise ConflictError("command_id was already used for a different resolution command")
+        return _resolution_read(existing)
+
+    if data.ruleset_release_id != campaign.ruleset_release_id:
+        raise ConflictError("Resolution ruleset release does not match the campaign pin")
+    if data.character_state_catalog_id != campaign.ruleset_data_catalog_id:
+        raise ConflictError("Resolution character-state catalog does not match the campaign pin")
+    state = get_campaign_state(session, campaign_id)
+    if campaign.play_mode == "party_commander" and not state.party_ready:
+        raise ConflictError(
+            f"At least {campaign.party_min_active} finalized active characters are required"
+        )
+    character = session.scalar(
+        select(Character)
+        .where(Character.campaign_id == campaign_id, Character.id == data.actor_character_id)
+        .with_for_update()
+    )
+    if character is None:
+        raise NotFoundError("Acting character not found in campaign")
+    if character.creation_status != "finalized" or character.party_status != "active":
+        raise ConflictError("Acting character must be finalized and active")
+
+    registry = get_ruleset_registry()
+    try:
+        catalogs = registry.get_resolution_catalogs(
+            campaign.ruleset_release_id,
+            campaign.ruleset_data_catalog_id,
+            data.resolution_catalog_id,
+        )
+    except UnknownRulesetDataCatalogError as exc:
+        raise ConflictError(str(exc)) from exc
+    resolution_catalog = catalogs.resolution.document
+    if not isinstance(resolution_catalog, ResolutionRulesCatalog):
+        raise ConflictError("Selected data catalog does not support rule resolution")
+    _ensure_ruleset_data_catalog(session, catalogs.resolution, campaign.ruleset_release_id)
+
+    character_read = _character_read(
+        session,
+        character,
+        catalogs.character_creation,
+        catalogs.character_state,
+    )
+    mechanical_state = character_read.mechanical_state
+    if mechanical_state is None:
+        raise ConflictError("Acting character has no authoritative mechanical state")
+
+    automatic_disadvantage: list[AppliedAdjustmentSource] = []
+    if (
+        data.resolution_type == "ability_check"
+        and data.ability == "dexterity"
+        and data.skill == "stealth"
+    ):
+        loadout = Loadout.model_validate(character.equipped_items)
+        worn = next(
+            (
+                item
+                for item in catalogs.character_state.equipment
+                if item.item_id == loadout.worn_armor_item_id
+            ),
+            None,
+        )
+        if worn is not None and worn.stealth_disadvantage:
+            automatic_disadvantage.append(
+                AppliedAdjustmentSource(
+                    definition_key=worn.definition_key,
+                    reason=f"Worn {worn.item_name} imposes Disadvantage on Stealth checks",
+                    source_ids=list(worn.source_ids),
+                    automatic=True,
+                )
+            )
+
+    advantage_state = determine_advantage_state(
+        has_advantage=bool(data.advantage_reasons),
+        has_disadvantage=bool(data.disadvantage_reasons or automatic_disadvantage),
+    )
+    dice_notation = "1d20" if advantage_state == "normal" else "2d20"
+    roller = dice_service or DiceService()
+    rolled = roller.roll(dice_notation)
+    resolved = resolve_d20_test(
+        data,
+        mechanical_state,
+        catalogs.character_creation,
+        catalogs.character_state,
+        resolution_catalog,
+        rolled.rolls,
+        automatic_disadvantage_sources=automatic_disadvantage,
+    )
+
+    roll = DiceRoll(
+        campaign_id=campaign_id,
+        ruleset_release_id=campaign.ruleset_release_id,
+        ruleset_data_catalog_id=resolution_catalog.id,
+        turn_id=None,
+        notation=resolved.dice_notation,
+        rolls=resolved.dice_faces,
+        modifier=resolved.modifier,
+        total=resolved.total,
+        purpose=(
+            f"{resolved.resolution_type}: {resolved.ability}"
+            + (f" ({resolved.skill})" if resolved.skill else "")
+        ),
+        hidden=False,
+        actor_character_id=character.id,
+    )
+    session.add(roll)
+    session.flush()
+
+    resolution = RuleResolution(
+        command_id=data.command_id,
+        campaign_id=campaign_id,
+        actor_character_id=character.id,
+        ruleset_release_id=campaign.ruleset_release_id,
+        character_state_catalog_id=campaign.ruleset_data_catalog_id,
+        ruleset_data_catalog_id=resolution_catalog.id,
+        dice_roll_id=roll.id,
+        character_revision=resolved.character_revision,
+        state_revision=resolved.state_revision,
+        resolution_type=resolved.resolution_type,
+        ability=resolved.ability,
+        skill=resolved.skill,
+        difficulty_class=resolved.difficulty_class,
+        rule_definition_keys=resolved.rule_definition_keys,
+        source_ids=resolved.source_ids,
+        command=command,
+        modifier_formula=resolved.modifier_formula,
+        modifier_components=[
+            component.model_dump(mode="json") for component in resolved.modifier_components
+        ],
+        advantage_sources=[source.model_dump(mode="json") for source in resolved.advantage_sources],
+        disadvantage_sources=[
+            source.model_dump(mode="json") for source in resolved.disadvantage_sources
+        ],
+        advantage_state=resolved.advantage_state,
+        dice_notation=resolved.dice_notation,
+        dice_faces=resolved.dice_faces,
+        selected_die=resolved.selected_die,
+        modifier=resolved.modifier,
+        total=resolved.total,
+        outcome=resolved.outcome,
+        resolver_version=resolved.resolver_version,
+        rng_version=roller.algorithm_version,
+    )
+    session.add(resolution)
+    session.flush()
+    _add_event(
+        session,
+        campaign_id,
+        "rule_resolved",
+        {
+            "resolution_id": str(resolution.id),
+            "command_id": str(resolution.command_id),
+            "actor_character_id": str(character.id),
+            "resolution_catalog_id": resolution.ruleset_data_catalog_id,
+            "character_state_catalog_id": resolution.character_state_catalog_id,
+            "resolution": resolved.model_dump(mode="json"),
+            "dice_roll_id": str(roll.id),
+            "rng_version": resolution.rng_version,
+        },
+        actor_character_id=character.id,
+    )
+    session.commit()
+    return _resolution_read(resolution)
+
+
+def get_rule_resolution(
+    session: Session,
+    campaign_id: uuid.UUID,
+    resolution_id: uuid.UUID,
+) -> RuleResolutionRead:
+    resolution = session.scalar(
+        select(RuleResolution).where(
+            RuleResolution.campaign_id == campaign_id,
+            RuleResolution.id == resolution_id,
+        )
+    )
+    if resolution is None:
+        raise NotFoundError("Rule resolution not found")
+    return _resolution_read(resolution)
+
+
+def list_rule_resolutions(
+    session: Session,
+    campaign_id: uuid.UUID,
+) -> list[RuleResolutionRead]:
+    if session.get(Campaign, campaign_id) is None:
+        raise NotFoundError("Campaign not found")
+    return [
+        _resolution_read(resolution)
+        for resolution in session.scalars(
+            select(RuleResolution)
+            .where(RuleResolution.campaign_id == campaign_id)
+            .order_by(RuleResolution.created_at, RuleResolution.id)
+        )
+    ]
+
+
+def replay_rule_resolution(
+    session: Session,
+    campaign_id: uuid.UUID,
+    resolution_id: uuid.UUID,
+) -> RuleResolutionReplayRead:
+    original = get_rule_resolution(session, campaign_id, resolution_id)
+    try:
+        catalogs = get_ruleset_registry().get_resolution_catalogs(
+            original.ruleset_release_id,
+            original.character_state_catalog_id,
+            original.ruleset_data_catalog_id,
+        )
+    except UnknownRulesetDataCatalogError as exc:
+        raise ResolutionError(str(exc)) from exc
+    catalog = catalogs.resolution.document
+    if not isinstance(catalog, ResolutionRulesCatalog):
+        raise ResolutionError("Stored resolution catalog is not available")
+    if catalog.resolver_version != original.resolver_version:
+        raise ResolutionError("Stored resolution resolver version is not available")
+    known_rule_keys = {rule.definition_key for rule in catalog.rules}
+    if not set(original.rule_definition_keys) <= known_rule_keys:
+        raise ResolutionError("Stored resolution cites definitions outside its pinned catalog")
+
+    advantage_state = determine_advantage_state(
+        has_advantage=bool(original.advantage_sources),
+        has_disadvantage=bool(original.disadvantage_sources),
+    )
+    modifier = sum(
+        component.value for component in original.modifier_components if component.applied
+    )
+    selected_die, total, outcome = replay_d20_values(
+        advantage_state,
+        original.dice_faces,
+        modifier,
+        original.difficulty_class,
+    )
+    equivalent = (
+        advantage_state == original.advantage_state
+        and modifier == original.modifier
+        and selected_die == original.selected_die
+        and total == original.total
+        and outcome == original.outcome
+    )
+    replayed = original.model_copy(
+        update={
+            "advantage_state": advantage_state,
+            "modifier": modifier,
+            "selected_die": selected_die,
+            "total": total,
+            "outcome": outcome,
+        }
+    )
+    return RuleResolutionReplayRead(
+        resolution_id=resolution_id,
+        equivalent=equivalent,
+        replayed=replayed,
     )
 
 

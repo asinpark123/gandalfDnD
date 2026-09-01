@@ -21,6 +21,11 @@ class RollResult:
 class DiceService:
     def __init__(self, random_source: RandomSource | None = None) -> None:
         self._random = random_source or random.SystemRandom()
+        self.algorithm_version = (
+            "system-random-1.0.0"
+            if random_source is None
+            else getattr(random_source, "algorithm_version", "injected-random-source-1.0.0")
+        )
 
     def roll(self, notation: str, modifier: int = 0) -> RollResult:
         match = _DICE_PATTERN.fullmatch(notation)
@@ -39,3 +44,7 @@ class DiceService:
             modifier=modifier,
             total=sum(rolls) + modifier,
         )
+
+
+def get_dice_service() -> DiceService:
+    return DiceService()

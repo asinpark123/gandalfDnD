@@ -188,6 +188,7 @@ class CharacterMechanicalState(StrictModel):
     state_revision: int
     level: int
     abilities: dict[AbilityName, AbilityScoreRead]
+    ability_modifiers: dict[AbilityName, DerivedNumber]
     proficiency_bonus: DerivedNumber
     saving_throws: dict[AbilityName, ModifierState]
     skills: dict[str, ModifierState]
@@ -407,6 +408,7 @@ def derive_character_state(
             resolver_version=state_catalog.resolver_version,
         )
 
+    ability_modifier_rule = rules["ability_modifier"]
     proficiency_rule = rules["proficiency_bonus"]
     save_rule = rules["saving_throw_modifier"]
     skill_rule = rules["skill_modifier"]
@@ -425,6 +427,20 @@ def derive_character_state(
     )
 
     ability_by_id = {ability.id: ability for ability in character_creation.abilities}
+    ability_modifiers: dict[AbilityName, DerivedNumber] = {}
+    for ability, score in sheet.abilities.items():
+        ability_modifiers[ability] = DerivedNumber(
+            value=score.modifier,
+            provenance=provenance(
+                "floor((ability score - 10) / 2)",
+                [
+                    ability_modifier_rule.definition_key,
+                    ability_by_id[ability].definition_key,
+                    *grant_definition_keys(f"ability.base.{ability}"),
+                    *grant_definition_keys(f"ability.background.{ability}"),
+                ],
+            ),
+        )
     saving_throws: dict[AbilityName, ModifierState] = {}
     for ability, score in sheet.abilities.items():
         proficient = ability in sheet.saving_throw_proficiencies
@@ -660,6 +676,7 @@ def derive_character_state(
         state_revision=state_revision,
         level=sheet.level,
         abilities=sheet.abilities,
+        ability_modifiers=ability_modifiers,
         proficiency_bonus=proficiency_bonus,
         saving_throws=saving_throws,
         skills=skills,

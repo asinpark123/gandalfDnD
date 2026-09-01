@@ -51,6 +51,13 @@ def test_checked_in_registry_and_generated_schemas_are_valid() -> None:
     assert character_catalog.sha256 == (
         "aba4fcdbffb037eece88c862c76be988ffc60808b46361cc9a9dda0730fe763b"
     )
+    resolution_catalog = registry.get_data_catalog(
+        "srd-5.2.1", "srd-5.2.1-check-save-resolution-v1"
+    )
+    assert resolution_catalog.kind == "rules_resolution"
+    assert resolution_catalog.sha256 == (
+        "09d2b0a963a5fba5c28a0a018b8114bcad25dd65717efcf5e1b791cc4f751448"
+    )
 
     result = subprocess.run(
         [sys.executable, "-m", "scripts.export_ruleset_schemas", "--check"],
@@ -359,6 +366,7 @@ def test_migration_backfills_legacy_mechanical_records() -> None:
                 select(RulesetDataCatalog.id).order_by(RulesetDataCatalog.id)
             ).scalars().all() == [
                 "srd-5.2.1-character-creation-v1",
+                "srd-5.2.1-check-save-resolution-v1",
                 "srd-5.2.1-foundation-v1",
                 "srd-5.2.1-party-state-v1",
             ]

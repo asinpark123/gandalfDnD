@@ -73,7 +73,7 @@ class RulesetDataCatalog(TimestampMixin, Base):
 
     __table_args__ = (
         CheckConstraint(
-            "kind IN ('foundation', 'character_creation', 'character_state')",
+            "kind IN ('foundation', 'character_creation', 'character_state', 'rules_resolution')",
             name="ruleset_data_catalog_kind",
         ),
         CheckConstraint(
@@ -269,6 +269,90 @@ class DiceRoll(TimestampMixin, Base):
     hidden: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     actor_character_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("characters.id", ondelete="SET NULL"), index=True
+    )
+
+
+class RuleResolution(TimestampMixin, Base):
+    __tablename__ = "rule_resolutions"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    command_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    campaign_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("campaigns.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    actor_character_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("characters.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    ruleset_release_id: Mapped[str] = mapped_column(
+        ForeignKey("ruleset_releases.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    character_state_catalog_id: Mapped[str] = mapped_column(
+        ForeignKey("ruleset_data_catalogs.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    ruleset_data_catalog_id: Mapped[str] = mapped_column(
+        ForeignKey("ruleset_data_catalogs.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    dice_roll_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("dice_rolls.id", ondelete="RESTRICT"), nullable=False, unique=True
+    )
+    character_revision: Mapped[int] = mapped_column(Integer, nullable=False)
+    state_revision: Mapped[int] = mapped_column(Integer, nullable=False)
+    resolution_type: Mapped[str] = mapped_column(String(30), nullable=False)
+    ability: Mapped[str] = mapped_column(String(20), nullable=False)
+    skill: Mapped[str | None] = mapped_column(String(40))
+    difficulty_class: Mapped[int] = mapped_column(Integer, nullable=False)
+    rule_definition_keys: Mapped[list[str]] = mapped_column(JSONB, nullable=False)
+    source_ids: Mapped[list[str]] = mapped_column(JSONB, nullable=False)
+    command: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    modifier_formula: Mapped[str] = mapped_column(Text, nullable=False)
+    modifier_components: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, nullable=False)
+    advantage_sources: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, nullable=False)
+    disadvantage_sources: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, nullable=False)
+    advantage_state: Mapped[str] = mapped_column(String(20), nullable=False)
+    dice_notation: Mapped[str] = mapped_column(String(20), nullable=False)
+    dice_faces: Mapped[list[int]] = mapped_column(JSONB, nullable=False)
+    selected_die: Mapped[int] = mapped_column(Integer, nullable=False)
+    modifier: Mapped[int] = mapped_column(Integer, nullable=False)
+    total: Mapped[int] = mapped_column(Integer, nullable=False)
+    outcome: Mapped[str] = mapped_column(String(20), nullable=False)
+    resolver_version: Mapped[str] = mapped_column(String(60), nullable=False)
+    rng_version: Mapped[str] = mapped_column(String(60), nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("campaign_id", "command_id", name="uq_rule_resolutions_command"),
+        CheckConstraint(
+            "character_revision > 0 AND state_revision > 0",
+            name="rule_resolution_revisions_positive",
+        ),
+        CheckConstraint(
+            "resolution_type IN ('ability_check', 'saving_throw')",
+            name="rule_resolution_type",
+        ),
+        CheckConstraint(
+            "resolution_type = 'ability_check' OR skill IS NULL",
+            name="rule_resolution_save_has_no_skill",
+        ),
+        CheckConstraint(
+            "ability IN ('strength', 'dexterity', 'constitution', 'intelligence', "
+            "'wisdom', 'charisma')",
+            name="rule_resolution_ability",
+        ),
+        CheckConstraint(
+            "difficulty_class BETWEEN 1 AND 100", name="rule_resolution_difficulty_class"
+        ),
+        CheckConstraint(
+            "advantage_state IN ('normal', 'advantage', 'disadvantage')",
+            name="rule_resolution_advantage_state",
+        ),
+        CheckConstraint("dice_notation IN ('1d20', '2d20')", name="rule_resolution_dice_notation"),
+        CheckConstraint(
+            "jsonb_typeof(dice_faces) = 'array' AND "
+            "((dice_notation = '1d20' AND jsonb_array_length(dice_faces) = 1) OR "
+            "(dice_notation = '2d20' AND jsonb_array_length(dice_faces) = 2))",
+            name="rule_resolution_dice_count",
+        ),
+        CheckConstraint("selected_die BETWEEN 1 AND 20", name="rule_resolution_selected_die"),
+        CheckConstraint("outcome IN ('success', 'failure')", name="rule_resolution_outcome"),
     )
 
 

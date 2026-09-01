@@ -6,6 +6,14 @@ from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 from app.character_creation import CharacterSheet
 from app.character_state import CharacterMechanicalState, Loadout
+from app.resolution import (
+    AdvantageState,
+    AppliedAdjustmentSource,
+    ModifierComponent,
+    ResolutionCreate,
+    ResolutionOutcome,
+    ResolutionType,
+)
 
 ShortText = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=160)]
 
@@ -181,6 +189,48 @@ class EventRead(BaseModel):
     payload: dict
     actor_character_id: uuid.UUID | None
     created_at: datetime
+
+
+class RuleResolutionRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    command_id: uuid.UUID
+    campaign_id: uuid.UUID
+    actor_character_id: uuid.UUID
+    ruleset_release_id: str
+    character_state_catalog_id: str
+    ruleset_data_catalog_id: str
+    dice_roll_id: uuid.UUID
+    character_revision: int
+    state_revision: int
+    resolution_type: ResolutionType
+    ability: str
+    skill: str | None
+    difficulty_class: int
+    rule_definition_keys: list[str]
+    source_ids: list[str]
+    command: ResolutionCreate
+    modifier_formula: str
+    modifier_components: list[ModifierComponent]
+    advantage_sources: list[AppliedAdjustmentSource]
+    disadvantage_sources: list[AppliedAdjustmentSource]
+    advantage_state: AdvantageState
+    dice_notation: str
+    dice_faces: list[int]
+    selected_die: int
+    modifier: int
+    total: int
+    outcome: ResolutionOutcome
+    resolver_version: str
+    rng_version: str
+    created_at: datetime
+
+
+class RuleResolutionReplayRead(BaseModel):
+    resolution_id: uuid.UUID
+    equivalent: bool
+    replayed: RuleResolutionRead
 
 
 class HealthRead(BaseModel):

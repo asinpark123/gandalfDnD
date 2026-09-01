@@ -24,10 +24,12 @@ maintained in the [living development plan](docs/PROJECT_PLAN.md).
   step-by-step API workflow, limitations, and rules-source notes
 - [M1.3 owner acceptance checklist](docs/player/M1_3_ACCEPTANCE_CHECKLIST.md) — hands-on Party
   Commander verification and feedback record
+- [M1.4 owner acceptance checklist](docs/player/M1_4_ACCEPTANCE_CHECKLIST.md) — authoritative
+  check/save, rejection, attribution, and replay verification
 
 Documentation distinguishes planned behavior from verified implementation. M1.3 Party Commander
-and complete level-one character state have passed automated verification and await the recorded
-owner checkpoint; authoritative check/save resolution remains M1.4 work.
+and complete level-one character state are Done. M1.4 authoritative ability-check and saving-throw
+resolution has passed automated verification and awaits its owner checkpoint.
 
 ## Versioned rulesets
 
@@ -64,6 +66,9 @@ checksum, size, license, attribution, normalized-data catalogs, and schema versi
   modifiers, AC alternatives, initiative, passive Perception, Speed, features/resources, equipment
   positions, and source/acquisition provenance
 - acting-character attribution on turns, dice, player-visible events, and isolated state changes
+- authoritative ability checks and saving throws with canonical modifiers, contextual skill
+  abilities, Advantage/Disadvantage cancellation, exact dice, typed outcomes, idempotency, immutable
+  provenance, and restart replay
 - HP, inventory, and current-location state changes with pre-commit validation
 - auditable application dice rolls, including internally logged hidden rolls
 - provider-neutral DM interface
@@ -129,6 +134,10 @@ canonical state: all proposed changes pass through `StateChangeValidator` first.
 | `PUT` | `/campaigns/{id}/characters/{character_id}/loadout` | Select worn armor and held/readied weapons |
 | `GET` | `/campaigns/{id}/state` | Read canonical campaign, party, character, and location state |
 | `POST` | `/campaigns/{id}/turns` | Process one actor-attributed player action after party readiness |
+| `POST` | `/campaigns/{id}/resolutions` | Resolve an actor-bound ability check or saving throw from canonical state |
+| `GET` | `/campaigns/{id}/resolutions` | List immutable authoritative resolutions |
+| `GET` | `/campaigns/{id}/resolutions/{resolution_id}` | Read one authoritative resolution and its provenance |
+| `POST` | `/campaigns/{id}/resolutions/{resolution_id}/replay` | Recompute stored dice/modifier inputs and verify equivalence |
 | `GET` | `/campaigns/{id}/events` | Read the ordered player-visible event trail |
 
 ## Verification
@@ -151,6 +160,8 @@ never target the development database or any pre-existing service database.
 - Campaign events are immutable after insertion.
 - Every model output is typed and validated before commit.
 - Dice outcomes come from `DiceService`, never model invention.
+- Authoritative check/save commands contain no modifier field; canonical character state supplies
+  every applied modifier component.
 - Ruleset releases are immutable; changing versions requires a future explicit migration workflow.
 - Normalized data catalogs are immutable; pre-M1.2 records retain their original foundation catalog
   rather than silently acquiring later rules semantics.

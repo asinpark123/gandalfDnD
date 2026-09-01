@@ -13,8 +13,10 @@ from app.character_creation import (
 from app.character_state import CharacterCreationOptions, CharacterStateError
 from app.config import Settings, get_settings
 from app.db import get_session
+from app.dice import DiceService, get_dice_service
 from app.llm.base import DMProvider
 from app.llm.factory import get_dm_provider
+from app.resolution import ResolutionCreate, ResolutionError
 from app.rulesets import UnknownRulesetDataCatalogError, UnknownRulesetError, get_ruleset_registry
 from app.schemas import (
     CampaignCreate,
@@ -26,6 +28,8 @@ from app.schemas import (
     EventRead,
     HealthRead,
     LoadoutUpdate,
+    RuleResolutionRead,
+    RuleResolutionReplayRead,
     TurnCreate,
     TurnRead,
 )
@@ -34,19 +38,24 @@ from app.services import (
     NotFoundError,
     add_character,
     create_campaign,
+    create_rule_resolution,
     finalize_character,
     get_campaign_state,
     get_character_read,
+    get_rule_resolution,
     list_character_grants,
     list_characters,
     list_events,
+    list_rule_resolutions,
     process_turn,
+    replay_rule_resolution,
     update_character_loadout,
 )
 from app.validation import InvalidStateChange
 
 SessionDep = Annotated[Session, Depends(get_session)]
 ProviderDep = Annotated[DMProvider, Depends(get_dm_provider)]
+DiceDep = Annotated[DiceService, Depends(get_dice_service)]
 SettingsDep = Annotated[Settings, Depends(get_settings)]
 
 
@@ -249,6 +258,72 @@ def create_app() -> FastAPI:
         except ConflictError as exc:
             session.rollback()
             raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+    @app.post(
+        "/campaigns/{campaign_id}/resolutions",
+        response_model=RuleResolutionRead,
+        status_code=status.HTTP_201_CREATED,
+    )
+    def resolutions_create(
+        campaign_id: uuid.UUID,
+        data: ResolutionCreate,
+        session: SessionDep,
+        dice_service: DiceDep,
+    ) -> RuleResolutionRead:
+        try:
+            return create_rule_resolution(session, campaign_id, data, dice_service)
+        except NotFoundError as exc:
+            session.rollback()
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except ResolutionError as exc:
+            session.rollback()
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        except ConflictError as exc:
+            session.rollback()
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+    @app.get(
+        "/campaigns/{campaign_id}/resolutions",
+        response_model=list[RuleResolutionRead],
+    )
+    def resolutions_list(
+        campaign_id: uuid.UUID,
+        session: SessionDep,
+    ) -> list[RuleResolutionRead]:
+        try:
+            return list_rule_resolutions(session, campaign_id)
+        except NotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    @app.get(
+        "/campaigns/{campaign_id}/resolutions/{resolution_id}",
+        response_model=RuleResolutionRead,
+    )
+    def resolutions_get(
+        campaign_id: uuid.UUID,
+        resolution_id: uuid.UUID,
+        session: SessionDep,
+    ) -> RuleResolutionRead:
+        try:
+            return get_rule_resolution(session, campaign_id, resolution_id)
+        except NotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    @app.post(
+        "/campaigns/{campaign_id}/resolutions/{resolution_id}/replay",
+        response_model=RuleResolutionReplayRead,
+    )
+    def resolutions_replay(
+        campaign_id: uuid.UUID,
+        resolution_id: uuid.UUID,
+        session: SessionDep,
+    ) -> RuleResolutionReplayRead:
+        try:
+            return replay_rule_resolution(session, campaign_id, resolution_id)
+        except NotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except ResolutionError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     @app.get("/campaigns/{campaign_id}/events", response_model=list[EventRead])
     def events_list(campaign_id: uuid.UUID, session: SessionDep) -> list[EventRead]:

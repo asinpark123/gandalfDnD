@@ -12,7 +12,8 @@
           "enum": [
             "foundation",
             "character_creation",
-            "character_state"
+            "character_state",
+            "rules_resolution"
           ],
           "title": "Kind",
           "type": "string"

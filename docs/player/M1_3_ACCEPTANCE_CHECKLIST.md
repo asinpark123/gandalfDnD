@@ -1,9 +1,9 @@
 # M1.3 Party Commander Owner Acceptance Checklist
 
-- **Milestone state:** Verification
+- **Milestone state:** Done (accepted 2026-09-01)
 - **Automated gate:** Passed on 2026-08-31
-- **Purpose:** Confirm that the implemented party and character state is correct and understandable
-  from a player's perspective before M1.3 is marked Done.
+- **Purpose:** Preserve the owner acceptance workflow and evidence for Party Commander backend
+  correctness. Player-interface usability is intentionally reassessed in M7.
 
 ## Setup
 
@@ -123,3 +123,13 @@ After updating to the correction commit, only these checks need repeating:
    `dm_response` events both identify character 1 in `actor_character_id`.
 
 Then answer the five subjective feedback questions above. No other M1.3 action needs repeating.
+
+## Final outcome
+
+The targeted retest passed all technical checks. The owner accepted questions 1–4 as frontend
+concerns because direct JSON testing can establish structured-value correctness but cannot establish
+visual clarity or discoverability. The owner considered the tested API error adequate for developer
+diagnosis, while requiring the future frontend to add contextual, actionable player guidance.
+
+M1.3 is Done. The deferred interface requirements are tracked as `UX-001` under M7 in
+[`../PROJECT_PLAN.md`](../PROJECT_PLAN.md); no additional M1.3 API rerun is required.

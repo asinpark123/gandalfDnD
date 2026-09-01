@@ -3,8 +3,8 @@
 - **Document status:** Active
 - **Last updated:** 2026-09-01
 - **Rules baseline:** SRD 5.2.1 (pinned; M1.3 character-state catalog automated verification passed)
-- **Current delivery stage:** M1.3 Verification — automated and targeted owner retest gates passed;
-  subjective owner feedback pending
+- **Current delivery stage:** M1.4 ready to begin — M1.3 backend correctness and owner acceptance
+  gates passed
 - **Canonical repository:** `~/Git/gandalfDnD`
 
 ## 1. Purpose of this document
@@ -268,7 +268,7 @@ results, known limitations, and where observations will be recorded.
 | Checkpoint | Owner input required | Owner testing expectation |
 | --- | --- | --- |
 | M1.2 guided creation | None; the supported slice and deferrals are already accepted | Optional API/Swagger review of valid creation, rejected invalid choices, finalized sheet, and provenance |
-| M1.3 Party Commander and complete character state | No blocking input unless a new rules/product ambiguity appears; clarity feedback is welcome | Short acceptance review of party/character selection, isolated state, AC, initiative, speed, proficiencies, equipment, HP/Hit Dice, features/resources, and beginner readability |
+| M1.3 Party Commander and complete character state | Completed 2026-09-01; no further input required | Owner confirmed the API exposes the correct structured values; presentation clarity and end-user corrective guidance are deferred to the M7 interface checkpoint |
 | M1.4 deterministic resolution | Decide only genuinely ambiguous adjudication/product policies that cannot be resolved from the pinned SRD and accepted rulings | Important acceptance test proving saved character choices change checks/saves and model-supplied modifiers cannot override canonical results |
 | M2 live AI feasibility | Approve any paid live-model evaluation and provide desired narrative tone/content boundaries | Critical Lantern Test covering dialogue, movement, inventory, check, damage, restart, resume, and narration/mechanics agreement |
 | M3 persistent world | Provide campaign-structure preferences when they affect consequence and quest design | Multi-session play test confirming decisions, NPC relationships, quests, and revealed facts persist coherently across restarts |
@@ -577,8 +577,9 @@ M1.2 milestone review:
 
 #### M1.3 Party Commander and complete Phase 1 character state
 
-**Status:** Verification — automated gates and targeted owner retest passed; subjective feedback
-pending
+**Status:** Done
+
+**Completed:** 2026-09-01
 
 - campaign-level party identity and multiple independently addressable player characters;
 - explicit `party_commander` campaign mode and player-controlled character ownership/control state;
@@ -593,9 +594,10 @@ pending
 - commands, state changes, events, and later resolutions identify the acting/affected character;
 - no spellcasting fields are required by the initial supported slice.
 
-Owner checkpoint: no input is required to begin implementation. At `Verification`, provide a short
-party/character selection, sheet-readability, state-isolation, and correctness checklist covering
-every field above; record feedback before M1.3 is closed.
+Owner checkpoint completed. Because this milestone exposes a backend API rather than a player
+interface, its acceptance gate evaluates structured-value correctness, format, attribution, and
+state isolation. Presentation clarity, visual discoverability, and ordinary-player recovery from
+errors are M7 interface acceptance criteria.
 
 Implemented:
 
@@ -657,7 +659,19 @@ Targeted owner retest, 2026-09-01:
 - the event log returned HTTP 200 and both the successful `player_action` and corresponding
   `dm_response` identify SugarHigh (`2039690f-15ca-4154-8822-1fbd4190daf1`) as actor;
 - all three targeted technical checks passed. No further API rerun is required; only the five
-  subjective readability and usability answers remain before the owner gate can close.
+  subjective readability and usability answers remained before the owner gate could close.
+
+Owner usability assessment and milestone decision, 2026-09-01:
+
+- for questions 1–4, the owner judged visual obviousness and usability to be premature while
+  interacting directly with JSON; correct values in the correct structured format are the relevant
+  backend criterion, and that criterion passed;
+- the owner found the API error sufficiently informative for debugging, but not sufficient by
+  itself for an ordinary player to recover through a future frontend;
+- M7 must show the selected acting character, explain calculated state and isolated changes in
+  player language, and map typed backend errors to contextual corrective instructions;
+- this is a deferred interface requirement, not an M1.3 backend defect. M1.3 is accepted as Done and
+  development may proceed to M1.4.
 
 Known non-blocking limitation: the existing Starlette/httpx TestClient deprecation warning remains
 under `WARN-001`. Resource expenditure/recovery and authoritative check/save resolution belong to
@@ -792,6 +806,12 @@ Add the simplest useful play interface, character creation screens, state summar
 inspection, campaign export, and explicit corrective/admin events. Choose frontend technology only
 after API workflows are proven.
 
+The interface must make party membership and the selected acting character visible; present
+calculated values, provenance explanations, loadout changes, and per-character isolation in
+player-oriented language; and translate typed API errors into contextual instructions that tell a
+player what happened and how to correct it. Raw backend detail may remain available for diagnostics
+without being the primary player message.
+
 ### M8 — Deployment and operations
 
 - **Status:** Deferred
@@ -829,6 +849,7 @@ deployable if Clawvis is offline.
 | ISSUE-002 | Migration/test fixture | Resolved | Synthetic M1.2 migration tests could begin after isolated cleanup had removed the M1.1 seed row | The new foreign-key-backed catalog seed could not be installed from that test baseline | `0003` inserts the exact immutable M1.1 release with `ON CONFLICT DO NOTHING`; transactional migration tests and the full suite pass |
 | ISSUE-003 | Migration/test fixture | Resolved | The first M1.3 run found the isolated test DB at migration `0003` after fixture cleanup had removed immutable seed rows | `0004` initially could not insert its state catalog because the known release FK row was absent | `0004` idempotently restores only the exact pinned release before inserting the new catalog; focused migration smoke, full-chain tests, and 39-test suite pass |
 | ISSUE-004 | Character-state provenance | Resolved | The first M1.3 owner run showed empty projected source/acquisition provenance for Dice Set and GP; ordinary package items were unaffected | The visible equipment projection did not meet GF-004 even though canonical grants remained intact | The corrected projection and exhaustive regression passed 39 automated tests; the 2026-09-01 owner retest confirmed complete Dice Set/GP definition, source, and acquisition-event provenance for both existing characters |
+| UX-001 | Player interface | Deferred | Backend errors are adequate for developer diagnosis but do not yet provide contextual, player-oriented recovery guidance; JSON also cannot validate visual actor/state clarity | Ordinary players may not know what happened or how to correct an invalid action when the frontend is introduced | In M7, map stable typed API errors to actionable messages and test actor visibility, calculated-value explanations, and isolated character changes through the full player journey |
 
 New entries must include reproduction steps or evidence when applicable. Do not close an issue only
 because a workaround exists; record both the workaround and the permanent resolution.
@@ -965,13 +986,11 @@ Destination milestone:
 
 ## 17. Immediate next actions
 
-1. Record the owner's five M1.3 subjective usability answers; correct any reported defect or mark
-   M1.3 Done. No further technical API rerun is currently required.
-2. Begin M1.4 only after the remaining M1.3 owner checkpoint passes; then
-   implement authoritative check/save resolution, fixed-dice replay, and model-modifier rejection.
-3. Review complete M1 evidence and documentation freshness before M2; move broader character options
+1. Begin M1.4: implement authoritative check/save resolution, fixed-dice replay, and
+   model-modifier rejection from the selected acting character's canonical state.
+2. Review complete M1 evidence and documentation freshness before M2; move broader character options
    to M1.5 rather than expanding the exit gate during implementation.
-4. At each `Verification` gate, issue the owner checklist defined in section 7.6 and route every
+3. At each `Verification` gate, issue the owner checklist defined in section 7.6 and route every
    observation to evidence, defects, rulings, scope, or an explicitly accepted limitation.
 
 ## 18. Documentation change log
@@ -992,3 +1011,4 @@ Destination milestone:
 | 2026-08-31 | DOC-012 | Advanced M1.3 to Verification and recorded Party Commander/state implementation, corrected Alert initiative, migration/runtime evidence, limitations, and owner gate | Migration `0004`, immutable state catalog, 39 tests, 92% coverage, zero Alembic drift, dev health 200, and actor-isolation/loadout fixtures passed | Complete the owner checklist, record feedback, then either fix defects or close M1.3 and begin M1.4 |
 | 2026-08-31 | DOC-013 | Recorded the first owner acceptance run, resolved its Dice Set/GP projection-provenance defect, and narrowed the remaining gate to three targeted checks plus subjective feedback | Owner evidence confirmed the main workflow and exposed ISSUE-004; the corrected projection and exhaustive equipment-provenance regression pass the full 39-test suite | Run the targeted retest, record subjective answers, and close or rework M1.3 from that evidence |
 | 2026-09-01 | DOC-014 | Recorded the successful targeted M1.3 owner retest and closed ISSUE-004 | Both characters now expose complete Dice Set/GP provenance, omitted actor selection returns the intended domain 409, and both successful turn events retain SugarHigh's actor ID | Record the five subjective answers, then close or rework M1.3 without repeating the technical workflow |
+| 2026-09-01 | DOC-015 | Closed M1.3 and converted the owner's backend-versus-frontend usability distinction into explicit M7 acceptance requirements | Structured-value correctness passed; JSON output cannot meaningfully prove visual clarity, and API errors need frontend context before ordinary players can self-correct | Begin M1.4; implement and test UX-001 during M7 rather than treating it as an M1.3 backend defect |

@@ -14,8 +14,8 @@ from app.character_state import CharacterCreationOptions, CharacterStateError
 from app.config import Settings, get_settings
 from app.db import get_session
 from app.dice import DiceService, get_dice_service
-from app.llm.base import DMProvider, TurnInterpretationProvider
-from app.llm.factory import get_dm_provider, get_turn_interpreter
+from app.llm.base import DMProvider, TurnInterpretationProvider, TurnNarrationProvider
+from app.llm.factory import get_dm_provider, get_turn_interpreter, get_turn_narrator
 from app.resolution import ResolutionCreate, ResolutionError
 from app.rulesets import UnknownRulesetDataCatalogError, UnknownRulesetError, get_ruleset_registry
 from app.schemas import (
@@ -34,18 +34,21 @@ from app.schemas import (
     TurnCreate,
     TurnExecutionCreate,
     TurnExecutionRead,
+    TurnFinalizationRead,
     TurnInterpretationRead,
     TurnRead,
 )
 from app.services import (
     ConflictError,
     NotFoundError,
+    TurnNarrationError,
     add_character,
     cancel_turn_execution,
     create_campaign,
     create_rule_resolution,
     create_turn_execution,
     finalize_character,
+    finalize_turn_execution,
     get_campaign_state,
     get_character_read,
     get_rule_resolution,
@@ -68,6 +71,7 @@ from app.validation import InvalidStateChange
 SessionDep = Annotated[Session, Depends(get_session)]
 ProviderDep = Annotated[DMProvider, Depends(get_dm_provider)]
 InterpreterDep = Annotated[TurnInterpretationProvider, Depends(get_turn_interpreter)]
+NarratorDep = Annotated[TurnNarrationProvider, Depends(get_turn_narrator)]
 DiceDep = Annotated[DiceService, Depends(get_dice_service)]
 SettingsDep = Annotated[Settings, Depends(get_settings)]
 
@@ -392,6 +396,36 @@ def create_app() -> FastAPI:
             session.rollback()
             raise HTTPException(status_code=409, detail=str(exc)) from exc
         except TurnInterpretationError as exc:
+            session.rollback()
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    @app.post(
+        "/campaigns/{campaign_id}/turn-executions/{turn_id}/finalize",
+        response_model=TurnFinalizationRead,
+    )
+    def turn_executions_finalize(
+        campaign_id: uuid.UUID,
+        turn_id: uuid.UUID,
+        session: SessionDep,
+        provider: NarratorDep,
+    ) -> TurnFinalizationRead:
+        try:
+            return finalize_turn_execution(
+                session,
+                campaign_id,
+                turn_id,
+                provider,
+            )
+        except NotFoundError as exc:
+            session.rollback()
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except InvalidStateChange as exc:
+            session.rollback()
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        except ConflictError as exc:
+            session.rollback()
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        except TurnNarrationError as exc:
             session.rollback()
             raise HTTPException(status_code=502, detail=str(exc)) from exc
 

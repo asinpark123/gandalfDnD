@@ -1,7 +1,7 @@
 from functools import lru_cache
 
 from app.config import get_settings
-from app.llm.base import DMProvider, TurnInterpretationProvider
+from app.llm.base import DMProvider, TurnInterpretationProvider, TurnNarrationProvider
 from app.llm.deterministic import DeterministicDMProvider
 from app.llm.openai_provider import OpenAIDMProvider
 
@@ -25,5 +25,15 @@ def get_turn_interpreter() -> TurnInterpretationProvider:
     if settings.llm_provider != "deterministic":
         raise RuntimeError(
             "M2 interpretation is restricted to the deterministic provider until the M2.5 gate"
+        )
+    return DeterministicDMProvider()
+
+
+@lru_cache
+def get_turn_narrator() -> TurnNarrationProvider:
+    settings = get_settings()
+    if settings.llm_provider != "deterministic":
+        raise RuntimeError(
+            "M2 narration is restricted to the deterministic provider until the M2.5 gate"
         )
     return DeterministicDMProvider()

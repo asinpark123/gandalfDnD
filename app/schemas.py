@@ -139,6 +139,15 @@ class DMTurnOutput(BaseModel):
     dice_requests: list[DiceRequest] = Field(default_factory=list, max_length=10)
 
 
+class TurnNarrationOutput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    narration: str = Field(min_length=1, max_length=8000)
+    resolution_id: uuid.UUID | None = None
+    acknowledged_outcome: ResolutionOutcome | None = None
+    state_changes: list[StateChange] = Field(default_factory=list, max_length=20)
+
+
 class TurnCreate(BaseModel):
     action: str = Field(min_length=1, max_length=4000)
     actor_character_id: uuid.UUID | None = None
@@ -285,6 +294,13 @@ class TurnInterpretationRead(BaseModel):
     turn: TurnExecutionRead
     intent: TurnIntent
     resolution: RuleResolutionRead | None
+
+
+class TurnFinalizationRead(BaseModel):
+    turn: TurnExecutionRead
+    intent: TurnIntent
+    resolution: RuleResolutionRead | None
+    state: CampaignState
 
 
 class RuleResolutionReplayRead(BaseModel):

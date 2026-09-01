@@ -23,7 +23,7 @@ from app.character_state import (
     validate_loadout,
 )
 from app.dice import DiceService
-from app.llm.base import DMProvider, TurnInterpretationProvider
+from app.llm.base import DMProvider, TurnInterpretationProvider, TurnNarrationProvider
 from app.models import (
     Campaign,
     CampaignEvent,
@@ -65,7 +65,9 @@ from app.schemas import (
     RuleResolutionReplayRead,
     TurnExecutionCreate,
     TurnExecutionRead,
+    TurnFinalizationRead,
     TurnInterpretationRead,
+    TurnNarrationOutput,
     TurnRead,
 )
 from app.turn_interpretation import (
@@ -74,7 +76,7 @@ from app.turn_interpretation import (
     TurnInterpretationError,
     validate_turn_intent,
 )
-from app.validation import CharacterSnapshot, StateChangeValidator
+from app.validation import CharacterSnapshot, InvalidStateChange, StateChangeValidator
 
 
 class NotFoundError(LookupError):
@@ -82,6 +84,10 @@ class NotFoundError(LookupError):
 
 
 class ConflictError(ValueError):
+    pass
+
+
+class TurnNarrationError(RuntimeError):
     pass
 
 
@@ -606,6 +612,313 @@ def interpret_turn_execution(
     return TurnInterpretationRead(
         turn=TurnExecutionRead.model_validate(turn), intent=intent, resolution=resolution
     )
+
+
+def _turn_resolution(
+    session: Session, campaign_id: uuid.UUID, turn: Turn
+) -> RuleResolutionRead | None:
+    if turn.resolution_id is None:
+        return None
+    return get_rule_resolution(session, campaign_id, turn.resolution_id)
+
+
+def _turn_finalization_result(
+    session: Session,
+    campaign_id: uuid.UUID,
+    turn: Turn,
+    intent: TurnIntent,
+) -> TurnFinalizationRead:
+    return TurnFinalizationRead(
+        turn=TurnExecutionRead.model_validate(turn),
+        intent=intent,
+        resolution=_turn_resolution(session, campaign_id, turn),
+        state=get_campaign_state(session, campaign_id),
+    )
+
+
+def _character_snapshot(
+    campaign: Campaign,
+    character: Character,
+) -> CharacterSnapshot:
+    equipped_ids = {
+        item_id
+        for item_id in [
+            character.equipped_items.get("worn_armor_item_id"),
+            *character.equipped_items.get("held_item_ids", []),
+        ]
+        if item_id
+    }
+    catalogs = get_ruleset_registry().get_character_catalogs(
+        campaign.ruleset_release_id, campaign.ruleset_data_catalog_id
+    )
+    equipped_names = frozenset(
+        item.item_name
+        for item in (catalogs.character_state.equipment if catalogs.character_state else [])
+        if item.item_id in equipped_ids
+    )
+    return CharacterSnapshot(
+        character.hp or 0,
+        character.max_hp or 0,
+        dict(character.inventory),
+        equipped_names,
+    )
+
+
+def _record_narration_failure(
+    session: Session,
+    campaign_id: uuid.UUID,
+    turn_id: uuid.UUID,
+    *,
+    attempt: int,
+    provider: TurnNarrationProvider,
+    latency_ms: int,
+    error_code: str,
+    error_detail: str,
+    resume_status: str,
+    output: TurnNarrationOutput | None = None,
+) -> None:
+    session.rollback()
+    _campaign_for_update(session, campaign_id)
+    turn = session.scalar(
+        select(Turn).where(Turn.campaign_id == campaign_id, Turn.id == turn_id).with_for_update()
+    )
+    assert turn is not None
+    provider_call = ProviderCall(
+        campaign_id=campaign_id,
+        turn_id=turn_id,
+        stage="narration",
+        attempt=attempt,
+        provider=provider.provider_name,
+        model=provider.model_name,
+        prompt_version=provider.narration_prompt_version,
+        status="succeeded" if output is not None else "failed",
+        latency_ms=latency_ms,
+        error_code=None if output is not None else error_code,
+        error_detail=None if output is not None else error_detail,
+    )
+    if output is not None:
+        provider_call.structured_output = output.model_dump(mode="json")
+    session.add(provider_call)
+    turn.status = "failed"
+    turn.failure_stage = "narration"
+    turn.error_code = error_code
+    turn.error_detail = error_detail
+    turn.resumable = True
+    turn.resume_status = resume_status
+    session.commit()
+
+
+def finalize_turn_execution(
+    session: Session,
+    campaign_id: uuid.UUID,
+    turn_id: uuid.UUID,
+    provider: TurnNarrationProvider,
+) -> TurnFinalizationRead:
+    campaign = _campaign_for_update(session, campaign_id)
+    turn = session.scalar(
+        select(Turn).where(Turn.campaign_id == campaign_id, Turn.id == turn_id).with_for_update()
+    )
+    if turn is None or turn.workflow_version != TURN_WORKFLOW_TWO_STAGE:
+        raise NotFoundError("Turn execution not found")
+    intent = _stored_turn_intent(turn)
+    if turn.status == "completed":
+        return _turn_finalization_result(session, campaign_id, turn, intent)
+    resolution = _turn_resolution(session, campaign_id, turn)
+    if isinstance(intent, D20TestIntent):
+        if resolution is None or turn.status not in {"resolved", "narrating"}:
+            raise ConflictError("A check/save turn must be resolved before narration")
+        resume_status = "resolved"
+    else:
+        if resolution is not None or turn.status not in {"intent_ready", "narrating"}:
+            raise ConflictError("Narrative turn is not ready for narration")
+        resume_status = "intent_ready"
+
+    character = session.scalar(
+        select(Character)
+        .where(Character.id == turn.actor_character_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
+    if character is None:
+        raise NotFoundError("Acting character not found in campaign")
+    if character.state_revision != turn.state_revision_before:
+        mark_turn_execution_failed(
+            session,
+            campaign_id,
+            turn_id,
+            failure_stage="narration",
+            error_code="stale_character_state",
+            error_detail="Acting character state changed before narration",
+            resume_status=None,
+        )
+        raise ConflictError("Acting character state changed before narration")
+    current_location = session.scalar(
+        select(Location).where(
+            Location.campaign_id == campaign_id,
+            Location.is_current.is_(True),
+        )
+    )
+    if current_location is None:
+        raise ConflictError("Campaign has no current location")
+    location_id_before = current_location.id
+    context = _provider_context(get_campaign_state(session, campaign_id))
+    attempt = _next_provider_attempt(session, turn.id, "narration")
+    player_action = turn.player_action
+    turn.status = "narrating"
+    session.commit()
+
+    started = perf_counter()
+    try:
+        provider_output = provider.narrate_outcome(
+            context,
+            player_action,
+            intent,
+            resolution,
+        )
+        output = TurnNarrationOutput.model_validate(provider_output)
+        expected_resolution_id = resolution.id if resolution else None
+        expected_outcome = resolution.outcome if resolution else None
+        if output.resolution_id != expected_resolution_id:
+            raise TurnNarrationError("Narration did not acknowledge the stored resolution")
+        if output.acknowledged_outcome != expected_outcome:
+            raise TurnNarrationError("Narration did not acknowledge the stored outcome")
+    except Exception as exc:
+        latency_ms = max(0, round((perf_counter() - started) * 1000))
+        if isinstance(exc, ValidationError):
+            error_code = "invalid_structured_output"
+            safe_detail = "Narration provider returned invalid structured output"
+        elif isinstance(exc, TurnNarrationError):
+            error_code = "invalid_outcome_acknowledgement"
+            safe_detail = str(exc)
+        else:
+            error_code = "narration_provider_error"
+            safe_detail = "Narration provider failed"
+        _record_narration_failure(
+            session,
+            campaign_id,
+            turn_id,
+            attempt=attempt,
+            provider=provider,
+            latency_ms=latency_ms,
+            error_code=error_code,
+            error_detail=safe_detail,
+            resume_status=resume_status,
+        )
+        raise TurnNarrationError(safe_detail) from exc
+
+    latency_ms = max(0, round((perf_counter() - started) * 1000))
+    _campaign_for_update(session, campaign_id)
+    turn = session.scalar(
+        select(Turn).where(Turn.campaign_id == campaign_id, Turn.id == turn_id).with_for_update()
+    )
+    assert turn is not None
+    if turn.status != "narrating":
+        raise ConflictError("Turn changed while narration was running")
+    character = session.scalar(
+        select(Character)
+        .where(Character.id == turn.actor_character_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
+    current_location = session.scalar(
+        select(Location)
+        .where(
+            Location.campaign_id == campaign_id,
+            Location.is_current.is_(True),
+        )
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
+    stale_state = (
+        character is None
+        or character.state_revision != turn.state_revision_before
+        or current_location is None
+        or current_location.id != location_id_before
+    )
+    if stale_state:
+        _record_narration_failure(
+            session,
+            campaign_id,
+            turn_id,
+            attempt=attempt,
+            provider=provider,
+            latency_ms=latency_ms,
+            error_code="stale_campaign_state",
+            error_detail="Campaign state changed during narration",
+            resume_status=resume_status,
+            output=output,
+        )
+        raise ConflictError("Campaign state changed during narration")
+    assert character is not None
+    try:
+        StateChangeValidator().validate(
+            _character_snapshot(campaign, character), output.state_changes
+        )
+    except InvalidStateChange as exc:
+        _record_narration_failure(
+            session,
+            campaign_id,
+            turn_id,
+            attempt=attempt,
+            provider=provider,
+            latency_ms=latency_ms,
+            error_code="invalid_state_proposal",
+            error_detail=str(exc),
+            resume_status=resume_status,
+            output=output,
+        )
+        raise
+
+    session.add(
+        ProviderCall(
+            campaign_id=campaign_id,
+            turn_id=turn_id,
+            stage="narration",
+            attempt=attempt,
+            provider=provider.provider_name,
+            model=provider.model_name,
+            prompt_version=provider.narration_prompt_version,
+            status="succeeded",
+            latency_ms=latency_ms,
+            structured_output=output.model_dump(mode="json"),
+        )
+    )
+    _apply_state_changes(session, campaign_id, character, output.state_changes)
+    turn.dm_narration = output.narration
+    turn.provider = provider.provider_name
+    turn.model = provider.model_name
+    turn.structured_output = output.model_dump(mode="json")
+    turn.narration_prompt_version = provider.narration_prompt_version
+    turn.state_revision_after = character.state_revision
+    _add_event(
+        session,
+        campaign_id,
+        "dm_response",
+        {
+            "narration": output.narration,
+            "resolution_id": str(resolution.id) if resolution else None,
+            "outcome": resolution.outcome if resolution else None,
+        },
+        turn_id=turn.id,
+        actor_character_id=character.id,
+    )
+    if output.state_changes:
+        _add_event(
+            session,
+            campaign_id,
+            "state_changed",
+            {
+                "changes": [change.model_dump(mode="json") for change in output.state_changes],
+                "affected_character_ids": [str(character.id)],
+            },
+            turn_id=turn.id,
+            actor_character_id=character.id,
+        )
+    turn.status = "completed"
+    turn.completed_at = datetime.now(UTC)
+    session.commit()
+    session.refresh(turn)
+    return _turn_finalization_result(session, campaign_id, turn, intent)
 
 
 def _ensure_ruleset_release(

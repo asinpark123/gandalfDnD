@@ -1,6 +1,6 @@
 # M2 Two-Stage AI Turn Implementation Strategy
 
-- **Status:** In Progress — M2.1–M2.2 Done; M2.3 Ready
+- **Status:** In Progress — M2.1–M2.3 Done; M2.4 Ready
 - **Prepared:** 2026-09-02
 - **Depends on:** M1 Party character creation and deterministic mechanics (Done)
 - **Owner input required now:** None
@@ -203,6 +203,8 @@ does not narrate or apply gameplay changes; M2.3 owns that final stage and `DEBT
 
 ### M2.3 — Outcome narration and atomic finalization
 
+**Status: Done (2026-09-02).**
+
 - introduce the narration/finalization contract with the immutable resolution in its input;
 - validate bounded state proposals and commit them with final events atomically;
 - prove narration matches success/failure and cannot establish an untyped mechanical effect;
@@ -210,6 +212,37 @@ does not narrate or apply gameplay changes; M2.3 owns that final stage and `DEBT
 
 Exit: deterministic dialogue, movement, inventory, check, and bounded environmental-damage scenarios
 complete with consistent narration and state.
+
+Implemented evidence:
+
+- a strict provider-neutral `TurnNarrationOutput` accepts narration, the exact acknowledged
+  resolution/outcome, and only the existing bounded typed state proposals; extra fields, including
+  attempted dice data, are rejected;
+- `/turn-executions/{turn_id}/finalize` supplies the stored intent and immutable M1.4 resolution to
+  narration only after interpretation/resolution has completed, closing `DEBT-002`;
+- no database transaction remains open during narration; finalization then re-locks the campaign,
+  selected actor, and current location and rejects a response generated against stale state;
+- narration for a resolved check must echo the exact resolution ID and outcome. Contradictory
+  acknowledgement becomes a recoverable narration failure without final events or state mutation;
+- the application validates the complete proposal list before applying any part of it, then writes
+  the provider audit, HP/inventory/location changes, `dm_response`, optional `state_changed`, and
+  completed turn in one transaction;
+- deterministic dialogue, movement, inventory use, successful climb, and failed-climb bounded
+  environmental damage all complete with consistent state and ordered events. Prose that merely
+  claims an HP change produces no mechanical effect;
+- repeated finalization of a completed turn is idempotent and does not call the provider or append
+  duplicate events;
+- the first invalid-output fixture exposed a JSON-null-versus-SQL-NULL mismatch in failed
+  provider-call audits. The constructor now leaves failed structured output unset, satisfying the
+  database result-shape constraint; the regression passes;
+- no schema migration was required beyond M2.1's `0006` storage;
+- nine focused M2.3 tests and the full 69-test suite pass at 90% coverage, with lint, compilation,
+  catalog validation, generated-schema freshness, zero Alembic drift, and no external or paid model
+  calls.
+
+M2.3 proves successful finalization and its immediate rejection boundaries. M2.4 now owns broader
+provider exception normalization, resume/restart matrices, timeout/token observability, concurrency
+hardening, and the ten consecutive deterministic Lantern scenarios.
 
 ### M2.4 — Failure, retry, observability, and restart hardening
 

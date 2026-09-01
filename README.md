@@ -35,8 +35,9 @@ Documentation distinguishes planned behavior from verified implementation. M1.3 
 and complete level-one character state are Done. M1.4 authoritative ability-check and saving-throw
 resolution is also Done after automated and owner runtime verification. The complete M1 gate is
 Done; M2 is In Progress. M2.1 lifecycle and M2.2 authoritative interpretation/resolution are
-complete; M2.3 narration and atomic finalization are next. Paid model calls remain disabled until
-the owner-approved M2.5 gate.
+complete; M2.3 post-outcome narration and atomic finalization are also complete. M2.4 failure,
+retry, restart, observability, and concurrency hardening is next. Paid model calls remain disabled
+until the owner-approved M2.5 gate.
 
 ## Versioned rulesets
 
@@ -76,6 +77,8 @@ checksum, size, license, attribution, normalized-data catalogs, and schema versi
 - authoritative ability checks and saving throws with canonical modifiers, contextual skill
   abilities, Advantage/Disadvantage cancellation, exact dice, typed outcomes, idempotency, immutable
   provenance, and restart replay
+- resumable two-stage turn execution with typed intent, post-resolution narration, exact outcome
+  acknowledgement, bounded proposals, stale-state rejection, and atomic final events/state commit
 - HP, inventory, and current-location state changes with pre-commit validation
 - auditable application dice rolls, including internally logged hidden rolls
 - provider-neutral DM interface

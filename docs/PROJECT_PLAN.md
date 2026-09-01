@@ -4,8 +4,8 @@
 - **Last updated:** 2026-09-02
 - **Rules baseline:** SRD 5.2.1 (pinned; character-state and check/save-resolution catalogs pass
   integrity and schema verification)
-- **Current delivery stage:** M2 In Progress — M2.1–M2.2 are Done; begin M2.3 outcome narration
-  and atomic finalization without paid model calls
+- **Current delivery stage:** M2 In Progress — M2.1–M2.3 are Done; begin M2.4 failure, retry,
+  observability, restart, and concurrency hardening without paid model calls
 - **Canonical repository:** `~/Git/gandalfDnD`
 
 ## 1. Purpose of this document
@@ -311,7 +311,7 @@ Use these values consistently:
 | --- | --- | --- | --- |
 | M0 | Persistence and safety foundation | Done | Canonical state and auditable turn skeleton |
 | M1 | Party character creation and deterministic mechanics | Done | The selected acting character's choices drive calculated outcomes |
-| M2 | Two-stage AI turn and live feasibility | In Progress (M2.1–M2.2 Done; M2.3 Ready) | Real DM uses recorded dice results safely |
+| M2 | Two-stage AI turn and live feasibility | In Progress (M2.1–M2.3 Done; M2.4 Ready) | Real DM uses recorded dice results safely |
 | M3 | Persistent world model | Proposed | NPCs, quests, scenes, clues, time, and visibility |
 | M4 | Long-term memory and retrieval | Proposed | Coherent recall without full history in context |
 | M5 | Basic deterministic combat | Proposed | Reproducible initiative, actions, attacks, and damage |
@@ -819,7 +819,7 @@ Review findings and decision:
 
 ### M2 — Two-stage AI turn and live feasibility
 
-- **Status:** In Progress — M2.1–M2.2 Done; M2.3 Ready
+- **Status:** In Progress — M2.1–M2.3 Done; M2.4 Ready
 - **Depends on:** M1
 - **Detailed strategy:** [`M2_IMPLEMENTATION_STRATEGY.md`](M2_IMPLEMENTATION_STRATEGY.md)
 
@@ -865,8 +865,18 @@ outcomes are linked to the turn; resolved retries cannot reroll; malformed outpu
 resumable; invalid skills fail before rolling; and stale state during interpretation is rejected.
 The legacy endpoint now rejects provider dice requests before any write, closing `DEBT-001`.
 Nine focused fixtures and all 60 tests pass at 90% coverage, including a direct no-open-transaction
-provider assertion, with lint, catalog, diff, and
-schema-drift checks green. M2.3 is next; no narration or final gameplay mutation is claimed yet.
+provider assertion, with lint, catalog, diff, and schema-drift checks green.
+
+M2.3 completed on 2026-09-02 without another migration. A strict typed narration contract receives
+the recorded intent and immutable resolution only after authoritative resolution, must echo the
+exact resolution ID/outcome, and cannot request dice or establish mechanics through prose alone.
+Narration runs without an open database transaction; finalization re-locks and fresh-reads campaign,
+actor, and location state, validates the complete proposal list, and atomically commits provider
+audit, bounded HP/inventory/location changes, ordered final events, and turn completion. Invalid,
+contradictory, or stale proposals leave no final events or application-authored state changes, while
+completed retries are idempotent. Nine focused fixtures and the complete 69-test suite pass at 90%
+coverage with lint, compilation, catalog/schema freshness, zero Alembic drift, and no external or
+paid model calls. This closes `DEBT-002`; M2.4 hardening is next.
 
 Exit gate: ten consecutive Lantern Test runs complete without impossible state, invented dice,
 partial commits, or contradictory resume output. Failures are categorized before proceeding.
@@ -954,8 +964,8 @@ deployable if Clawvis is offline.
 | ID | Type | Status | Description | Impact | Resolution/owner milestone |
 | --- | --- | --- | --- | --- | --- |
 | ISSUE-001 | Environment | Resolved | VM template revoked `CREATE` on `public`, initially blocking Alembic | Tests/migrations failed | Granted each restricted role schema creation only in its own DB; M0 |
-| DEBT-001 | Architecture | Resolved | M2.2 routes typed Party Commander turn checks/saves through M1.4 and rejects any legacy provider dice request before writes | Every accepted new turn roll now derives canonical actor modifiers and application dice; narration remains M2.3 work | Strict intent contract, authoritative turn resolution, no-reroll retry, legacy rejection, and actor-isolation fixtures; M2.2 |
-| DEBT-002 | Architecture | Open | Narration is generated before dice results | Narration may contradict outcome | Two-stage turn flow; M2 |
+| DEBT-001 | Architecture | Resolved | M2.2 routes typed Party Commander turn checks/saves through M1.4 and rejects any legacy provider dice request before writes | Every accepted new turn roll now derives canonical actor modifiers and application dice; M2.3 subsequently added post-resolution narration | Strict intent contract, authoritative turn resolution, no-reroll retry, legacy rejection, and actor-isolation fixtures; M2.2 |
+| DEBT-002 | Architecture | Resolved | M2.3 narration receives the stored intent and immutable resolution only after M1.4 resolution, and must echo the exact resolution ID/outcome | Narration can no longer precede or silently contradict an accepted check/save result; prose alone cannot change mechanics | Typed narration contract, contradiction and prose-only fixtures, atomic finalization, and no-open-transaction assertion; M2.3 |
 | GAP-001 | Product | Resolved | M1.3 supports an ordered 2–4 character Party Commander party with independently derived equipment/defense/resource state and actor isolation | Party Commander foundation now exists; character content breadth remains intentionally narrow | Migration `0004`, automated evidence, owner acceptance, and final M1 review passed; broader breadth remains deferred to M1.5 |
 | GAP-002 | Product | Open | No deterministic quest/world decision model | Decisions have limited lasting effects | M3 |
 | TEST-001 | Validation | Open | OpenAI provider has no paid live evaluation | Real structured behavior unproven | Lantern Test; M2 |
@@ -969,6 +979,7 @@ deployable if Clawvis is offline.
 | ISSUE-002 | Migration/test fixture | Resolved | Synthetic M1.2 migration tests could begin after isolated cleanup had removed the M1.1 seed row | The new foreign-key-backed catalog seed could not be installed from that test baseline | `0003` inserts the exact immutable M1.1 release with `ON CONFLICT DO NOTHING`; transactional migration tests and the full suite pass |
 | ISSUE-003 | Migration/test fixture | Resolved | The first M1.3 run found the isolated test DB at migration `0003` after fixture cleanup had removed immutable seed rows | `0004` initially could not insert its state catalog because the known release FK row was absent | `0004` idempotently restores only the exact pinned release before inserting the new catalog; focused migration smoke, full-chain tests, and 39-test suite pass |
 | ISSUE-005 | Concurrency | Resolved | The first M2.2 stale-state fixture showed that an ORM identity-map value could mask a character revision changed while interpretation ran outside the transaction | A delayed interpretation could otherwise proceed against a stale pre-state | Force a fresh locked character read after interpretation and before resolution; the stale-state fixture now records a safe terminal failure without rolling |
+| ISSUE-006 | Provider audit persistence | Resolved | The first M2.3 malformed-narration fixture explicitly assigned Python `None` to a PostgreSQL JSONB field, which persisted JSON `null` rather than SQL `NULL` and violated the failed-call result-shape constraint | A malformed narration response could mask the intended safe 502 response with a database integrity error | Leave failed structured output unset and assign JSON only for validated successful output; the malformed-output regression and full 69-test suite pass |
 | ISSUE-004 | Character-state provenance | Resolved | The first M1.3 owner run showed empty projected source/acquisition provenance for Dice Set and GP; ordinary package items were unaffected | The visible equipment projection did not meet GF-004 even though canonical grants remained intact | The corrected projection and exhaustive regression passed 39 automated tests; the 2026-09-01 owner retest confirmed complete Dice Set/GP definition, source, and acquisition-event provenance for both existing characters |
 | UX-001 | Player interface | Deferred | Backend errors are adequate for developer diagnosis but do not yet provide contextual, player-oriented recovery guidance; JSON also cannot validate visual actor/state clarity | Ordinary players may not know what happened or how to correct an invalid action when the frontend is introduced | In M7, map stable typed API errors to actionable messages and test actor visibility, calculated-value explanations, and isolated character changes through the full player journey |
 
@@ -1108,12 +1119,12 @@ Destination milestone:
 
 ## 17. Immediate next actions
 
-1. Implement M2.3's typed outcome-narration contract and atomically finalize validated state and
-   player-visible events from the recorded intent/resolution.
-2. Continue through M2.4 autonomously while keeping broader character content in M1.5 and all
-   live model calls disabled.
-3. Produce narration only after the recorded outcome in M2.3, closing `DEBT-002`, and preserve the
-   no-reroll/no-partial-write guarantees established in M2.2.
+1. Implement M2.4 provider failure normalization, safe resume/restart behavior, timeout and
+   token/latency observability, stale-state/concurrency hardening, and the deterministic Lantern
+   run matrix.
+2. Keep broader character content in M1.5 and all live model calls disabled while M2.4 is underway.
+3. Reverify no-reroll, no-open-provider-transaction, no-partial-write, exact-outcome narration, and
+   ordered-event guarantees across every injected M2.4 failure and retry path.
 4. At the M2.5 gate, request one combined owner decision on paid evaluation authorization/cap,
    narrative/content boundaries, and the non-combat environmental-damage fixture.
 
@@ -1141,3 +1152,4 @@ Destination milestone:
 | 2026-09-02 | DOC-018 | Closed M1 and advanced M2 to Ready with a dedicated two-stage turn implementation strategy | All twelve M1 exit criteria map to passing evidence; 46 tests at 91% coverage, lint/format/schema/catalog/artifact/release/migration/runtime checks, and owner gates pass. GF-012 received a direct no-mutation fixture and stale GF-014 status was corrected | Implement M2.1–M2.4 locally without paid calls; request owner authorization and content decisions only at M2.5 |
 | 2026-09-02 | DOC-019 | Completed M2.1 and advanced M2.2 to Ready | Migration `0006`, legacy backfill, resumable lifecycle, idempotency, active-turn protection, immutable provider-call audit storage, guarded downgrade, restart reads, five focused fixtures, 51 total tests at 91% coverage, lint/catalog/schema-drift checks, and no external model calls passed | Implement typed deterministic interpretation and M1.4-backed authoritative resolution in M2.2 |
 | 2026-09-02 | DOC-020 | Completed M2.2, closed DEBT-001, and advanced M2.3 to Ready | Strict typed interpretation excludes modifiers/dice; checks and saves use M1.4; retry preserves exact dice; provider attempts are audited; invalid skill and stale state fail before resolution; legacy provider dice requests fail before writes; nine focused and 60 total tests pass at 90% coverage with no open provider transaction, zero schema drift, and no external calls | Implement typed post-outcome narration and atomic finalization in M2.3; keep DEBT-002 open until narration can only follow recorded outcomes |
+| 2026-09-02 | DOC-021 | Completed M2.3, closed DEBT-002, resolved ISSUE-006, and advanced M2.4 to Ready | Strict narration echoes immutable outcomes, rejects untyped mechanics and contradictions, runs outside database transactions, and atomically finalizes bounded state/events after stale-state validation; nine focused and 69 total tests pass at 90% coverage with catalog/schema freshness, zero Alembic drift, and no external calls | Harden failure, retry, restart, observability, and concurrency behavior and run ten consecutive deterministic Lantern scenarios in M2.4 |

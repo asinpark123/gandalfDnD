@@ -28,27 +28,36 @@ from app.schemas import (
     EventRead,
     HealthRead,
     LoadoutUpdate,
+    ProviderCallRead,
     RuleResolutionRead,
     RuleResolutionReplayRead,
     TurnCreate,
+    TurnExecutionCreate,
+    TurnExecutionRead,
     TurnRead,
 )
 from app.services import (
     ConflictError,
     NotFoundError,
     add_character,
+    cancel_turn_execution,
     create_campaign,
     create_rule_resolution,
+    create_turn_execution,
     finalize_character,
     get_campaign_state,
     get_character_read,
     get_rule_resolution,
+    get_turn_execution,
     list_character_grants,
     list_characters,
     list_events,
+    list_provider_calls,
     list_rule_resolutions,
+    list_turn_executions,
     process_turn,
     replay_rule_resolution,
+    resume_turn_execution,
     update_character_loadout,
 )
 from app.validation import InvalidStateChange
@@ -258,6 +267,97 @@ def create_app() -> FastAPI:
         except ConflictError as exc:
             session.rollback()
             raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+    @app.post(
+        "/campaigns/{campaign_id}/turn-executions",
+        response_model=TurnExecutionRead,
+        status_code=status.HTTP_201_CREATED,
+    )
+    def turn_executions_create(
+        campaign_id: uuid.UUID,
+        data: TurnExecutionCreate,
+        session: SessionDep,
+    ) -> TurnExecutionRead:
+        try:
+            return create_turn_execution(session, campaign_id, data)
+        except NotFoundError as exc:
+            session.rollback()
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except (ConflictError, IntegrityError) as exc:
+            session.rollback()
+            detail = str(exc) if isinstance(exc, ConflictError) else "Campaign turn is busy"
+            raise HTTPException(status_code=409, detail=detail) from exc
+
+    @app.get(
+        "/campaigns/{campaign_id}/turn-executions",
+        response_model=list[TurnExecutionRead],
+    )
+    def turn_executions_list(
+        campaign_id: uuid.UUID, session: SessionDep
+    ) -> list[TurnExecutionRead]:
+        try:
+            return list_turn_executions(session, campaign_id)
+        except NotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    @app.get(
+        "/campaigns/{campaign_id}/turn-executions/{turn_id}",
+        response_model=TurnExecutionRead,
+    )
+    def turn_executions_get(
+        campaign_id: uuid.UUID, turn_id: uuid.UUID, session: SessionDep
+    ) -> TurnExecutionRead:
+        try:
+            return get_turn_execution(session, campaign_id, turn_id)
+        except NotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    @app.post(
+        "/campaigns/{campaign_id}/turn-executions/{turn_id}/cancel",
+        response_model=TurnExecutionRead,
+    )
+    def turn_executions_cancel(
+        campaign_id: uuid.UUID, turn_id: uuid.UUID, session: SessionDep
+    ) -> TurnExecutionRead:
+        try:
+            return cancel_turn_execution(session, campaign_id, turn_id)
+        except NotFoundError as exc:
+            session.rollback()
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except ConflictError as exc:
+            session.rollback()
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+    @app.post(
+        "/campaigns/{campaign_id}/turn-executions/{turn_id}/resume",
+        response_model=TurnExecutionRead,
+    )
+    def turn_executions_resume(
+        campaign_id: uuid.UUID, turn_id: uuid.UUID, session: SessionDep
+    ) -> TurnExecutionRead:
+        try:
+            return resume_turn_execution(session, campaign_id, turn_id)
+        except NotFoundError as exc:
+            session.rollback()
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except ConflictError as exc:
+            session.rollback()
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+    @app.get(
+        "/campaigns/{campaign_id}/turn-executions/{turn_id}/provider-calls",
+        response_model=list[ProviderCallRead],
+    )
+    def turn_execution_provider_calls(
+        campaign_id: uuid.UUID, turn_id: uuid.UUID, session: SessionDep
+    ) -> list[ProviderCallRead]:
+        try:
+            return [
+                ProviderCallRead.model_validate(call)
+                for call in list_provider_calls(session, campaign_id, turn_id)
+            ]
+        except NotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
 
     @app.post(
         "/campaigns/{campaign_id}/resolutions",

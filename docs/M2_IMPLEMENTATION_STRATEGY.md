@@ -1,6 +1,6 @@
 # M2 Two-Stage AI Turn Implementation Strategy
 
-- **Status:** Ready
+- **Status:** In Progress — M2.1 Done; M2.2 Ready
 - **Prepared:** 2026-09-02
 - **Depends on:** M1 Party character creation and deterministic mechanics (Done)
 - **Owner input required now:** None
@@ -130,12 +130,37 @@ campaign facts.
 
 ### M2.1 — Turn lifecycle and migration
 
+**Status: Done (2026-09-02).**
+
 - implement migration `0006`, status/idempotency/revision fields, provider-call audit storage, and
   read models;
 - backfill legacy turns and add guarded migration tests;
 - add create/read/resume API skeleton using only the deterministic provider.
 
 Exit: lifecycle, idempotency, one-active-turn constraint, legacy backfill, and restart reads pass.
+
+Implemented evidence:
+
+- migration `0006_turn_lifecycle` backfills legacy turns as completed with `command_id = id`, adds
+  lifecycle/checkpoint/failure/revision/prompt fields, links an optional immutable M1.4 resolution,
+  and permits unfinished turns without invented narration;
+- campaign-scoped command idempotency and a partial unique index enforce at most one active or
+  resumable-failed turn per campaign;
+- immutable `provider_calls` storage records complete interpretation/narration attempts without
+  credentials; M2.1 intentionally records none because it makes no provider calls;
+- `/turn-executions` create/list/read/cancel/resume/provider-call boundaries persist safely across
+  engine disposal and return 409 for changed idempotency input or competing active turns;
+- the legacy M1 `/turns` path remains available for regression compatibility, is marked
+  `legacy-turn-1.0.0`, and cannot run while an M2 execution is active;
+- a guarded downgrade refuses to discard any M2 execution or provider-call audit history;
+- 51 automated tests pass at 91% total coverage, including five lifecycle fixtures, full M0/M1
+  regression, provider-call update/delete rejection, guarded downgrade, lint, catalog validation,
+  and zero Alembic drift.
+
+M2.1 is an internal foundation, not a playable two-stage AI turn. Interpretation begins in M2.2;
+narration/finalization begins in M2.3. The legacy provider call still holds its original transaction
+lock and remains tracked debt until authoritative M2 turns replace it. No external or paid model
+call was made.
 
 ### M2.2 — Typed interpretation and authoritative resolution
 

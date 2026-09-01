@@ -4,8 +4,8 @@
 - **Last updated:** 2026-09-02
 - **Rules baseline:** SRD 5.2.1 (pinned; character-state and check/save-resolution catalogs pass
   integrity and schema verification)
-- **Current delivery stage:** M2 Ready — M1 is Done; begin the local deterministic M2.1 turn
-  lifecycle without paid model calls
+- **Current delivery stage:** M2 In Progress — M2.1 lifecycle is Done; begin M2.2 typed
+  interpretation and authoritative resolution without paid model calls
 - **Canonical repository:** `~/Git/gandalfDnD`
 
 ## 1. Purpose of this document
@@ -311,7 +311,7 @@ Use these values consistently:
 | --- | --- | --- | --- |
 | M0 | Persistence and safety foundation | Done | Canonical state and auditable turn skeleton |
 | M1 | Party character creation and deterministic mechanics | Done | The selected acting character's choices drive calculated outcomes |
-| M2 | Two-stage AI turn and live feasibility | Ready | Real DM uses recorded dice results safely |
+| M2 | Two-stage AI turn and live feasibility | In Progress (M2.1 Done; M2.2 Ready) | Real DM uses recorded dice results safely |
 | M3 | Persistent world model | Proposed | NPCs, quests, scenes, clues, time, and visibility |
 | M4 | Long-term memory and retrieval | Proposed | Coherent recall without full history in context |
 | M5 | Basic deterministic combat | Proposed | Reproducible initiative, actions, attacks, and damage |
@@ -851,6 +851,13 @@ resolution, M2.3 outcome narration plus atomic finalization, M2.4 failure/retry/
 then M2.5 owner-approved paid Lantern evaluation. No owner input or paid call is required before
 M2.5.
 
+M2.1 completed on 2026-09-02 with migration `0006_turn_lifecycle`, legacy backfill, an explicit
+resumable state machine, campaign-scoped command idempotency, one-active-turn enforcement,
+immutable provider-call audit storage, and create/list/read/cancel/resume API boundaries. The new
+boundary deliberately makes no provider call yet. Five focused lifecycle tests and the complete
+51-test regression suite pass at 91% coverage; lint, catalog validation, guarded downgrade,
+provider-call immutability, restart reads, and zero Alembic drift also pass. M2.2 is next.
+
 Exit gate: ten consecutive Lantern Test runs complete without impossible state, invented dice,
 partial commits, or contradictory resume output. Failures are categorized before proceeding.
 
@@ -1090,9 +1097,9 @@ Destination milestone:
 
 ## 17. Immediate next actions
 
-1. Implement M2.1's persisted turn lifecycle, idempotency, legacy backfill, provider-call audit, and
-   guarded migration using the deterministic provider only.
-2. Continue through M2.2–M2.4 autonomously while keeping broader character content in M1.5 and all
+1. Implement M2.2's typed interpretation contract and route accepted check/save requests through
+   the immutable M1.4 resolver using deterministic fixtures only.
+2. Continue through M2.3–M2.4 autonomously while keeping broader character content in M1.5 and all
    live model calls disabled.
 3. Replace the legacy provider dice-request modifier with M1.4 authoritative resolution in M2.2,
    closing `DEBT-001`; produce narration only after the recorded outcome in M2.3, closing
@@ -1122,3 +1129,4 @@ Destination milestone:
 | 2026-09-01 | DOC-016 | Advanced M1.4 to Verification and recorded the authoritative check/save service, supplemental immutable catalog, migration, automated/runtime evidence, limitations, decision, and owner checklist | Migration `0005`, 45 tests at 91% total coverage and 95% resolution-module coverage, lint/format/schema/catalog/diff checks, zero Alembic drift, development health, modifier rejection, actor isolation, immutable provenance, and restart replay passed | Complete the M1.4 owner checklist; fix defects or close M1.4, then review the complete M1 gate before M2 |
 | 2026-09-02 | DOC-017 | Closed M1.4 after preserving and analysing the complete owner acceptance run | All nine actions passed; the owner confirmed the API restart before replay, no defect or targeted retest was required, and same-build actor evidence was complemented by the automated contrasting-ability fixture | Complete the full M1 gate/freshness review, then either close M1 or correct any cross-milestone gap before M2 |
 | 2026-09-02 | DOC-018 | Closed M1 and advanced M2 to Ready with a dedicated two-stage turn implementation strategy | All twelve M1 exit criteria map to passing evidence; 46 tests at 91% coverage, lint/format/schema/catalog/artifact/release/migration/runtime checks, and owner gates pass. GF-012 received a direct no-mutation fixture and stale GF-014 status was corrected | Implement M2.1–M2.4 locally without paid calls; request owner authorization and content decisions only at M2.5 |
+| 2026-09-02 | DOC-019 | Completed M2.1 and advanced M2.2 to Ready | Migration `0006`, legacy backfill, resumable lifecycle, idempotency, active-turn protection, immutable provider-call audit storage, guarded downgrade, restart reads, five focused fixtures, 51 total tests at 91% coverage, lint/catalog/schema-drift checks, and no external model calls passed | Implement typed deterministic interpretation and M1.4-backed authoritative resolution in M2.2 |

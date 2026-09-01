@@ -29,6 +29,7 @@ from app.models import (
     CharacterGrant,
     DiceRoll,
     Location,
+    ProviderCall,
     RuleResolution,
     RulesetDataCatalog,
     RulesetRelease,
@@ -60,6 +61,8 @@ from app.schemas import (
     MoveLocation,
     RuleResolutionRead,
     RuleResolutionReplayRead,
+    TurnExecutionCreate,
+    TurnExecutionRead,
     TurnRead,
 )
 from app.validation import CharacterSnapshot, StateChangeValidator
@@ -71,6 +74,18 @@ class NotFoundError(LookupError):
 
 class ConflictError(ValueError):
     pass
+
+
+TURN_WORKFLOW_LEGACY = "legacy-turn-1.0.0"
+TURN_WORKFLOW_TWO_STAGE = "two-stage-turn-1.0.0"
+ACTIVE_TURN_STATUSES = {
+    "received",
+    "interpreting",
+    "intent_ready",
+    "resolving",
+    "resolved",
+    "narrating",
+}
 
 
 def _campaign_for_update(session: Session, campaign_id: uuid.UUID) -> Campaign:
@@ -119,6 +134,230 @@ def _add_event(
     session.add(event)
     session.flush()
     return event
+
+
+def _active_turn(session: Session, campaign_id: uuid.UUID) -> Turn | None:
+    return session.scalar(
+        select(Turn).where(
+            Turn.campaign_id == campaign_id,
+            (Turn.status.in_(ACTIVE_TURN_STATUSES))
+            | ((Turn.status == "failed") & Turn.resumable.is_(True)),
+        )
+    )
+
+
+def _validate_turn_actor(
+    session: Session,
+    campaign: Campaign,
+    actor_character_id: uuid.UUID | None,
+) -> Character | None:
+    state = get_campaign_state(session, campaign.id)
+    if campaign.play_mode == "party_commander":
+        if not state.party_ready:
+            raise ConflictError(
+                f"At least {campaign.party_min_active} finalized active characters are required"
+            )
+        if actor_character_id is None:
+            raise ConflictError("Party Commander turns require actor_character_id")
+    character = None
+    if actor_character_id is not None:
+        character = session.scalar(
+            select(Character).where(
+                Character.campaign_id == campaign.id,
+                Character.id == actor_character_id,
+            )
+        )
+        if character is None:
+            raise NotFoundError("Acting character not found in campaign")
+        if character.creation_status != "finalized" or character.party_status != "active":
+            raise ConflictError("Acting character must be finalized and active")
+    elif len(state.characters) == 1:
+        character = session.get(Character, state.characters[0].id)
+    return character
+
+
+def create_turn_execution(
+    session: Session,
+    campaign_id: uuid.UUID,
+    data: TurnExecutionCreate,
+) -> TurnExecutionRead:
+    campaign = _campaign_for_update(session, campaign_id)
+    existing = session.scalar(
+        select(Turn).where(
+            Turn.campaign_id == campaign_id,
+            Turn.command_id == data.command_id,
+        )
+    )
+    if existing is not None:
+        if (
+            existing.player_action != data.action
+            or existing.actor_character_id != data.actor_character_id
+        ):
+            raise ConflictError("command_id already exists with different turn input")
+        if existing.workflow_version != TURN_WORKFLOW_TWO_STAGE:
+            raise ConflictError("command_id belongs to a legacy turn")
+        return TurnExecutionRead.model_validate(existing)
+
+    active = _active_turn(session, campaign_id)
+    if active is not None:
+        raise ConflictError(f"Campaign already has active turn {active.id}")
+    character = _validate_turn_actor(session, campaign, data.actor_character_id)
+    sequence = (
+        session.scalar(select(func.max(Turn.sequence)).where(Turn.campaign_id == campaign_id)) or 0
+    ) + 1
+    turn = Turn(
+        command_id=data.command_id,
+        campaign_id=campaign_id,
+        sequence=sequence,
+        player_action=data.action,
+        actor_character_id=character.id if character else None,
+        workflow_version=TURN_WORKFLOW_TWO_STAGE,
+        status="received",
+        resumable=False,
+        state_revision_before=character.state_revision if character else None,
+    )
+    session.add(turn)
+    session.flush()
+    _add_event(
+        session,
+        campaign_id,
+        "player_action",
+        {
+            "action": data.action,
+            "actor_character_id": str(character.id) if character else None,
+            "command_id": str(data.command_id),
+            "workflow_version": TURN_WORKFLOW_TWO_STAGE,
+        },
+        turn_id=turn.id,
+        actor_character_id=character.id if character else None,
+    )
+    session.commit()
+    session.refresh(turn)
+    return TurnExecutionRead.model_validate(turn)
+
+
+def get_turn_execution(
+    session: Session, campaign_id: uuid.UUID, turn_id: uuid.UUID
+) -> TurnExecutionRead:
+    turn = session.scalar(select(Turn).where(Turn.campaign_id == campaign_id, Turn.id == turn_id))
+    if turn is None or turn.workflow_version != TURN_WORKFLOW_TWO_STAGE:
+        raise NotFoundError("Turn execution not found")
+    return TurnExecutionRead.model_validate(turn)
+
+
+def list_turn_executions(session: Session, campaign_id: uuid.UUID) -> list[TurnExecutionRead]:
+    if session.get(Campaign, campaign_id) is None:
+        raise NotFoundError("Campaign not found")
+    turns = session.scalars(
+        select(Turn)
+        .where(
+            Turn.campaign_id == campaign_id,
+            Turn.workflow_version == TURN_WORKFLOW_TWO_STAGE,
+        )
+        .order_by(Turn.sequence)
+    )
+    return [TurnExecutionRead.model_validate(turn) for turn in turns]
+
+
+def cancel_turn_execution(
+    session: Session, campaign_id: uuid.UUID, turn_id: uuid.UUID
+) -> TurnExecutionRead:
+    _campaign_for_update(session, campaign_id)
+    turn = session.scalar(
+        select(Turn).where(Turn.campaign_id == campaign_id, Turn.id == turn_id).with_for_update()
+    )
+    if turn is None or turn.workflow_version != TURN_WORKFLOW_TWO_STAGE:
+        raise NotFoundError("Turn execution not found")
+    if turn.status in {"completed", "cancelled"} or (
+        turn.status == "failed" and not turn.resumable
+    ):
+        raise ConflictError(f"Turn in {turn.status} status cannot be cancelled")
+    turn.status = "cancelled"
+    turn.failure_stage = None
+    turn.error_code = None
+    turn.error_detail = None
+    turn.resumable = False
+    turn.resume_status = None
+    turn.completed_at = datetime.now(UTC)
+    _add_event(
+        session,
+        campaign_id,
+        "turn_cancelled",
+        {"command_id": str(turn.command_id)},
+        turn_id=turn.id,
+        actor_character_id=turn.actor_character_id,
+    )
+    session.commit()
+    session.refresh(turn)
+    return TurnExecutionRead.model_validate(turn)
+
+
+def mark_turn_execution_failed(
+    session: Session,
+    campaign_id: uuid.UUID,
+    turn_id: uuid.UUID,
+    *,
+    failure_stage: str,
+    error_code: str,
+    error_detail: str | None,
+    resume_status: str | None,
+) -> TurnExecutionRead:
+    _campaign_for_update(session, campaign_id)
+    turn = session.scalar(
+        select(Turn).where(Turn.campaign_id == campaign_id, Turn.id == turn_id).with_for_update()
+    )
+    if turn is None or turn.workflow_version != TURN_WORKFLOW_TWO_STAGE:
+        raise NotFoundError("Turn execution not found")
+    if turn.status in {"completed", "cancelled", "failed"}:
+        raise ConflictError(f"Turn in {turn.status} status cannot fail")
+    if resume_status not in {None, "received", "intent_ready", "resolved"}:
+        raise ValueError("Invalid resume status")
+    turn.status = "failed"
+    turn.failure_stage = failure_stage
+    turn.error_code = error_code
+    turn.error_detail = error_detail
+    turn.resumable = resume_status is not None
+    turn.resume_status = resume_status
+    turn.completed_at = None if turn.resumable else datetime.now(UTC)
+    session.commit()
+    session.refresh(turn)
+    return TurnExecutionRead.model_validate(turn)
+
+
+def resume_turn_execution(
+    session: Session, campaign_id: uuid.UUID, turn_id: uuid.UUID
+) -> TurnExecutionRead:
+    _campaign_for_update(session, campaign_id)
+    turn = session.scalar(
+        select(Turn).where(Turn.campaign_id == campaign_id, Turn.id == turn_id).with_for_update()
+    )
+    if turn is None or turn.workflow_version != TURN_WORKFLOW_TWO_STAGE:
+        raise NotFoundError("Turn execution not found")
+    if turn.status != "failed" or not turn.resumable or turn.resume_status is None:
+        raise ConflictError("Turn is not resumable")
+    turn.status = turn.resume_status
+    turn.failure_stage = None
+    turn.error_code = None
+    turn.error_detail = None
+    turn.resumable = False
+    turn.resume_status = None
+    turn.completed_at = None
+    session.commit()
+    session.refresh(turn)
+    return TurnExecutionRead.model_validate(turn)
+
+
+def list_provider_calls(
+    session: Session, campaign_id: uuid.UUID, turn_id: uuid.UUID
+) -> list[ProviderCall]:
+    get_turn_execution(session, campaign_id, turn_id)
+    return list(
+        session.scalars(
+            select(ProviderCall)
+            .where(ProviderCall.campaign_id == campaign_id, ProviderCall.turn_id == turn_id)
+            .order_by(ProviderCall.stage, ProviderCall.attempt)
+        )
+    )
 
 
 def _ensure_ruleset_release(
@@ -1120,6 +1359,9 @@ def process_turn(
     dice_service: DiceService | None = None,
 ) -> TurnRead:
     campaign = _campaign_for_update(session, campaign_id)
+    active = _active_turn(session, campaign_id)
+    if active is not None:
+        raise ConflictError(f"Campaign already has active turn {active.id}")
     state_before = get_campaign_state(session, campaign_id)
     if campaign.play_mode == "party_commander":
         if not state_before.party_ready:
@@ -1174,6 +1416,7 @@ def process_turn(
         session.scalar(select(func.max(Turn.sequence)).where(Turn.campaign_id == campaign_id)) or 0
     ) + 1
     turn = Turn(
+        command_id=uuid.uuid4(),
         campaign_id=campaign_id,
         sequence=turn_sequence,
         player_action=player_action,
@@ -1182,6 +1425,12 @@ def process_turn(
         model=provider.model_name,
         structured_output=output.model_dump(mode="json"),
         actor_character_id=character.id if character else None,
+        workflow_version=TURN_WORKFLOW_LEGACY,
+        status="completed",
+        resumable=False,
+        state_revision_before=character.state_revision if character else None,
+        state_revision_after=None,
+        completed_at=datetime.now(UTC),
     )
     session.add(turn)
     session.flush()
@@ -1236,6 +1485,7 @@ def process_turn(
         )
 
     _apply_state_changes(session, campaign_id, character, output.state_changes)
+    turn.state_revision_after = character.state_revision if character else None
     _add_event(
         session,
         campaign_id,

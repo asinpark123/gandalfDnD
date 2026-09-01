@@ -143,6 +143,59 @@ class TurnCreate(BaseModel):
     actor_character_id: uuid.UUID | None = None
 
 
+class TurnExecutionCreate(TurnCreate):
+    model_config = ConfigDict(extra="forbid")
+
+    command_id: uuid.UUID
+
+
+class TurnExecutionRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    command_id: uuid.UUID
+    campaign_id: uuid.UUID
+    sequence: int
+    player_action: str
+    actor_character_id: uuid.UUID | None
+    workflow_version: str
+    status: str
+    failure_stage: str | None
+    error_code: str | None
+    error_detail: str | None
+    resumable: bool
+    resume_status: str | None
+    intent_output: dict | None
+    resolution_id: uuid.UUID | None
+    state_revision_before: int | None
+    state_revision_after: int | None
+    interpretation_prompt_version: str | None
+    narration_prompt_version: str | None
+    narration: str | None = Field(validation_alias="dm_narration")
+    structured_output: dict | None
+    created_at: datetime
+    completed_at: datetime | None
+
+
+class ProviderCallRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    stage: str
+    attempt: int
+    provider: str
+    model: str | None
+    prompt_version: str
+    status: str
+    latency_ms: int | None
+    input_tokens: int | None
+    output_tokens: int | None
+    structured_output: dict | None
+    error_code: str | None
+    error_detail: str | None
+    created_at: datetime
+
+
 class DiceRollRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

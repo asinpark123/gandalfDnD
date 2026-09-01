@@ -195,22 +195,137 @@ class Turn(TimestampMixin, Base):
     __tablename__ = "turns"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    command_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     campaign_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("campaigns.id", ondelete="CASCADE"), nullable=False, index=True
     )
     sequence: Mapped[int] = mapped_column(Integer, nullable=False)
     player_action: Mapped[str] = mapped_column(Text, nullable=False)
-    dm_narration: Mapped[str] = mapped_column(Text, nullable=False)
-    provider: Mapped[str] = mapped_column(String(40), nullable=False)
+    dm_narration: Mapped[str | None] = mapped_column(Text)
+    provider: Mapped[str | None] = mapped_column(String(40))
     model: Mapped[str | None] = mapped_column(String(80))
-    structured_output: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    structured_output: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     actor_character_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("characters.id", ondelete="SET NULL"), index=True
     )
+    workflow_version: Mapped[str] = mapped_column(String(40), nullable=False)
+    status: Mapped[str] = mapped_column(String(30), nullable=False)
+    failure_stage: Mapped[str | None] = mapped_column(String(30))
+    error_code: Mapped[str | None] = mapped_column(String(80))
+    error_detail: Mapped[str | None] = mapped_column(Text)
+    resumable: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    resume_status: Mapped[str | None] = mapped_column(String(30))
+    intent_output: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    resolution_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey(
+            "rule_resolutions.id",
+            name="fk_turns_resolution_id_rule_resolutions",
+            ondelete="RESTRICT",
+            use_alter=True,
+        ),
+        unique=True,
+    )
+    state_revision_before: Mapped[int | None] = mapped_column(Integer)
+    state_revision_after: Mapped[int | None] = mapped_column(Integer)
+    interpretation_prompt_version: Mapped[str | None] = mapped_column(String(60))
+    narration_prompt_version: Mapped[str | None] = mapped_column(String(60))
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     __table_args__ = (
         UniqueConstraint("campaign_id", "sequence", name="uq_turns_campaign_sequence"),
+        UniqueConstraint("campaign_id", "command_id", name="uq_turns_campaign_command"),
         CheckConstraint("sequence > 0", name="turn_sequence_positive"),
+        CheckConstraint(
+            "workflow_version IN ('legacy-turn-1.0.0', 'two-stage-turn-1.0.0')",
+            name="turn_workflow_version",
+        ),
+        CheckConstraint(
+            "status IN ('received', 'interpreting', 'intent_ready', 'resolving', 'resolved', "
+            "'narrating', 'completed', 'failed', 'cancelled')",
+            name="turn_status",
+        ),
+        CheckConstraint(
+            "resume_status IS NULL OR resume_status IN ('received', 'intent_ready', 'resolved')",
+            name="turn_resume_status",
+        ),
+        CheckConstraint(
+            "state_revision_before IS NULL OR state_revision_before >= 0",
+            name="turn_state_revision_before_nonnegative",
+        ),
+        CheckConstraint(
+            "state_revision_after IS NULL OR state_revision_after >= 0",
+            name="turn_state_revision_after_nonnegative",
+        ),
+        CheckConstraint(
+            "(status = 'failed' AND failure_stage IS NOT NULL AND error_code IS NOT NULL) OR "
+            "(status <> 'failed' AND failure_stage IS NULL AND error_code IS NULL AND "
+            "error_detail IS NULL AND resumable = false AND resume_status IS NULL)",
+            name="turn_failure_shape",
+        ),
+        CheckConstraint(
+            "status <> 'failed' OR (resumable = (resume_status IS NOT NULL))",
+            name="turn_resumable_shape",
+        ),
+        CheckConstraint(
+            "status <> 'completed' OR (dm_narration IS NOT NULL AND structured_output IS NOT NULL "
+            "AND completed_at IS NOT NULL)",
+            name="turn_completed_shape",
+        ),
+        Index(
+            "uq_turns_one_active_per_campaign",
+            "campaign_id",
+            unique=True,
+            postgresql_where=text(
+                "status IN ('received', 'interpreting', 'intent_ready', 'resolving', "
+                "'resolved', 'narrating') OR (status = 'failed' AND resumable)"
+            ),
+        ),
+    )
+
+
+class ProviderCall(TimestampMixin, Base):
+    __tablename__ = "provider_calls"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    campaign_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("campaigns.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    turn_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("turns.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    stage: Mapped[str] = mapped_column(String(30), nullable=False)
+    attempt: Mapped[int] = mapped_column(Integer, nullable=False)
+    provider: Mapped[str] = mapped_column(String(40), nullable=False)
+    model: Mapped[str | None] = mapped_column(String(80))
+    prompt_version: Mapped[str] = mapped_column(String(60), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False)
+    latency_ms: Mapped[int | None] = mapped_column(Integer)
+    input_tokens: Mapped[int | None] = mapped_column(Integer)
+    output_tokens: Mapped[int | None] = mapped_column(Integer)
+    structured_output: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    error_code: Mapped[str | None] = mapped_column(String(80))
+    error_detail: Mapped[str | None] = mapped_column(Text)
+
+    __table_args__ = (
+        UniqueConstraint("turn_id", "stage", "attempt", name="uq_provider_calls_attempt"),
+        CheckConstraint("stage IN ('interpretation', 'narration')", name="provider_call_stage"),
+        CheckConstraint("attempt > 0", name="provider_call_attempt_positive"),
+        CheckConstraint("status IN ('succeeded', 'failed')", name="provider_call_status"),
+        CheckConstraint(
+            "latency_ms IS NULL OR latency_ms >= 0", name="provider_call_latency_nonnegative"
+        ),
+        CheckConstraint(
+            "input_tokens IS NULL OR input_tokens >= 0", name="provider_call_input_nonnegative"
+        ),
+        CheckConstraint(
+            "output_tokens IS NULL OR output_tokens >= 0", name="provider_call_output_nonnegative"
+        ),
+        CheckConstraint(
+            "(status = 'succeeded' AND structured_output IS NOT NULL AND error_code IS NULL "
+            "AND error_detail IS NULL) OR "
+            "(status = 'failed' AND structured_output IS NULL AND error_code IS NOT NULL)",
+            name="provider_call_result_shape",
+        ),
     )
 
 

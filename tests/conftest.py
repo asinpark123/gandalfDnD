@@ -42,7 +42,8 @@ def clean_database(migrated_test_database: None) -> Generator[None, None, None]:
     with get_engine().begin() as connection:
         connection.execute(
             text(
-                "TRUNCATE rule_resolutions, character_grants, campaign_events, dice_rolls, "
+                "TRUNCATE provider_calls, rule_resolutions, character_grants, "
+                "campaign_events, dice_rolls, "
                 "turns, characters, "
                 "locations, campaigns, ruleset_data_catalogs, ruleset_releases "
                 "RESTART IDENTITY CASCADE"

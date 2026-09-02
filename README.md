@@ -36,13 +36,16 @@ maintained in the [living development plan](docs/PROJECT_PLAN.md).
   deployment boundary, security, activation, and model/GM-style strategy
 - [M2.5A OpenClaw evaluation](docs/M2_5_OPENCLAW_EVALUATION.md) — live deployment, compatibility,
   ten-scenario acceptance, recovery, usage, and latency evidence
+- [M3 implementation strategy](docs/M3_IMPLEMENTATION_STRATEGY.md) — persistent scenes, NPCs,
+  facts, quests, decisions, time, visibility, and branching acceptance gates
 
 Documentation distinguishes planned behavior from verified implementation. M1.3 Party Commander
 and complete level-one character state are Done. M1.4 authoritative ability-check and saving-throw
 resolution is also Done after automated and owner runtime verification. The complete M1 gate is
 Done. M2 is also Done: the resumable two-stage workflow, deterministic Lantern suite, private
-OpenClaw activation, and three passing ten-scenario live model-authored runs are verified. Direct paid
-API integration remains deferred and paid model calls remain disabled.
+OpenClaw activation, and three passing ten-scenario live model-authored runs are verified. Direct
+paid API integration remains deferred and paid model calls remain disabled. M3 is Ready;
+implementation begins with exact scene/NPC presence, explicit target IDs, and world-revision safety.
 
 ## Versioned rulesets
 

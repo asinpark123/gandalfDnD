@@ -1,12 +1,12 @@
 # GandalfDnD Development Strategy and Living Project Plan
 
 - **Document status:** Active
-- **Last updated:** 2026-09-02
+- **Last updated:** 2026-09-03
 - **Rules baseline:** SRD 5.2.1 (pinned; character-state and check/save-resolution catalogs pass
   integrity and schema verification)
-- **Current delivery stage:** M2 Done — the private OpenClaw activation and three ten-scenario live
-  Lantern runs passed; M3 persistent-world planning is next, while direct paid-provider integration
-  remains deferred and not authorized
+- **Current delivery stage:** M3 Ready — the persistent-world strategy is defined and M3.1 scene/NPC
+  presence is next; M2 remains Done, while direct paid-provider integration remains deferred and
+  not authorized
 - **Canonical repository:** `~/Git/gandalfDnD`
 
 ## 1. Purpose of this document
@@ -97,6 +97,7 @@ Current documentation index:
 | M2 two-stage turn engineering and acceptance strategy | [`M2_IMPLEMENTATION_STRATEGY.md`](M2_IMPLEMENTATION_STRATEGY.md) |
 | OpenClaw provider topology, security, activation, and model/GM-style policy | [`OPENCLAW_INTEGRATION.md`](OPENCLAW_INTEGRATION.md) |
 | M2.5A live OpenClaw evaluation and usage/latency evidence | [`M2_5_OPENCLAW_EVALUATION.md`](M2_5_OPENCLAW_EVALUATION.md) |
+| M3 persistent-world architecture, slices, and acceptance strategy | [`M3_IMPLEMENTATION_STRATEGY.md`](M3_IMPLEMENTATION_STRATEGY.md) |
 
 ## 2. Product objective
 
@@ -199,7 +200,7 @@ presented separately from the immutable SRD baseline.
 | `postgresvm` | Isolated development and test databases | Active |
 | `gandalfdnd_dev` | Manual development and play-test state | Provisioned and migrated |
 | `gandalfdnd_test` | Automated integration-test state | Provisioned and migrated |
-| Clawvis VM | Existing unrelated services | Intentionally untouched |
+| Clawvis VM | Existing services plus the restricted private OpenClaw provider route | No Gandalf application/database deployment; loopback-only gateway integration |
 | Gandalf application VM | Future persistent runtime | Deferred |
 | pgvector | Future semantic memory | Not installed; deferred to Milestone 4 |
 
@@ -281,7 +282,7 @@ results, known limitations, and where observations will be recorded.
 | M1.3 Party Commander and complete character state | Completed 2026-09-01; no further input required | Owner confirmed the API exposes the correct structured values; presentation clarity and end-user corrective guidance are deferred to the M7 interface checkpoint |
 | M1.4 deterministic resolution | Completed 2026-09-02; no further input required | All nine owner actions passed, including canonical modifiers, modifier rejection, Advantage/Disadvantage, actor attribution, and confirmed post-restart replay |
 | M2 model-authored feasibility | Completed 2026-09-02; no further input required. Any optional direct paid-provider test still needs separate authorization and a cap | The private OpenClaw activation, smoke checks, and three ten-scenario live Lantern runs passed; manual fallback and direct paid transport remain separately classified evidence |
-| M3 persistent world | Provide campaign-structure preferences when they affect consequence and quest design | Multi-session play test confirming decisions, NPC relationships, quests, and revealed facts persist coherently across restarts |
+| M3 persistent world | No input required for M3.1–M3.4's neutral fixture; provide campaign-structure and consequence preferences at the M3.5 owner gate | Multi-session play test confirming decisions, NPC relationships, quests, revealed facts, and time persist coherently across restarts |
 | M1.5 content expansion | Prioritize desired species, backgrounds, classes, feats, equipment routes, spellcasting, and play styles | Create contrasting supported characters and confirm their choices produce understandable, distinct state and later gameplay |
 | M5 party combat | Provide difficulty/lethality feedback for standard party play; companion autonomy and lone-hero compensation remain later decisions | Repeated Party Commander combat tests across favorable, difficult, defeat, recovery, and restart scenarios |
 | Protagonist with Companions | Choose desired companion autonomy, instruction granularity, personality influence, and player override behavior after Party Commander is proven | Compare delegated companion proposals with direct Party Commander control and verify the same deterministic rules constrain both |
@@ -318,7 +319,7 @@ Use these values consistently:
 | M0 | Persistence and safety foundation | Done | Canonical state and auditable turn skeleton |
 | M1 | Party character creation and deterministic mechanics | Done | The selected acting character's choices drive calculated outcomes |
 | M2 | Two-stage AI turn and model-authored feasibility | Done | Real DM-authored output uses recorded dice results safely through a private provider boundary |
-| M3 | Persistent world model | Proposed | NPCs, quests, scenes, clues, time, and visibility |
+| M3 | Persistent world model | Ready | NPCs, quests, scenes, clues, time, decisions, and visibility |
 | M4 | Long-term memory and retrieval | Proposed | Coherent recall without full history in context |
 | M5 | Basic deterministic combat | Proposed | Reproducible initiative, actions, attacks, and damage |
 | M6 | Spoiler-safe Guide | Proposed | Beginner help with enforceable knowledge boundaries |
@@ -920,17 +921,36 @@ The final normal repository gate passed all 96 tests with the opt-in live test c
 plus formatting, lint, compilation, ruleset/catalog integrity, generated-schema freshness, zero
 Alembic drift, and diff checks.
 
-Exit gate: Passed. Ten consecutive live Lantern Test runs completed three times without impossible state,
-invented dice, partial commits, actor leakage, rerolls, or contradictory resume output. The optional
-direct paid-provider route remains deferred and is not required for M2 acceptance.
+Exit gate: Passed. Ten consecutive live Lantern Test runs completed three times without impossible
+state, invented dice, partial commits, actor leakage, rerolls, or contradictory resume output. The
+optional direct paid-provider route remains deferred and is not required for M2 acceptance.
 
 ### M3 — Persistent world model
 
-- **Status:** Proposed
+- **Status:** Ready
 - **Depends on:** M2
+- **Detailed strategy:** [`M3_IMPLEMENTATION_STRATEGY.md`](M3_IMPLEMENTATION_STRATEGY.md)
 
 Add NPCs, relationships, factions, scenes, quests/objectives, world time, clues, knowledge entries,
 and explicit visibility. Decisions must update structured world state and create explainable events.
+
+Delivery sequence:
+
+1. M3.1 adds campaign world revisions, current scenes, stable NPC identity/presence, explicit turn
+   targets, a player-safe aggregate world read, and stale-world/restart protection.
+2. M3.2 adds typed narrative-only facts, relationships, supersession, and controlled reveal while
+   keeping DM-only values outside M3 provider context.
+3. M3.3 adds quests/objectives, explicit decision points/options, legal transitions, and divergent
+   but explainable branch consequences.
+4. M3.4 adds factions, bounded narrative time, complete visibility projections, and context budgets.
+5. M3.5 runs the deterministic branching Lantern scenario and owner acceptance gate before any
+   separately approved capped OpenClaw rerun.
+
+World state is relational and causal. Names are display data; UUIDs are authoritative. Narrative
+facts are mechanically inert unless a separately implemented rule or versioned house-rule resolver
+authorizes their exact semantics. Every accepted world mutation increments the campaign world
+revision and cites its event. Existing M2 character revision, provider, atomicity, retry, and
+no-reroll boundaries remain unchanged.
 
 Exit gate: player decisions produce persistent branching consequences across restarts, while
 DM-only facts remain absent from player-visible APIs.
@@ -1012,7 +1032,7 @@ agent direct database or unvalidated state-mutation access.
 | DEBT-001 | Architecture | Resolved | M2.2 routes typed Party Commander turn checks/saves through M1.4 and rejects any legacy provider dice request before writes | Every accepted new turn roll now derives canonical actor modifiers and application dice; M2.3 subsequently added post-resolution narration | Strict intent contract, authoritative turn resolution, no-reroll retry, legacy rejection, and actor-isolation fixtures; M2.2 |
 | DEBT-002 | Architecture | Resolved | M2.3 narration receives the stored intent and immutable resolution only after M1.4 resolution, and must echo the exact resolution ID/outcome | Narration can no longer precede or silently contradict an accepted check/save result; prose alone cannot change mechanics | Typed narration contract, contradiction and prose-only fixtures, atomic finalization, and no-open-transaction assertion; M2.3 |
 | GAP-001 | Product | Resolved | M1.3 supports an ordered 2–4 character Party Commander party with independently derived equipment/defense/resource state and actor isolation | Party Commander foundation now exists; character content breadth remains intentionally narrow | Migration `0004`, automated evidence, owner acceptance, and final M1 review passed; broader breadth remains deferred to M1.5 |
-| GAP-002 | Product | Open | No deterministic quest/world decision model | Decisions have limited lasting effects | M3 |
+| GAP-002 | Product | Open | No deterministic quest/world decision model exists yet; the M3 strategy now defines scene/NPC presence, typed facts, quests, explicit branches, time, reveal, and acceptance slices | Decisions still have limited lasting effects until the slices ship | Implement M3.1–M3.5 from `M3_IMPLEMENTATION_STRATEGY.md` |
 | TEST-001 | Validation | Deferred | The direct automated OpenAI provider has no paid live evaluation and API spend is not authorized | Direct API authentication, billing/cap behavior, SDK compatibility, and usage accounting remain unproven | Optional M2.5B after explicit provider/cap authorization |
 | TEST-002 | Validation | Resolved | The private OpenClaw route passed real interpretation/narration smokes and three ten-scenario model-authored Lantern runs | Gateway authentication, model behavior, structured output, latency/usage audits, restart/resume, and application boundaries now have live evidence | `M2_5_OPENCLAW_EVALUATION.md`; M2.5A |
 | GAP-005 | Provider integration | Open | The two-stage provider factory supports OpenClaw but intentionally rejects direct OpenAI; the existing OpenAI adapter serves only the legacy Phase 0 contract | Subscription-backed automated play can proceed through OpenClaw after activation, while direct paid API play remains unavailable by design | M2.5B only after explicit authorization: implement direct-provider deadline plus failure/usage mapping, then run its separately capped evaluation |
@@ -1062,6 +1082,11 @@ because a workaround exists; record both the workaround and the permanent resolu
 | RISK-019 | Multi-character state or action attribution leaks across party members | Medium | High | Explicit actor/target IDs, per-character revisions and provenance, isolation/rollback tests, and GF-015 at every party-aware boundary |
 | RISK-020 | An OpenClaw gateway token exposes broader operator authority than one game campaign needs | Medium | High | Keep gateway loopback/private, use an SSH tunnel and dedicated zero/minimal-tool agent, never persist/log the token, rotate on exposure, and do not publish a personal subscription-backed gateway |
 | RISK-021 | Different provider models or narrative profiles produce inconsistent adjudication or structured-output reliability | High | Medium | Keep mechanics application-owned, treat model and GM profile as independent non-mechanical choices, and advertise only combinations that pass the same contract and Lantern evaluation matrix |
+| RISK-022 | Generic JSON world facts become an untyped shadow database | High | High | Small predicate registry, typed proposal schemas, validated subject/object references, and rejection of arbitrary mechanical semantics |
+| RISK-023 | Hidden world facts leak through APIs, provider context, errors, or audits | Medium | High | Audience-specific projection services, no hidden facts in M3 provider context, safe errors, and adversarial visibility tests |
+| RISK-024 | Slow provider work finalizes against stale scene/quest/decision state | Medium | High | Campaign world-revision checkpoint, locked fresh read, safe resume, and atomic rejection without partial writes |
+| RISK-025 | Names are used as identity or generated entities multiply without bounds | Medium | Medium | UUID targets, duplicate-name fixtures, bounded creation proposals, lifecycle constraints, and campaign isolation |
+| RISK-026 | Narrative relationships, time, or milestones silently create mechanics | High | High | Narrative-only defaults, no numeric reputation, no automatic time recovery/rewards, and explicit cited rule or house-rule resolver for every mechanical semantic |
 
 ## 13. Architectural decision log
 
@@ -1086,6 +1111,10 @@ because a workaround exists; record both the workaround and the permanent resolu
 | ADR-017 | 2026-09-01 | Add check/save definitions as a separately identified immutable supplemental catalog that explicitly extends the pinned character-state catalog | Existing campaigns must gain a compatible resolver without rewriting their historical catalog identity, while resolution records still need an exact machine-readable rules version | When catalog composition or an explicit campaign conversion workflow is designed |
 | ADR-018 | 2026-09-02 | Support OpenClaw as an optional two-stage provider and keep model route, GM narrative profile, and deterministic ruleset as independent axes | This can use a deployment's supported OAuth-backed models and offer different GM flavours without granting model output mechanical authority or requiring direct paid API use | If OpenClaw removes the required private structured-output boundary, or campaign-level provider/profile persistence is designed |
 | ADR-019 | 2026-09-02 | Treat provider structured-output controls as hints layered beneath exact prompt schemas and mandatory local Pydantic validation | The live OpenClaw route did not reliably emit required client-defined tool calls and `response_format` alone was insufficient; the layered contract passed without weakening application authority | If a future provider offers independently verified native schema enforcement, while retaining local validation |
+| ADR-020 | 2026-09-03 | Add one campaign world revision and store it on every authoritative turn checkpoint | M2 proves that slow provider work needs a fresh-state guard; one conservative world revision safely covers scenes, NPCs, facts, quests, decisions, factions, and time | If measured concurrency shows independent sub-revisions are necessary without weakening atomicity |
+| ADR-021 | 2026-09-03 | Require explicit UUID world targets and validate current scene presence before provider work | Natural-language names are ambiguous and the M2 live run showed that prose cannot establish whether an NPC is present | When a typed remote/indirect interaction command is implemented |
+| ADR-022 | 2026-09-03 | Keep DM-only fact values out of all M3 provider context until an explicit reveal | Prompt-only secrecy is not an enforceable player-output boundary; M3 prioritizes non-leakage over secret-aware generative planning | When a separately tested planner/narrator architecture can use hidden facts without exposing them |
+| ADR-023 | 2026-09-03 | Treat M3 world facts, relationships, quest completion, and narrative time as mechanically inert by default | Persistent story causality is required now, but automatic modifiers, recovery, rewards, or conditions would invent unsupported rules | When a cited deterministic rule or versioned house-rule resolver authorizes a specific semantic |
 
 ## 14. Milestone review template
 
@@ -1174,17 +1203,15 @@ Destination milestone:
 
 ## 17. Immediate next actions
 
-1. Prepare the M3 persistent-world implementation strategy and trace every proposed field to the
-   smallest executable slice: current scene, present NPCs, relationship facts, objectives, world
-   time, clues/knowledge, and visibility.
-2. Start M3 with structured scene/NPC presence and target validation so the game can distinguish a
-   reachable character from an absent one before narration; preserve the M2 deterministic turn and
-   provider boundaries unchanged.
-3. Add persistent player decisions and explainable consequences incrementally, with restart,
-   branching, player/DM visibility, actor-isolation, and rollback fixtures at every slice.
-4. Provide an owner acceptance checkpoint only after a complete minimal world-decision loop works
-   through the API. Keep `TEST-001` and direct-provider `GAP-005` deferred unless M2.5B and its spend
-   cap receive separate authorization.
+1. Implement M3.1's migration and backfill: campaign/turn world revisions, one active scene for each
+   existing campaign location, stable NPC identity, and scene presence with safe constraints.
+2. Add the optional bounded starting-scene/NPC campaign contract, player-safe aggregate world read,
+   and explicit `target_npc_id` turn field with pre-provider presence/visibility validation.
+3. Integrate scene transitions and world-revision stale checks into M2 atomic finalization/recovery;
+   add migration, duplicate-name, cross-campaign, hidden-target, rollback, restart, and context-size
+   fixtures before expanding the world schema.
+4. Advance M3.1 to Verification only after all M0–M2 regressions, migration drift, and documentation
+   gates pass. No owner input or live model call is needed for this first slice.
 
 ## 18. Documentation change log
 
@@ -1215,3 +1242,4 @@ Destination milestone:
 | 2026-09-02 | DOC-023 | Replaced the paid-by-default M2.5 path with M2.5A no-cost subscription-assisted evaluation and separately deferred M2.5B automation; added the beginner setup guide, accepted content/consequence rulings, and the deterministic non-lethal fallback | The owner wants to maximize an existing ChatGPT/Codex subscription without separate API charges and accepted classic heroic fantasy, non-graphic/player-agency boundaries, fixed 2 HP minor harm, and a 1 HP non-lethal floor. The focused 10-test finalization suite and all 81 regressions pass | Superseded by DOC-024 after OpenClaw became the preferred M2.5A transport; manual transfer remains a fallback |
 | 2026-09-02 | DOC-024 | Adopted OpenClaw as the preferred subscription-backed M2.5A transport, implemented and offline-verified the Gandalf adapter, documented the read-only Clawvis audit and activation boundary, separated model from GM profile, and retained manual/direct-API fallbacks as distinct evidence paths | The owner approved the direction; Clawvis exposes a compatible private OAuth-backed gateway, and 25 focused plus all 95 repository tests pass with lint/format/compilation/ruleset/schema/migration-drift gates green, without a live call or Clawvis mutation | Obtain explicit authorization for the narrow Clawvis change set, activate privately, smoke-test, and run the ten-scenario live Lantern gate; keep direct API spend deferred |
 | 2026-09-02 | DOC-025 | Activated and hardened the private Clawvis/OpenClaw route, replaced the incompatible required-function transport with layered exact-schema validation, compacted provider context, passed three live Lantern runs, and closed M2 with permanent evidence | The exact final prompt versions completed 10 turns and 20 real calls plus one injected/recovered timeout; all deterministic boundaries passed, input use remained 44.4% below baseline at 419,782 tokens, and all 96 normal tests plus static/schema/migration gates passed | Commit and push M2 closure, then prepare the M3 strategy |
+| 2026-09-03 | DOC-026 | Prepared the M3 persistent-world strategy, advanced M3 to Ready, and defined scene/NPC presence, world revisions, typed facts, explicit decisions, visibility, context, risks, and five vertical slices | M2's absent-innkeeper observation and the preserved event/fact research identify exact presence, target, causality, and spoiler boundaries as the next trustworthy foundation | Implement and verify M3.1 without adding RAG, combat, generic workflow infrastructure, or hidden model context |

@@ -229,6 +229,7 @@ class Turn(TimestampMixin, Base):
     state_revision_after: Mapped[int | None] = mapped_column(Integer)
     interpretation_prompt_version: Mapped[str | None] = mapped_column(String(60))
     narration_prompt_version: Mapped[str | None] = mapped_column(String(60))
+    stage_started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     __table_args__ = (
@@ -270,6 +271,13 @@ class Turn(TimestampMixin, Base):
             "status <> 'completed' OR (dm_narration IS NOT NULL AND structured_output IS NOT NULL "
             "AND completed_at IS NOT NULL)",
             name="turn_completed_shape",
+        ),
+        CheckConstraint(
+            "(status IN ('interpreting', 'resolving', 'narrating') AND "
+            "stage_started_at IS NOT NULL) OR "
+            "(status NOT IN ('interpreting', 'resolving', 'narrating') AND "
+            "stage_started_at IS NULL)",
+            name="turn_stage_started_shape",
         ),
         Index(
             "uq_turns_one_active_per_campaign",

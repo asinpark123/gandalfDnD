@@ -34,10 +34,9 @@ maintained in the [living development plan](docs/PROJECT_PLAN.md).
 Documentation distinguishes planned behavior from verified implementation. M1.3 Party Commander
 and complete level-one character state are Done. M1.4 authoritative ability-check and saving-throw
 resolution is also Done after automated and owner runtime verification. The complete M1 gate is
-Done; M2 is In Progress. M2.1 lifecycle and M2.2 authoritative interpretation/resolution are
-complete; M2.3 post-outcome narration and atomic finalization are also complete. M2.4 failure,
-retry, restart, observability, and concurrency hardening is next. Paid model calls remain disabled
-until the owner-approved M2.5 gate.
+Done; M2 is in Verification. M2.1–M2.4 are complete, including failure/retry, restart,
+observability, concurrency hardening, and ten consecutive deterministic Lantern scenarios. M2.5
+requires the owner-approved live-evaluation gate. Paid model calls remain disabled until that gate.
 
 ## Versioned rulesets
 
@@ -78,12 +77,14 @@ checksum, size, license, attribution, normalized-data catalogs, and schema versi
   abilities, Advantage/Disadvantage cancellation, exact dice, typed outcomes, idempotency, immutable
   provenance, and restart replay
 - resumable two-stage turn execution with typed intent, post-resolution narration, exact outcome
-  acknowledgement, bounded proposals, stale-state rejection, and atomic final events/state commit
+  acknowledgement, bounded proposals, stage leases, stale-state rejection, safe restart recovery,
+  stable provider errors, usage audits, and atomic final events/state commit
 - HP, inventory, and current-location state changes with pre-commit validation
 - auditable application dice rolls, including internally logged hidden rolls
 - provider-neutral DM interface
 - deterministic offline provider for development and repeatable tests
-- OpenAI Responses provider with Pydantic structured output
+- legacy Phase 0 OpenAI Responses adapter with Pydantic structured output; the two-stage live adapter
+  remains disabled until M2.5 adds deadline/error/usage mapping and the owner authorizes evaluation
 
 Not included yet: RAG/pgvector, the spoiler-safe Guide, combat, a web UI, Redis, Celery, or a
 permanent application VM.

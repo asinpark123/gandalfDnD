@@ -1,9 +1,10 @@
 # M2 Two-Stage AI Turn Implementation Strategy
 
-- **Status:** In Progress — M2.1–M2.3 Done; M2.4 Ready
+- **Status:** Verification — M2.1–M2.4 Done; M2.5 owner gate required
 - **Prepared:** 2026-09-02
 - **Depends on:** M1 Party character creation and deterministic mechanics (Done)
-- **Owner input required now:** None
+- **Owner input required now:** Yes — M2.5 authorization/cap, content profile, and damage-fixture
+  confirmation
 - **Paid external model calls:** Forbidden until the M2.5 owner gate is explicitly approved
 
 ## 1. Objective
@@ -246,6 +247,8 @@ hardening, and the ten consecutive deterministic Lantern scenarios.
 
 ### M2.4 — Failure, retry, observability, and restart hardening
 
+**Status: Done (2026-09-02).**
+
 - implement provider exception normalization, failed-stage metadata, safe resume, timeout handling,
   token/latency capture, stale-state rejection, and concurrency fixtures;
 - run ten consecutive deterministic Lantern scenarios before enabling a live provider;
@@ -253,7 +256,41 @@ hardening, and the ten consecutive deterministic Lantern scenarios.
 
 Exit: every injected failure preserves canonical gameplay state and every retry/resume is idempotent.
 
+Implemented evidence:
+
+- provider timeout, connection, refusal, empty-output, malformed-output, and generic failures map to
+  stable safe codes rather than leaking provider exception text;
+- recoverable 502 responses include the durable turn ID, failed stage, stable code, safe message,
+  and resumability flag so a client can retain and resume the same command;
+- the provider-neutral result envelope captures optional input/output token usage while the
+  application measures nonnegative latency for every completed attempt; provider/model/prompt and
+  immutable success/failure output remain auditable;
+- migration `0007_turn_stage_recovery` adds a constrained `stage_started_at` lease. Fresh
+  interpretation/resolution/narration stages reject competing recovery or provider calls, while an
+  expired stage can return to its last safe checkpoint;
+- interrupted interpretation returns to `received`; interrupted narration returns to
+  `intent_ready` or `resolved`; interrupted resolution relinks an already committed M1.4 result or
+  returns to `intent_ready`. Recovery after engine disposal reuses exact dice and records a hidden
+  operational `turn_stage_recovered` event;
+- provider failures and invalid proposals resume with incremented immutable attempt audits and no
+  duplicate player-visible events. State changed outside the turn makes the stale command terminal
+  instead of offering an unsafe retry;
+- the ten consecutive offline Lantern scenarios completed in one two-character campaign, covering
+  dialogue, movement, inventory use, successful and failed checks, bounded damage, character
+  switching, saving throws, Advantage/Disadvantage behavior, and engine disposal/restart. All ten
+  turns completed with 20 successful provider audits, no actor leakage, valid HP/inventory/location,
+  and the required event ordering;
+- 80 tests pass at 90% total coverage. Formatting, lint, compilation, ruleset/catalog integrity,
+  generated-schema freshness, migration application, and zero Alembic drift pass; no external or
+  paid model call was made.
+
+M2.4 completes deterministic hardening. The two-stage OpenAI adapter remains deliberately disabled;
+M2.5 must add provider-specific deadline/refusal/usage mapping and may make paid calls only after the
+owner accepts the gate below.
+
 ### M2.5 — Owner-approved live Lantern evaluation
+
+**Status: Awaiting owner gate.**
 
 - select the configured OpenAI model at evaluation time;
 - agree on a strict cost/request cap and narrative/content boundaries;

@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.api import app
 from app.db import get_engine
 from app.dice import DiceService, get_dice_service
+from app.llm.deterministic import DeterministicDMProvider
 from app.llm.factory import get_turn_narrator
 from app.schemas import TurnNarrationOutput
 from app.services import finalize_turn_execution
@@ -272,6 +273,18 @@ def test_invalid_proposal_is_audited_without_partial_state_or_final_events(
     assert calls[-1]["status"] == "succeeded"
     assert calls[-1]["structured_output"] is not None
 
+    resumed = client.post(f"/campaigns/{campaign_id}/turn-executions/{turn_id}/resume")
+    assert resumed.status_code == 200
+    assert resumed.json()["status"] == "intent_ready"
+    app.dependency_overrides[get_turn_narrator] = lambda: DeterministicDMProvider()
+    recovered = client.post(f"/campaigns/{campaign_id}/turn-executions/{turn_id}/finalize")
+    assert recovered.status_code == 200
+    assert recovered.json()["turn"]["status"] == "completed"
+    assert _turn_event_types(turn_id) == ["player_action", "dm_response"]
+    calls = client.get(f"/campaigns/{campaign_id}/turn-executions/{turn_id}/provider-calls").json()
+    narration_calls = [call for call in calls if call["stage"] == "narration"]
+    assert [call["attempt"] for call in narration_calls] == [1, 2]
+
 
 class NarrativeClaimOnlyProvider:
     provider_name = "claim-only-test"
@@ -353,7 +366,13 @@ def test_narration_must_acknowledge_the_exact_authoritative_outcome(
 
     response = client.post(f"/campaigns/{campaign_id}/turn-executions/{turn_id}/finalize")
     assert response.status_code == 502
-    assert response.json()["detail"] == "Narration did not acknowledge the stored outcome"
+    assert response.json()["detail"] == {
+        "turn_id": turn_id,
+        "stage": "narration",
+        "error_code": "invalid_outcome_acknowledgement",
+        "message": "Narration did not acknowledge the stored outcome",
+        "resumable": True,
+    }
     turn = client.get(f"/campaigns/{campaign_id}/turn-executions/{turn_id}").json()
     assert turn["status"] == "failed"
     assert turn["error_code"] == "invalid_outcome_acknowledgement"
@@ -407,6 +426,11 @@ def test_state_change_during_narration_rejects_all_proposals(client: TestClient)
     turn = client.get(f"/campaigns/{campaign_id}/turn-executions/{turn_id}").json()
     assert turn["status"] == "failed"
     assert turn["error_code"] == "stale_campaign_state"
+    assert turn["resumable"] is False
+    assert turn["completed_at"] is not None
+    assert (
+        client.post(f"/campaigns/{campaign_id}/turn-executions/{turn_id}/resume").status_code == 409
+    )
 
 
 class TransactionInspectingNarrator:

@@ -4,8 +4,8 @@
 - **Last updated:** 2026-09-02
 - **Rules baseline:** SRD 5.2.1 (pinned; character-state and check/save-resolution catalogs pass
   integrity and schema verification)
-- **Current delivery stage:** M2 In Progress — M2.1–M2.3 are Done; begin M2.4 failure, retry,
-  observability, restart, and concurrency hardening without paid model calls
+- **Current delivery stage:** M2 Verification — M2.1–M2.4 are Done; M2.5 requires the combined
+  owner authorization/content/damage-fixture gate before live-provider implementation or paid calls
 - **Canonical repository:** `~/Git/gandalfDnD`
 
 ## 1. Purpose of this document
@@ -311,7 +311,7 @@ Use these values consistently:
 | --- | --- | --- | --- |
 | M0 | Persistence and safety foundation | Done | Canonical state and auditable turn skeleton |
 | M1 | Party character creation and deterministic mechanics | Done | The selected acting character's choices drive calculated outcomes |
-| M2 | Two-stage AI turn and live feasibility | In Progress (M2.1–M2.3 Done; M2.4 Ready) | Real DM uses recorded dice results safely |
+| M2 | Two-stage AI turn and live feasibility | Verification (M2.1–M2.4 Done; M2.5 owner gate) | Real DM uses recorded dice results safely |
 | M3 | Persistent world model | Proposed | NPCs, quests, scenes, clues, time, and visibility |
 | M4 | Long-term memory and retrieval | Proposed | Coherent recall without full history in context |
 | M5 | Basic deterministic combat | Proposed | Reproducible initiative, actions, attacks, and damage |
@@ -819,7 +819,7 @@ Review findings and decision:
 
 ### M2 — Two-stage AI turn and live feasibility
 
-- **Status:** In Progress — M2.1–M2.3 Done; M2.4 Ready
+- **Status:** Verification — M2.1–M2.4 Done; M2.5 owner gate required
 - **Depends on:** M1
 - **Detailed strategy:** [`M2_IMPLEMENTATION_STRATEGY.md`](M2_IMPLEMENTATION_STRATEGY.md)
 
@@ -876,7 +876,20 @@ audit, bounded HP/inventory/location changes, ordered final events, and turn com
 contradictory, or stale proposals leave no final events or application-authored state changes, while
 completed retries are idempotent. Nine focused fixtures and the complete 69-test suite pass at 90%
 coverage with lint, compilation, catalog/schema freshness, zero Alembic drift, and no external or
-paid model calls. This closes `DEBT-002`; M2.4 hardening is next.
+paid model calls. This closed `DEBT-002` and established the input to the now-completed M2.4
+hardening slice.
+
+M2.4 completed on 2026-09-02 with migration `0007_turn_stage_recovery`. Provider timeout,
+connection, refusal, empty-output, malformed-output, and generic failures now have stable safe codes
+and recoverable API bodies containing the durable turn ID. Optional provider-reported token usage
+and measured latency are stored in immutable audits. Constrained stage-start leases block competing
+calls and allow expired interpretation, resolution, or narration work to recover after engine
+disposal to the last safe checkpoint; already-recorded resolutions are relinked without rerolling.
+Invalid proposals resume without partial state or duplicate final events, while state made stale by
+outside changes is terminal. Ten consecutive deterministic two-character Lantern scenarios and all
+80 tests pass at 90% coverage, with correct event order and actor isolation. Formatting, lint,
+compilation, catalog/schema checks, applied development migration, and zero Alembic drift pass, and
+no external or paid call was made. M2 is now in Verification pending M2.5's owner-approved live gate.
 
 Exit gate: ten consecutive Lantern Test runs complete without impossible state, invented dice,
 partial commits, or contradictory resume output. Failures are categorized before proceeding.
@@ -969,6 +982,7 @@ deployable if Clawvis is offline.
 | GAP-001 | Product | Resolved | M1.3 supports an ordered 2–4 character Party Commander party with independently derived equipment/defense/resource state and actor isolation | Party Commander foundation now exists; character content breadth remains intentionally narrow | Migration `0004`, automated evidence, owner acceptance, and final M1 review passed; broader breadth remains deferred to M1.5 |
 | GAP-002 | Product | Open | No deterministic quest/world decision model | Decisions have limited lasting effects | M3 |
 | TEST-001 | Validation | Open | OpenAI provider has no paid live evaluation | Real structured behavior unproven | Lantern Test; M2 |
+| GAP-005 | Provider integration | Open | The two-stage provider factory intentionally rejects OpenAI; the existing OpenAI adapter serves only the legacy Phase 0 contract | M2 cannot make a live two-stage turn, which prevents accidental paid calls before approval | After the M2.5 owner gate, implement SDK-enforced deadline plus timeout/connection/refusal/empty-output/usage mapping, then run the capped live Lantern evaluation |
 | WARN-001 | Dependency | Monitoring | Current TestClient emits an `httpx` deprecation warning | No functional failure today | Reassess FastAPI/Starlette test client during dependency maintenance |
 | OPS-001 | Source control | Resolved | Initial push was blocked because HTTPS lacked credentials and Git did not automatically select the nonstandard SSH key filename | GitHub was temporarily behind local `main` | Registered the existing Ed25519 key, verified GitHub's host fingerprint, configured this repository's SSH command, and synchronized `main`; 2026-08-30 |
 | OPS-002 | Infrastructure | Deferred | pgvector is unavailable on `postgresvm` | No semantic memory yet | Evaluate/install only at M4 |
@@ -980,6 +994,7 @@ deployable if Clawvis is offline.
 | ISSUE-003 | Migration/test fixture | Resolved | The first M1.3 run found the isolated test DB at migration `0003` after fixture cleanup had removed immutable seed rows | `0004` initially could not insert its state catalog because the known release FK row was absent | `0004` idempotently restores only the exact pinned release before inserting the new catalog; focused migration smoke, full-chain tests, and 39-test suite pass |
 | ISSUE-005 | Concurrency | Resolved | The first M2.2 stale-state fixture showed that an ORM identity-map value could mask a character revision changed while interpretation ran outside the transaction | A delayed interpretation could otherwise proceed against a stale pre-state | Force a fresh locked character read after interpretation and before resolution; the stale-state fixture now records a safe terminal failure without rolling |
 | ISSUE-006 | Provider audit persistence | Resolved | The first M2.3 malformed-narration fixture explicitly assigned Python `None` to a PostgreSQL JSONB field, which persisted JSON `null` rather than SQL `NULL` and violated the failed-call result-shape constraint | A malformed narration response could mask the intended safe 502 response with a database integrity error | Leave failed structured output unset and assign JSON only for validated successful output; the malformed-output regression and full 69-test suite pass |
+| ISSUE-007 | Turn recovery/concurrency | Resolved | Before M2.4, a process interruption during `interpreting` could strand a campaign and a repeated call during `narrating` could invoke a competing provider without an expiry boundary | A campaign could remain blocked after restart or incur duplicate provider work | Migration `0007` adds constrained stage leases; fresh work rejects competition, expired work restores a safe checkpoint, hidden recovery events retain operational evidence, and resolution recovery reuses exact dice |
 | ISSUE-004 | Character-state provenance | Resolved | The first M1.3 owner run showed empty projected source/acquisition provenance for Dice Set and GP; ordinary package items were unaffected | The visible equipment projection did not meet GF-004 even though canonical grants remained intact | The corrected projection and exhaustive regression passed 39 automated tests; the 2026-09-01 owner retest confirmed complete Dice Set/GP definition, source, and acquisition-event provenance for both existing characters |
 | UX-001 | Player interface | Deferred | Backend errors are adequate for developer diagnosis but do not yet provide contextual, player-oriented recovery guidance; JSON also cannot validate visual actor/state clarity | Ordinary players may not know what happened or how to correct an invalid action when the frontend is introduced | In M7, map stable typed API errors to actionable messages and test actor visibility, calculated-value explanations, and isolated character changes through the full player journey |
 
@@ -1119,14 +1134,15 @@ Destination milestone:
 
 ## 17. Immediate next actions
 
-1. Implement M2.4 provider failure normalization, safe resume/restart behavior, timeout and
-   token/latency observability, stale-state/concurrency hardening, and the deterministic Lantern
-   run matrix.
-2. Keep broader character content in M1.5 and all live model calls disabled while M2.4 is underway.
-3. Reverify no-reroll, no-open-provider-transaction, no-partial-write, exact-outcome narration, and
-   ordered-event guarantees across every injected M2.4 failure and retry path.
-4. At the M2.5 gate, request one combined owner decision on paid evaluation authorization/cap,
+1. Obtain the combined M2.5 owner decision on paid evaluation authorization/cap,
    narrative/content boundaries, and the non-combat environmental-damage fixture.
+2. After approval, verify the currently available supported OpenAI model from official sources,
+   implement the two-stage adapter with SDK-enforced request deadlines and stable error/usage
+   mapping, and keep the deterministic provider as the safe default.
+3. Run the capped ten-scenario live Lantern evaluation, classify every failure, and rework rather
+   than weaken no-reroll, no-partial-write, exact-outcome, actor-isolation, or event-order guarantees.
+4. Close M2 and `TEST-001` only if all ten consecutive live scenarios pass; otherwise record the
+   evidence and return the affected slice to Rework.
 
 ## 18. Documentation change log
 
@@ -1153,3 +1169,4 @@ Destination milestone:
 | 2026-09-02 | DOC-019 | Completed M2.1 and advanced M2.2 to Ready | Migration `0006`, legacy backfill, resumable lifecycle, idempotency, active-turn protection, immutable provider-call audit storage, guarded downgrade, restart reads, five focused fixtures, 51 total tests at 91% coverage, lint/catalog/schema-drift checks, and no external model calls passed | Implement typed deterministic interpretation and M1.4-backed authoritative resolution in M2.2 |
 | 2026-09-02 | DOC-020 | Completed M2.2, closed DEBT-001, and advanced M2.3 to Ready | Strict typed interpretation excludes modifiers/dice; checks and saves use M1.4; retry preserves exact dice; provider attempts are audited; invalid skill and stale state fail before resolution; legacy provider dice requests fail before writes; nine focused and 60 total tests pass at 90% coverage with no open provider transaction, zero schema drift, and no external calls | Implement typed post-outcome narration and atomic finalization in M2.3; keep DEBT-002 open until narration can only follow recorded outcomes |
 | 2026-09-02 | DOC-021 | Completed M2.3, closed DEBT-002, resolved ISSUE-006, and advanced M2.4 to Ready | Strict narration echoes immutable outcomes, rejects untyped mechanics and contradictions, runs outside database transactions, and atomically finalizes bounded state/events after stale-state validation; nine focused and 69 total tests pass at 90% coverage with catalog/schema freshness, zero Alembic drift, and no external calls | Harden failure, retry, restart, observability, and concurrency behavior and run ten consecutive deterministic Lantern scenarios in M2.4 |
+| 2026-09-02 | DOC-022 | Completed M2.4, resolved ISSUE-007, added migration `0007`, and advanced M2 to Verification at the M2.5 owner gate | Stable provider errors include turn IDs; optional tokens and latency are audited; stage leases recover expired work without rerolls; invalid proposals resume safely; ten consecutive deterministic Lantern scenarios and all 80 tests pass at 90% coverage with zero drift and no external calls | Obtain the combined owner gate, implement the live two-stage adapter, and run the capped ten-scenario live Lantern evaluation |

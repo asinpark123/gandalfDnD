@@ -1,5 +1,5 @@
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from time import perf_counter
 from typing import Any
 
@@ -23,7 +23,16 @@ from app.character_state import (
     validate_loadout,
 )
 from app.dice import DiceService
-from app.llm.base import DMProvider, TurnInterpretationProvider, TurnNarrationProvider
+from app.llm.base import (
+    DMProvider,
+    ProviderConnectionError,
+    ProviderEmptyOutputError,
+    ProviderRefusalError,
+    ProviderResult,
+    ProviderTimeoutError,
+    TurnInterpretationProvider,
+    TurnNarrationProvider,
+)
 from app.models import (
     Campaign,
     CampaignEvent,
@@ -70,6 +79,7 @@ from app.schemas import (
     TurnNarrationOutput,
     TurnRead,
 )
+from app.turn_errors import TurnProviderError
 from app.turn_interpretation import (
     D20TestIntent,
     TurnIntent,
@@ -87,7 +97,11 @@ class ConflictError(ValueError):
     pass
 
 
-class TurnNarrationError(RuntimeError):
+class TurnNarrationError(TurnProviderError):
+    pass
+
+
+class _NarrationAcknowledgementError(ValueError):
     pass
 
 
@@ -102,6 +116,29 @@ ACTIVE_TURN_STATUSES = {
     "narrating",
 }
 RESOLUTION_CATALOG_ID = "srd-5.2.1-check-save-resolution-v1"
+
+
+def _unpack_provider_result(result: Any) -> tuple[Any, int | None, int | None]:
+    if isinstance(result, ProviderResult):
+        return result.output, result.input_tokens, result.output_tokens
+    return result, None, None
+
+
+def _provider_failure(stage: str, exc: Exception) -> tuple[str, str]:
+    if isinstance(exc, (ProviderTimeoutError, TimeoutError)):
+        return "provider_timeout", f"{stage.title()} provider timed out"
+    if isinstance(exc, (ProviderConnectionError, ConnectionError)):
+        return "provider_connection_error", f"{stage.title()} provider could not be reached"
+    if isinstance(exc, ProviderRefusalError):
+        return "provider_refusal", f"{stage.title()} provider refused the request"
+    if isinstance(exc, ProviderEmptyOutputError):
+        return "provider_empty_output", f"{stage.title()} provider returned no structured output"
+    if isinstance(exc, ValidationError):
+        return (
+            "invalid_structured_output",
+            f"{stage.title()} provider returned invalid structured output",
+        )
+    return f"{stage}_provider_error", f"{stage.title()} provider failed"
 
 
 def _campaign_for_update(session: Session, campaign_id: uuid.UUID) -> Campaign:
@@ -294,6 +331,7 @@ def cancel_turn_execution(
     turn.error_detail = None
     turn.resumable = False
     turn.resume_status = None
+    turn.stage_started_at = None
     turn.completed_at = datetime.now(UTC)
     _add_event(
         session,
@@ -334,6 +372,7 @@ def mark_turn_execution_failed(
     turn.error_detail = error_detail
     turn.resumable = resume_status is not None
     turn.resume_status = resume_status
+    turn.stage_started_at = None
     turn.completed_at = None if turn.resumable else datetime.now(UTC)
     session.commit()
     session.refresh(turn)
@@ -341,7 +380,11 @@ def mark_turn_execution_failed(
 
 
 def resume_turn_execution(
-    session: Session, campaign_id: uuid.UUID, turn_id: uuid.UUID
+    session: Session,
+    campaign_id: uuid.UUID,
+    turn_id: uuid.UUID,
+    *,
+    stale_after_seconds: int = 120,
 ) -> TurnExecutionRead:
     _campaign_for_update(session, campaign_id)
     turn = session.scalar(
@@ -349,15 +392,62 @@ def resume_turn_execution(
     )
     if turn is None or turn.workflow_version != TURN_WORKFLOW_TWO_STAGE:
         raise NotFoundError("Turn execution not found")
-    if turn.status != "failed" or not turn.resumable or turn.resume_status is None:
+    checkpoint: str | None = None
+    interrupted_stage: str | None = None
+    if turn.status == "failed" and turn.resumable and turn.resume_status is not None:
+        checkpoint = turn.resume_status
+    elif turn.status in {"interpreting", "resolving", "narrating"}:
+        if turn.stage_started_at is None:
+            raise ConflictError("Turn stage has no recovery timestamp")
+        recovery_cutoff = datetime.now(UTC) - timedelta(seconds=stale_after_seconds)
+        if turn.stage_started_at > recovery_cutoff:
+            raise ConflictError(f"Turn {turn.status} stage is still in progress")
+        interrupted_stage = turn.status
+        if turn.status == "interpreting":
+            checkpoint = "received"
+        elif turn.status == "resolving":
+            resolution = session.scalar(
+                select(RuleResolution).where(
+                    RuleResolution.campaign_id == campaign_id,
+                    RuleResolution.command_id == turn.command_id,
+                )
+            )
+            if resolution is None:
+                checkpoint = "intent_ready"
+            else:
+                roll = session.get(DiceRoll, resolution.dice_roll_id)
+                if roll is None or roll.turn_id != turn.id:
+                    raise ConflictError("Recovered resolution does not belong to this turn")
+                turn.resolution_id = resolution.id
+                checkpoint = "resolved"
+        else:
+            checkpoint = "resolved" if turn.resolution_id is not None else "intent_ready"
+    else:
         raise ConflictError("Turn is not resumable")
-    turn.status = turn.resume_status
+
+    assert checkpoint is not None
+    turn.status = checkpoint
     turn.failure_stage = None
     turn.error_code = None
     turn.error_detail = None
     turn.resumable = False
     turn.resume_status = None
+    turn.stage_started_at = None
     turn.completed_at = None
+    if interrupted_stage is not None:
+        _add_event(
+            session,
+            campaign_id,
+            "turn_stage_recovered",
+            {
+                "interrupted_stage": interrupted_stage,
+                "restored_checkpoint": checkpoint,
+                "command_id": str(turn.command_id),
+            },
+            turn_id=turn.id,
+            visibility="dm_only",
+            actor_character_id=turn.actor_character_id,
+        )
     session.commit()
     session.refresh(turn)
     return TurnExecutionRead.model_validate(turn)
@@ -436,25 +526,33 @@ def interpret_turn_execution(
         if character is None:
             raise NotFoundError("Acting character not found in campaign")
         if character.state_revision != turn.state_revision_before:
+            mark_turn_execution_failed(
+                session,
+                campaign_id,
+                turn_id,
+                failure_stage="interpretation",
+                error_code="stale_character_state",
+                error_detail="Acting character state changed after the turn was received",
+                resume_status=None,
+            )
             raise ConflictError("Acting character state changed after the turn was received")
         context = _provider_context(get_campaign_state(session, campaign_id))
         attempt = _next_provider_attempt(session, turn.id, "interpretation")
         player_action = turn.player_action
         turn.status = "interpreting"
+        turn.stage_started_at = datetime.now(UTC)
         session.commit()
 
         started = perf_counter()
         try:
-            provider_output = provider.interpret_action(context, player_action)
+            provider_result = provider.interpret_action(context, player_action)
+            provider_output, input_tokens, output_tokens = _unpack_provider_result(provider_result)
+            if provider_output is None:
+                raise ProviderEmptyOutputError
             intent = validate_turn_intent(provider_output)
         except Exception as exc:
             latency_ms = max(0, round((perf_counter() - started) * 1000))
-            if isinstance(exc, ValidationError):
-                error_code = "invalid_structured_output"
-                safe_detail = "Interpretation provider returned invalid structured output"
-            else:
-                error_code = "interpretation_provider_error"
-                safe_detail = "Interpretation provider failed"
+            error_code, safe_detail = _provider_failure("interpretation", exc)
             session.rollback()
             _campaign_for_update(session, campaign_id)
             failed_turn = session.scalar(
@@ -484,8 +582,15 @@ def interpret_turn_execution(
             failed_turn.error_detail = safe_detail
             failed_turn.resumable = True
             failed_turn.resume_status = "received"
+            failed_turn.stage_started_at = None
             session.commit()
-            raise TurnInterpretationError(safe_detail) from exc
+            raise TurnInterpretationError(
+                safe_detail,
+                turn_id=turn_id,
+                stage="interpretation",
+                error_code=error_code,
+                resumable=True,
+            ) from exc
 
         latency_ms = max(0, round((perf_counter() - started) * 1000))
         _campaign_for_update(session, campaign_id)
@@ -515,6 +620,8 @@ def interpret_turn_execution(
                 prompt_version=provider.interpretation_prompt_version,
                 status="succeeded",
                 latency_ms=latency_ms,
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
                 structured_output=intent.model_dump(mode="json"),
             )
         )
@@ -526,9 +633,11 @@ def interpret_turn_execution(
             turn.error_code = "stale_character_state"
             turn.error_detail = "Acting character state changed during interpretation"
             turn.resumable = False
+            turn.stage_started_at = None
             turn.completed_at = datetime.now(UTC)
         else:
             turn.status = "intent_ready"
+            turn.stage_started_at = None
         session.commit()
         session.refresh(turn)
         if stale_state:
@@ -562,6 +671,7 @@ def interpret_turn_execution(
         )
         assert turn is not None
         turn.status = "resolving"
+        turn.stage_started_at = datetime.now(UTC)
         session.commit()
 
     request = intent.resolution
@@ -607,6 +717,7 @@ def interpret_turn_execution(
         raise ConflictError("Turn is already linked to a different resolution")
     turn.resolution_id = resolution.id
     turn.status = "resolved"
+    turn.stage_started_at = None
     session.commit()
     session.refresh(turn)
     return TurnInterpretationRead(
@@ -674,8 +785,10 @@ def _record_narration_failure(
     latency_ms: int,
     error_code: str,
     error_detail: str,
-    resume_status: str,
+    resume_status: str | None,
     output: TurnNarrationOutput | None = None,
+    input_tokens: int | None = None,
+    output_tokens: int | None = None,
 ) -> None:
     session.rollback()
     _campaign_for_update(session, campaign_id)
@@ -693,6 +806,8 @@ def _record_narration_failure(
         prompt_version=provider.narration_prompt_version,
         status="succeeded" if output is not None else "failed",
         latency_ms=latency_ms,
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
         error_code=None if output is not None else error_code,
         error_detail=None if output is not None else error_detail,
     )
@@ -703,8 +818,10 @@ def _record_narration_failure(
     turn.failure_stage = "narration"
     turn.error_code = error_code
     turn.error_detail = error_detail
-    turn.resumable = True
+    turn.resumable = resume_status is not None
     turn.resume_status = resume_status
+    turn.stage_started_at = None
+    turn.completed_at = None if turn.resumable else datetime.now(UTC)
     session.commit()
 
 
@@ -723,6 +840,8 @@ def finalize_turn_execution(
     intent = _stored_turn_intent(turn)
     if turn.status == "completed":
         return _turn_finalization_result(session, campaign_id, turn, intent)
+    if turn.status == "narrating":
+        raise ConflictError("Turn narration is already in progress")
     resolution = _turn_resolution(session, campaign_id, turn)
     if isinstance(intent, D20TestIntent):
         if resolution is None or turn.status not in {"resolved", "narrating"}:
@@ -765,34 +884,36 @@ def finalize_turn_execution(
     attempt = _next_provider_attempt(session, turn.id, "narration")
     player_action = turn.player_action
     turn.status = "narrating"
+    turn.stage_started_at = datetime.now(UTC)
     session.commit()
 
     started = perf_counter()
     try:
-        provider_output = provider.narrate_outcome(
+        provider_result = provider.narrate_outcome(
             context,
             player_action,
             intent,
             resolution,
         )
+        provider_output, input_tokens, output_tokens = _unpack_provider_result(provider_result)
+        if provider_output is None:
+            raise ProviderEmptyOutputError
         output = TurnNarrationOutput.model_validate(provider_output)
         expected_resolution_id = resolution.id if resolution else None
         expected_outcome = resolution.outcome if resolution else None
         if output.resolution_id != expected_resolution_id:
-            raise TurnNarrationError("Narration did not acknowledge the stored resolution")
+            raise _NarrationAcknowledgementError(
+                "Narration did not acknowledge the stored resolution"
+            )
         if output.acknowledged_outcome != expected_outcome:
-            raise TurnNarrationError("Narration did not acknowledge the stored outcome")
+            raise _NarrationAcknowledgementError("Narration did not acknowledge the stored outcome")
     except Exception as exc:
         latency_ms = max(0, round((perf_counter() - started) * 1000))
-        if isinstance(exc, ValidationError):
-            error_code = "invalid_structured_output"
-            safe_detail = "Narration provider returned invalid structured output"
-        elif isinstance(exc, TurnNarrationError):
+        if isinstance(exc, _NarrationAcknowledgementError):
             error_code = "invalid_outcome_acknowledgement"
             safe_detail = str(exc)
         else:
-            error_code = "narration_provider_error"
-            safe_detail = "Narration provider failed"
+            error_code, safe_detail = _provider_failure("narration", exc)
         _record_narration_failure(
             session,
             campaign_id,
@@ -804,7 +925,13 @@ def finalize_turn_execution(
             error_detail=safe_detail,
             resume_status=resume_status,
         )
-        raise TurnNarrationError(safe_detail) from exc
+        raise TurnNarrationError(
+            safe_detail,
+            turn_id=turn_id,
+            stage="narration",
+            error_code=error_code,
+            resumable=True,
+        ) from exc
 
     latency_ms = max(0, round((perf_counter() - started) * 1000))
     _campaign_for_update(session, campaign_id)
@@ -845,8 +972,10 @@ def finalize_turn_execution(
             latency_ms=latency_ms,
             error_code="stale_campaign_state",
             error_detail="Campaign state changed during narration",
-            resume_status=resume_status,
+            resume_status=None,
             output=output,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
         )
         raise ConflictError("Campaign state changed during narration")
     assert character is not None
@@ -866,6 +995,8 @@ def finalize_turn_execution(
             error_detail=str(exc),
             resume_status=resume_status,
             output=output,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
         )
         raise
 
@@ -880,6 +1011,8 @@ def finalize_turn_execution(
             prompt_version=provider.narration_prompt_version,
             status="succeeded",
             latency_ms=latency_ms,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
             structured_output=output.model_dump(mode="json"),
         )
     )
@@ -915,6 +1048,7 @@ def finalize_turn_execution(
             actor_character_id=character.id,
         )
     turn.status = "completed"
+    turn.stage_started_at = None
     turn.completed_at = datetime.now(UTC)
     session.commit()
     session.refresh(turn)

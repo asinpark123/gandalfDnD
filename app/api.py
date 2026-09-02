@@ -341,10 +341,18 @@ def create_app() -> FastAPI:
         response_model=TurnExecutionRead,
     )
     def turn_executions_resume(
-        campaign_id: uuid.UUID, turn_id: uuid.UUID, session: SessionDep
+        campaign_id: uuid.UUID,
+        turn_id: uuid.UUID,
+        session: SessionDep,
+        settings: SettingsDep,
     ) -> TurnExecutionRead:
         try:
-            return resume_turn_execution(session, campaign_id, turn_id)
+            return resume_turn_execution(
+                session,
+                campaign_id,
+                turn_id,
+                stale_after_seconds=settings.turn_stage_timeout_seconds,
+            )
         except NotFoundError as exc:
             session.rollback()
             raise HTTPException(status_code=404, detail=str(exc)) from exc
@@ -397,7 +405,7 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=409, detail=str(exc)) from exc
         except TurnInterpretationError as exc:
             session.rollback()
-            raise HTTPException(status_code=502, detail=str(exc)) from exc
+            raise HTTPException(status_code=502, detail=exc.api_detail()) from exc
 
     @app.post(
         "/campaigns/{campaign_id}/turn-executions/{turn_id}/finalize",
@@ -427,7 +435,7 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=409, detail=str(exc)) from exc
         except TurnNarrationError as exc:
             session.rollback()
-            raise HTTPException(status_code=502, detail=str(exc)) from exc
+            raise HTTPException(status_code=502, detail=exc.api_detail()) from exc
 
     @app.post(
         "/campaigns/{campaign_id}/resolutions",

@@ -4,6 +4,7 @@ from pydantic import Field, TypeAdapter, model_validator
 
 from app.character_creation import AbilityName, StrictModel
 from app.resolution import ReasonText, ResolutionType
+from app.turn_errors import TurnProviderError
 
 
 class NarrativeIntent(StrictModel):
@@ -41,5 +42,5 @@ def validate_turn_intent(value: object) -> TurnIntent:
     return TURN_INTENT_ADAPTER.validate_python(value)
 
 
-class TurnInterpretationError(RuntimeError):
+class TurnInterpretationError(TurnProviderError):
     """A provider attempt failed before an authoritative resolution was created."""

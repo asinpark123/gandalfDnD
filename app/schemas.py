@@ -181,6 +181,7 @@ class TurnExecutionRead(BaseModel):
     state_revision_after: int | None
     interpretation_prompt_version: str | None
     narration_prompt_version: str | None
+    stage_started_at: datetime | None
     narration: str | None = Field(validation_alias="dm_narration")
     structured_output: dict | None
     created_at: datetime

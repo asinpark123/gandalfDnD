@@ -161,7 +161,10 @@ def test_check_uses_actor_state_and_retry_never_rerolls(client: TestClient) -> N
 
     with get_engine().begin() as connection:
         connection.execute(
-            text("UPDATE turns SET status = 'resolving', resolution_id = NULL WHERE id = :turn_id"),
+            text(
+                "UPDATE turns SET status = 'resolving', resolution_id = NULL, "
+                "stage_started_at = now() WHERE id = :turn_id"
+            ),
             {"turn_id": uuid.UUID(turn_id)},
         )
     interrupted_retry_random = _fixed_dice([2])

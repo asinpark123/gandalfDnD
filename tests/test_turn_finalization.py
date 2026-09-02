@@ -169,7 +169,13 @@ def test_movement_and_inventory_proposals_update_only_typed_state(
     moved = client.post(f"/campaigns/{campaign_id}/turn-executions/{movement}/finalize")
     assert moved.status_code == 200, moved.text
     assert moved.json()["state"]["location"]["name"] == "Old Tower"
-    assert _turn_event_types(movement) == ["player_action", "dm_response", "state_changed"]
+    assert _turn_event_types(movement) == [
+        "player_action",
+        "dm_response",
+        "scene_closed",
+        "scene_opened",
+        "state_changed",
+    ]
 
     inventory = _execution(
         client,
@@ -206,6 +212,8 @@ def test_check_outcome_controls_success_movement_and_failure_damage(
         "player_action",
         "rule_resolved",
         "dm_response",
+        "scene_closed",
+        "scene_opened",
         "state_changed",
     ]
 

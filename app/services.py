@@ -37,6 +37,7 @@ from app.llm.base import (
     TurnNarrationProvider,
 )
 from app.models import (
+    NPC,
     Campaign,
     CampaignEvent,
     Character,
@@ -47,6 +48,8 @@ from app.models import (
     RuleResolution,
     RulesetDataCatalog,
     RulesetRelease,
+    Scene,
+    SceneNPCPresence,
     Turn,
 )
 from app.resolution import (
@@ -81,6 +84,7 @@ from app.schemas import (
     TurnInterpretationRead,
     TurnNarrationOutput,
     TurnRead,
+    WorldStateRead,
 )
 from app.turn_errors import TurnProviderError
 from app.turn_interpretation import (
@@ -154,7 +158,12 @@ def _provider_failure(stage: str, exc: Exception) -> tuple[str, str]:
 
 
 def _campaign_for_update(session: Session, campaign_id: uuid.UUID) -> Campaign:
-    campaign = session.scalar(select(Campaign).where(Campaign.id == campaign_id).with_for_update())
+    campaign = session.scalar(
+        select(Campaign)
+        .where(Campaign.id == campaign_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
     if campaign is None:
         raise NotFoundError("Campaign not found")
     return campaign
@@ -241,6 +250,67 @@ def _validate_turn_actor(
     return character
 
 
+def get_world_state(session: Session, campaign_id: uuid.UUID) -> WorldStateRead:
+    campaign = session.get(Campaign, campaign_id)
+    if campaign is None:
+        raise NotFoundError("Campaign not found")
+    scene = session.scalar(
+        select(Scene).where(Scene.campaign_id == campaign_id, Scene.status == "active")
+    )
+    if scene is None:
+        raise ConflictError("Campaign has no active scene")
+    location = session.get(Location, scene.location_id)
+    if location is None:
+        raise ConflictError("Active scene has no location")
+    npcs = list(
+        session.scalars(
+            select(NPC)
+            .join(SceneNPCPresence, SceneNPCPresence.npc_id == NPC.id)
+            .where(
+                SceneNPCPresence.scene_id == scene.id,
+                SceneNPCPresence.status == "present",
+                NPC.status == "active",
+                NPC.visibility == "player",
+            )
+            .order_by(NPC.created_at, NPC.id)
+        )
+    )
+    return WorldStateRead(
+        campaign_id=campaign.id,
+        world_revision=campaign.world_revision,
+        location=location,
+        scene=scene,
+        present_npcs=npcs,
+    )
+
+
+def _validate_turn_target(
+    session: Session, campaign_id: uuid.UUID, target_npc_id: uuid.UUID | None
+) -> NPC | None:
+    if target_npc_id is None:
+        return None
+    npc = session.get(NPC, target_npc_id)
+    if npc is None or npc.campaign_id != campaign_id:
+        raise NotFoundError("Target NPC not found in campaign")
+    if npc.visibility != "player":
+        raise ConflictError("Target NPC is not player-visible")
+    if npc.status != "active":
+        raise ConflictError("Target NPC is not active")
+    present = session.scalar(
+        select(SceneNPCPresence.id)
+        .join(Scene, Scene.id == SceneNPCPresence.scene_id)
+        .where(
+            Scene.campaign_id == campaign_id,
+            Scene.status == "active",
+            SceneNPCPresence.npc_id == npc.id,
+            SceneNPCPresence.status == "present",
+        )
+    )
+    if present is None:
+        raise ConflictError("Target NPC is not present in the current scene")
+    return npc
+
+
 def create_turn_execution(
     session: Session,
     campaign_id: uuid.UUID,
@@ -257,6 +327,7 @@ def create_turn_execution(
         if (
             existing.player_action != data.action
             or existing.actor_character_id != data.actor_character_id
+            or existing.target_npc_id != data.target_npc_id
         ):
             raise ConflictError("command_id already exists with different turn input")
         if existing.workflow_version != TURN_WORKFLOW_TWO_STAGE:
@@ -267,6 +338,7 @@ def create_turn_execution(
     if active is not None:
         raise ConflictError(f"Campaign already has active turn {active.id}")
     character = _validate_turn_actor(session, campaign, data.actor_character_id)
+    target = _validate_turn_target(session, campaign_id, data.target_npc_id)
     sequence = (
         session.scalar(select(func.max(Turn.sequence)).where(Turn.campaign_id == campaign_id)) or 0
     ) + 1
@@ -276,10 +348,12 @@ def create_turn_execution(
         sequence=sequence,
         player_action=data.action,
         actor_character_id=character.id if character else None,
+        target_npc_id=target.id if target else None,
         workflow_version=TURN_WORKFLOW_TWO_STAGE,
         status="received",
         resumable=False,
         state_revision_before=character.state_revision if character else None,
+        world_revision_before=campaign.world_revision,
     )
     session.add(turn)
     session.flush()
@@ -290,6 +364,7 @@ def create_turn_execution(
         {
             "action": data.action,
             "actor_character_id": str(character.id) if character else None,
+            "target_npc_id": str(target.id) if target else None,
             "command_id": str(data.command_id),
             "workflow_version": TURN_WORKFLOW_TWO_STAGE,
         },
@@ -548,7 +623,22 @@ def interpret_turn_execution(
                 resume_status=None,
             )
             raise ConflictError("Acting character state changed after the turn was received")
-        context = _provider_context(get_campaign_state(session, campaign_id))
+        if campaign.world_revision != turn.world_revision_before:
+            mark_turn_execution_failed(
+                session,
+                campaign_id,
+                turn_id,
+                failure_stage="interpretation",
+                error_code="stale_world_state",
+                error_detail="Campaign world changed after the turn was received",
+                resume_status=None,
+            )
+            raise ConflictError("Campaign world changed after the turn was received")
+        context = _provider_context(
+            get_campaign_state(session, campaign_id),
+            get_world_state(session, campaign_id),
+            turn.target_npc_id,
+        )
         attempt = _next_provider_attempt(session, turn.id, "interpretation")
         player_action = turn.player_action
         turn.status = "interpreting"
@@ -605,7 +695,7 @@ def interpret_turn_execution(
             ) from exc
 
         latency_ms = max(0, round((perf_counter() - started) * 1000))
-        _campaign_for_update(session, campaign_id)
+        campaign = _campaign_for_update(session, campaign_id)
         turn = session.scalar(
             select(Turn)
             .where(Turn.campaign_id == campaign_id, Turn.id == turn_id)
@@ -620,7 +710,10 @@ def interpret_turn_execution(
             .with_for_update()
             .execution_options(populate_existing=True)
         )
-        stale_state = character is None or character.state_revision != turn.state_revision_before
+        stale_character = (
+            character is None or character.state_revision != turn.state_revision_before
+        )
+        stale_world = campaign.world_revision != turn.world_revision_before
         session.add(
             ProviderCall(
                 campaign_id=campaign_id,
@@ -639,11 +732,15 @@ def interpret_turn_execution(
         )
         turn.intent_output = intent.model_dump(mode="json")
         turn.interpretation_prompt_version = provider.interpretation_prompt_version
-        if stale_state:
+        if stale_character or stale_world:
             turn.status = "failed"
             turn.failure_stage = "interpretation"
-            turn.error_code = "stale_character_state"
-            turn.error_detail = "Acting character state changed during interpretation"
+            turn.error_code = "stale_world_state" if stale_world else "stale_character_state"
+            turn.error_detail = (
+                "Campaign world changed during interpretation"
+                if stale_world
+                else "Acting character state changed during interpretation"
+            )
             turn.resumable = False
             turn.stage_started_at = None
             turn.completed_at = datetime.now(UTC)
@@ -652,8 +749,8 @@ def interpret_turn_execution(
             turn.stage_started_at = None
         session.commit()
         session.refresh(turn)
-        if stale_state:
-            raise ConflictError("Acting character state changed during interpretation")
+        if stale_character or stale_world:
+            raise ConflictError(turn.error_detail or "Turn state changed during interpretation")
     elif turn.status in {"intent_ready", "resolving"}:
         intent = _stored_turn_intent(turn)
     else:
@@ -675,6 +772,18 @@ def interpret_turn_execution(
                 resume_status=None,
             )
             raise ConflictError("Acting character state changed before resolution")
+        campaign = _campaign_for_update(session, campaign_id)
+        if campaign.world_revision != turn.world_revision_before:
+            mark_turn_execution_failed(
+                session,
+                campaign_id,
+                turn_id,
+                failure_stage="resolution",
+                error_code="stale_world_state",
+                error_detail="Campaign world changed before resolution",
+                resume_status=None,
+            )
+            raise ConflictError("Campaign world changed before resolution")
         _campaign_for_update(session, campaign_id)
         turn = session.scalar(
             select(Turn)
@@ -883,6 +992,17 @@ def finalize_turn_execution(
             resume_status=None,
         )
         raise ConflictError("Acting character state changed before narration")
+    if campaign.world_revision != turn.world_revision_before:
+        mark_turn_execution_failed(
+            session,
+            campaign_id,
+            turn_id,
+            failure_stage="narration",
+            error_code="stale_world_state",
+            error_detail="Campaign world changed before narration",
+            resume_status=None,
+        )
+        raise ConflictError("Campaign world changed before narration")
     current_location = session.scalar(
         select(Location).where(
             Location.campaign_id == campaign_id,
@@ -892,7 +1012,11 @@ def finalize_turn_execution(
     if current_location is None:
         raise ConflictError("Campaign has no current location")
     location_id_before = current_location.id
-    context = _provider_context(get_campaign_state(session, campaign_id))
+    context = _provider_context(
+        get_campaign_state(session, campaign_id),
+        get_world_state(session, campaign_id),
+        turn.target_npc_id,
+    )
     attempt = _next_provider_attempt(session, turn.id, "narration")
     player_action = turn.player_action
     turn.status = "narrating"
@@ -946,7 +1070,7 @@ def finalize_turn_execution(
         ) from exc
 
     latency_ms = max(0, round((perf_counter() - started) * 1000))
-    _campaign_for_update(session, campaign_id)
+    campaign = _campaign_for_update(session, campaign_id)
     turn = session.scalar(
         select(Turn).where(Turn.campaign_id == campaign_id, Turn.id == turn_id).with_for_update()
     )
@@ -968,11 +1092,13 @@ def finalize_turn_execution(
         .with_for_update()
         .execution_options(populate_existing=True)
     )
+    stale_world = campaign.world_revision != turn.world_revision_before
     stale_state = (
         character is None
         or character.state_revision != turn.state_revision_before
         or current_location is None
         or current_location.id != location_id_before
+        or stale_world
     )
     if stale_state:
         _record_narration_failure(
@@ -982,14 +1108,22 @@ def finalize_turn_execution(
             attempt=attempt,
             provider=provider,
             latency_ms=latency_ms,
-            error_code="stale_campaign_state",
-            error_detail="Campaign state changed during narration",
+            error_code="stale_world_state" if stale_world else "stale_campaign_state",
+            error_detail=(
+                "Campaign world changed during narration"
+                if stale_world
+                else "Campaign state changed during narration"
+            ),
             resume_status=None,
             output=output,
             input_tokens=input_tokens,
             output_tokens=output_tokens,
         )
-        raise ConflictError("Campaign state changed during narration")
+        raise ConflictError(
+            "Campaign world changed during narration"
+            if stale_world
+            else "Campaign state changed during narration"
+        )
     assert character is not None
     try:
         StateChangeValidator().validate(
@@ -1028,13 +1162,11 @@ def finalize_turn_execution(
             structured_output=output.model_dump(mode="json"),
         )
     )
-    _apply_state_changes(session, campaign_id, character, output.state_changes)
     turn.dm_narration = output.narration
     turn.provider = provider.provider_name
     turn.model = provider.model_name
     turn.structured_output = output.model_dump(mode="json")
     turn.narration_prompt_version = provider.narration_prompt_version
-    turn.state_revision_after = character.state_revision
     _add_event(
         session,
         campaign_id,
@@ -1047,6 +1179,16 @@ def finalize_turn_execution(
         turn_id=turn.id,
         actor_character_id=character.id,
     )
+    _apply_state_changes(
+        session,
+        campaign_id,
+        character,
+        output.state_changes,
+        turn_id=turn.id,
+        actor_character_id=character.id,
+    )
+    turn.state_revision_after = character.state_revision
+    turn.world_revision_after = campaign.world_revision
     if output.state_changes:
         _add_event(
             session,
@@ -1151,6 +1293,7 @@ def create_campaign(session: Session, data: CampaignCreate) -> Campaign:
         is_current=True,
     )
     session.add(location)
+    session.flush()
     _add_event(
         session,
         campaign.id,
@@ -1167,6 +1310,73 @@ def create_campaign(session: Session, data: CampaignCreate) -> Campaign:
             },
         },
     )
+    scene_input = data.starting_scene
+    scene = Scene(
+        campaign_id=campaign.id,
+        location_id=location.id,
+        sequence=1,
+        title=scene_input.title if scene_input else location.name,
+        summary=scene_input.summary if scene_input else location.description,
+        status="active",
+        revision=0,
+    )
+    session.add(scene)
+    session.flush()
+    scene_event = _add_event(
+        session,
+        campaign.id,
+        "scene_opened",
+        {
+            "scene_id": str(scene.id),
+            "location_id": str(location.id),
+            "title": scene.title,
+            "world_revision": campaign.world_revision,
+        },
+    )
+    scene.opened_by_event_id = scene_event.id
+    for npc_input in scene_input.npcs if scene_input else []:
+        npc = NPC(
+            campaign_id=campaign.id,
+            name=npc_input.name,
+            public_description=npc_input.public_description,
+            status="active",
+            visibility="player",
+            revision=0,
+        )
+        session.add(npc)
+        session.flush()
+        introduced = _add_event(
+            session,
+            campaign.id,
+            "npc_introduced",
+            {
+                "npc_id": str(npc.id),
+                "name": npc.name,
+                "public_description": npc.public_description,
+                "world_revision": campaign.world_revision,
+            },
+        )
+        npc.introduced_by_event_id = introduced.id
+        arrived = _add_event(
+            session,
+            campaign.id,
+            "npc_arrived",
+            {
+                "npc_id": str(npc.id),
+                "scene_id": str(scene.id),
+                "world_revision": campaign.world_revision,
+            },
+        )
+        session.add(
+            SceneNPCPresence(
+                campaign_id=campaign.id,
+                scene_id=scene.id,
+                npc_id=npc.id,
+                status="present",
+                revision=0,
+                arrived_by_event_id=arrived.id,
+            )
+        )
     session.commit()
     return campaign
 
@@ -2017,7 +2227,11 @@ def replay_rule_resolution(
     )
 
 
-def _provider_context(state: CampaignState) -> dict[str, Any]:
+def _provider_context(
+    state: CampaignState,
+    world: WorldStateRead | None = None,
+    target_npc_id: uuid.UUID | None = None,
+) -> dict[str, Any]:
     campaign = state.campaign.model_dump(
         mode="json",
         include={
@@ -2111,13 +2325,26 @@ def _provider_context(state: CampaignState) -> dict[str, Any]:
                 },
             }
         characters.append(compact_character)
-    return {
+    context: dict[str, Any] = {
         "campaign": campaign,
         "characters": characters,
         "party_ready": state.party_ready,
         "location": state.location.model_dump(mode="json"),
         "turn_count": state.turn_count,
     }
+    if world is not None:
+        selected_target = next(
+            (npc for npc in world.present_npcs if npc.id == target_npc_id), None
+        )
+        context["world"] = {
+            "world_revision": world.world_revision,
+            "scene": world.scene.model_dump(mode="json"),
+            "present_npcs": [npc.model_dump(mode="json") for npc in world.present_npcs],
+            "selected_target": (
+                selected_target.model_dump(mode="json") if selected_target is not None else None
+            ),
+        }
+    return context
 
 
 def _apply_state_changes(
@@ -2125,8 +2352,13 @@ def _apply_state_changes(
     campaign_id: uuid.UUID,
     character: Character | None,
     changes: list,
+    *,
+    turn_id: uuid.UUID | None = None,
+    actor_character_id: uuid.UUID | None = None,
 ) -> None:
     character_changed = False
+    campaign = session.get(Campaign, campaign_id)
+    assert campaign is not None
     for change in changes:
         if isinstance(change, HPDelta):
             assert character is not None
@@ -2143,6 +2375,30 @@ def _apply_state_changes(
             character.inventory = inventory
             character_changed = True
         elif isinstance(change, MoveLocation):
+            active_scene = session.scalar(
+                select(Scene).where(
+                    Scene.campaign_id == campaign_id,
+                    Scene.status == "active",
+                )
+            )
+            if active_scene is None:
+                raise ConflictError("Campaign has no active scene")
+            next_world_revision = campaign.world_revision + 1
+            closed_event = _add_event(
+                session,
+                campaign_id,
+                "scene_closed",
+                {
+                    "scene_id": str(active_scene.id),
+                    "location_id": str(active_scene.location_id),
+                    "world_revision": next_world_revision,
+                },
+                turn_id=turn_id,
+                actor_character_id=actor_character_id,
+            )
+            active_scene.status = "closed"
+            active_scene.revision += 1
+            active_scene.closed_by_event_id = closed_event.id
             current = session.scalar(
                 select(Location).where(
                     Location.campaign_id == campaign_id, Location.is_current.is_(True)
@@ -2166,6 +2422,39 @@ def _apply_state_changes(
                 session.add(destination)
             else:
                 destination.is_current = True
+            session.flush()
+            scene_sequence = (
+                session.scalar(
+                    select(func.max(Scene.sequence)).where(Scene.campaign_id == campaign_id)
+                )
+                or 0
+            ) + 1
+            new_scene = Scene(
+                campaign_id=campaign_id,
+                location_id=destination.id,
+                sequence=scene_sequence,
+                title=destination.name,
+                summary=destination.description,
+                status="active",
+                revision=0,
+            )
+            session.add(new_scene)
+            session.flush()
+            opened_event = _add_event(
+                session,
+                campaign_id,
+                "scene_opened",
+                {
+                    "scene_id": str(new_scene.id),
+                    "location_id": str(destination.id),
+                    "title": new_scene.title,
+                    "world_revision": next_world_revision,
+                },
+                turn_id=turn_id,
+                actor_character_id=actor_character_id,
+            )
+            new_scene.opened_by_event_id = opened_event.id
+            campaign.world_revision = next_world_revision
     if character_changed and character is not None:
         character.state_revision += 1
 
@@ -2254,6 +2543,8 @@ def process_turn(
         resumable=False,
         state_revision_before=character.state_revision if character else None,
         state_revision_after=None,
+        world_revision_before=campaign.world_revision,
+        world_revision_after=None,
         completed_at=datetime.now(UTC),
     )
     session.add(turn)
@@ -2310,6 +2601,7 @@ def process_turn(
 
     _apply_state_changes(session, campaign_id, character, output.state_changes)
     turn.state_revision_after = character.state_revision if character else None
+    turn.world_revision_after = campaign.world_revision
     _add_event(
         session,
         campaign_id,

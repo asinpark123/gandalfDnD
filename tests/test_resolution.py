@@ -402,5 +402,5 @@ def test_migration_refuses_to_discard_recorded_resolutions(client: TestClient) -
         command.downgrade(config, "0004_party_commander_state")
     with get_engine().connect() as connection:
         assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == (
-            "0007_turn_stage_recovery"
+            "0008_world_presence"
         )

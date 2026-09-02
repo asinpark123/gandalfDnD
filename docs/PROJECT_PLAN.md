@@ -4,9 +4,9 @@
 - **Last updated:** 2026-09-03
 - **Rules baseline:** SRD 5.2.1 (pinned; character-state and check/save-resolution catalogs pass
   integrity and schema verification)
-- **Current delivery stage:** M3 Ready — the persistent-world strategy is defined and M3.1 scene/NPC
-  presence is next; M2 remains Done, while direct paid-provider integration remains deferred and
-  not authorized
+- **Current delivery stage:** M3 In Progress — M3.1 scene/NPC presence is Done and M3.2 typed facts,
+  relationships, supersession, and controlled reveal is Ready; M2 remains Done, while direct
+  paid-provider integration remains deferred and not authorized
 - **Canonical repository:** `~/Git/gandalfDnD`
 
 ## 1. Purpose of this document
@@ -319,7 +319,7 @@ Use these values consistently:
 | M0 | Persistence and safety foundation | Done | Canonical state and auditable turn skeleton |
 | M1 | Party character creation and deterministic mechanics | Done | The selected acting character's choices drive calculated outcomes |
 | M2 | Two-stage AI turn and model-authored feasibility | Done | Real DM-authored output uses recorded dice results safely through a private provider boundary |
-| M3 | Persistent world model | Ready | NPCs, quests, scenes, clues, time, decisions, and visibility |
+| M3 | Persistent world model | In Progress (M3.1 Done; M3.2 Ready) | NPCs, quests, scenes, clues, time, decisions, and visibility |
 | M4 | Long-term memory and retrieval | Proposed | Coherent recall without full history in context |
 | M5 | Basic deterministic combat | Proposed | Reproducible initiative, actions, attacks, and damage |
 | M6 | Spoiler-safe Guide | Proposed | Beginner help with enforceable knowledge boundaries |
@@ -927,7 +927,7 @@ optional direct paid-provider route remains deferred and is not required for M2 
 
 ### M3 — Persistent world model
 
-- **Status:** Ready
+- **Status:** In Progress — M3.1 Done; M3.2 Ready
 - **Depends on:** M2
 - **Detailed strategy:** [`M3_IMPLEMENTATION_STRATEGY.md`](M3_IMPLEMENTATION_STRATEGY.md)
 
@@ -945,6 +945,14 @@ Delivery sequence:
 4. M3.4 adds factions, bounded narrative time, complete visibility projections, and context budgets.
 5. M3.5 runs the deterministic branching Lantern scenario and owner acceptance gate before any
    separately approved capped OpenClaw rerun.
+
+M3.1 completion evidence (2026-09-03): migration `0008_world_presence` safely backfills one active
+scene per existing campaign and guards destructive downgrade; optional starting scenes and up to
+eight player-visible NPCs use stable UUID identities and durable presence; the player-safe world
+aggregate, explicit target validation/idempotency, compact provider context, causal movement scene
+transitions, and interpretation/narration world-revision race checks are implemented. Six focused
+M3.1 tests and all 102 normal repository tests pass with lint and zero Alembic drift; the one live
+OpenClaw test remains opt-in/skipped, and Clawvis was not touched.
 
 World state is relational and causal. Names are display data; UUIDs are authoritative. Narrative
 facts are mechanically inert unless a separately implemented rule or versioned house-rule resolver
@@ -1203,15 +1211,15 @@ Destination milestone:
 
 ## 17. Immediate next actions
 
-1. Implement M3.1's migration and backfill: campaign/turn world revisions, one active scene for each
-   existing campaign location, stable NPC identity, and scene presence with safe constraints.
-2. Add the optional bounded starting-scene/NPC campaign contract, player-safe aggregate world read,
-   and explicit `target_npc_id` turn field with pre-provider presence/visibility validation.
-3. Integrate scene transitions and world-revision stale checks into M2 atomic finalization/recovery;
-   add migration, duplicate-name, cross-campaign, hidden-target, rollback, restart, and context-size
-   fixtures before expanding the world schema.
-4. Advance M3.1 to Verification only after all M0–M2 regressions, migration drift, and documentation
-   gates pass. No owner input or live model call is needed for this first slice.
+1. Implement M3.2's small typed narrative-fact registry for attitudes, promises, discoveries, and
+   clues; keep every fact mechanically inert and reject arbitrary predicates or numeric mechanics.
+2. Add durable relationship/fact supersession and explicit reveal with causal event links and
+   campaign world-revision advancement in the existing atomic finalization transaction.
+3. Extend the player API and provider projection so DM-only fact values remain absent before reveal,
+   including audit/error adversarial tests and bounded current-fact context.
+4. Verify persistence, supersession history, rollback, restart, campaign isolation, migration
+   safety, all M0–M3.1 regressions, and zero Alembic drift before advancing to M3.3. No owner input
+   or live model call is required for M3.2.
 
 ## 18. Documentation change log
 
@@ -1243,3 +1251,4 @@ Destination milestone:
 | 2026-09-02 | DOC-024 | Adopted OpenClaw as the preferred subscription-backed M2.5A transport, implemented and offline-verified the Gandalf adapter, documented the read-only Clawvis audit and activation boundary, separated model from GM profile, and retained manual/direct-API fallbacks as distinct evidence paths | The owner approved the direction; Clawvis exposes a compatible private OAuth-backed gateway, and 25 focused plus all 95 repository tests pass with lint/format/compilation/ruleset/schema/migration-drift gates green, without a live call or Clawvis mutation | Obtain explicit authorization for the narrow Clawvis change set, activate privately, smoke-test, and run the ten-scenario live Lantern gate; keep direct API spend deferred |
 | 2026-09-02 | DOC-025 | Activated and hardened the private Clawvis/OpenClaw route, replaced the incompatible required-function transport with layered exact-schema validation, compacted provider context, passed three live Lantern runs, and closed M2 with permanent evidence | The exact final prompt versions completed 10 turns and 20 real calls plus one injected/recovered timeout; all deterministic boundaries passed, input use remained 44.4% below baseline at 419,782 tokens, and all 96 normal tests plus static/schema/migration gates passed | Commit and push M2 closure, then prepare the M3 strategy |
 | 2026-09-03 | DOC-026 | Prepared the M3 persistent-world strategy, advanced M3 to Ready, and defined scene/NPC presence, world revisions, typed facts, explicit decisions, visibility, context, risks, and five vertical slices | M2's absent-innkeeper observation and the preserved event/fact research identify exact presence, target, causality, and spoiler boundaries as the next trustworthy foundation | Implement and verify M3.1 without adding RAG, combat, generic workflow infrastructure, or hidden model context |
+| 2026-09-03 | DOC-027 | Completed M3.1 and advanced M3.2 to Ready with migration `0008`, stable NPC identity/presence, player-safe world reads, explicit targets, causal scene transitions, and world-revision concurrency checks | Six focused tests cover duplicate names, visibility/presence/campaign isolation, target idempotency, restart, migration safety, bounded provider context, and interpretation/narration races; all 102 normal tests, lint, and zero drift pass without external calls | Implement M3.2 typed narrative-only facts, relationships, supersession, and controlled reveal while preserving the no-hidden-context and no-implicit-mechanics boundaries |

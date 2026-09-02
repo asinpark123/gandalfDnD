@@ -19,6 +19,8 @@ class StateChangeValidator:
     def validate(
         self, snapshot: CharacterSnapshot | None, changes: list[StateChange]
     ) -> CharacterSnapshot | None:
+        if sum(isinstance(change, MoveLocation) for change in changes) > 1:
+            raise InvalidStateChange("A turn can contain at most one location move")
         current = snapshot
         for change in changes:
             if isinstance(change, MoveLocation):

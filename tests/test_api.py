@@ -212,11 +212,14 @@ def test_guided_character_creation_persists_state_turns_and_events(client: TestC
     assert events.status_code == 200
     assert [event["event_type"] for event in events.json()] == [
         "campaign_created",
+        "scene_opened",
         "character_draft_created",
         "character_draft_created",
         "character_finalized",
         "character_finalized",
         "player_action",
+        "scene_closed",
+        "scene_opened",
         "dm_response",
         "state_changed",
     ]

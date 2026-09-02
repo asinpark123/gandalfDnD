@@ -262,6 +262,8 @@ def test_post_resolution_timeout_resume_reuses_exact_dice_after_restart(
         "player_action",
         "rule_resolved",
         "dm_response",
+        "scene_closed",
+        "scene_opened",
         "state_changed",
     ]
     calls = client.get(f"/campaigns/{campaign_id}/turn-executions/{turn_id}/provider-calls").json()
@@ -475,6 +477,11 @@ def test_ten_consecutive_deterministic_lantern_scenarios(client: TestClient) -> 
         if interpreted.json()["resolution"] is not None:
             expected.insert(1, "rule_resolved")
         if finalized.json()["turn"]["structured_output"]["state_changes"]:
+            if any(
+                change["type"] == "move_location"
+                for change in finalized.json()["turn"]["structured_output"]["state_changes"]
+            ):
+                expected.extend(["scene_closed", "scene_opened"])
             expected.append("state_changed")
         assert _turn_events(turn_id) == expected
 

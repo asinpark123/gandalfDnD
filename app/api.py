@@ -37,6 +37,7 @@ from app.schemas import (
     TurnFinalizationRead,
     TurnInterpretationRead,
     TurnRead,
+    WorldStateRead,
 )
 from app.services import (
     ConflictError,
@@ -53,6 +54,7 @@ from app.services import (
     get_character_read,
     get_rule_resolution,
     get_turn_execution,
+    get_world_state,
     interpret_turn_execution,
     list_character_grants,
     list_characters,
@@ -247,6 +249,15 @@ def create_app() -> FastAPI:
             return get_campaign_state(session, campaign_id)
         except NotFoundError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    @app.get("/campaigns/{campaign_id}/world", response_model=WorldStateRead)
+    def campaigns_world(campaign_id: uuid.UUID, session: SessionDep) -> WorldStateRead:
+        try:
+            return get_world_state(session, campaign_id)
+        except NotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except ConflictError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
 
     @app.post(
         "/campaigns/{campaign_id}/turns",

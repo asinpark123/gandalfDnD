@@ -1,6 +1,6 @@
 # M3 Persistent World Implementation Strategy
 
-- **Status:** Ready
+- **Status:** In progress — M3.1 Done; M3.2 Ready
 - **Prepared:** 2026-09-03
 - **Depends on:** M2 two-stage AI turn and model-authored feasibility (Done)
 - **Owner input required now:** No; M3 begins with a neutral, mechanically inert world fixture
@@ -273,6 +273,8 @@ design that prevents them from reaching player output; that is not assumed here.
 
 ### M3.1 — Scene and NPC presence foundation
 
+**Status:** Done (2026-09-03)
+
 Player outcome: a player can target a known present NPC, while an absent, hidden, inactive, or
 cross-campaign NPC is rejected before any provider call.
 
@@ -289,6 +291,22 @@ Deliver:
 Exit evidence: presence/absence, duplicate names, cross-campaign IDs, hidden NPC filtering,
 movement, actor/target isolation, idempotency, stale-world finalization, restart, migration, and
 context-budget fixtures pass.
+
+Implemented evidence:
+
+- migration `0008_world_presence` adds guarded/backfilled campaign and turn world revisions,
+  scenes, stable NPC identities, scene presence, causal event links, and explicit NPC targets;
+- campaign creation accepts up to eight optional starting NPCs, while omitted input remains
+  compatible and creates a safe empty active scene;
+- `GET /campaigns/{campaign_id}/world` returns only active, player-visible NPCs in the active scene;
+- target UUID validation rejects hidden, inactive, absent, and cross-campaign NPCs before provider
+  work, and command idempotency includes the target;
+- interpretation and narration receive a bounded player-safe current-world projection and reject
+  a changed `world_revision` after an external provider call;
+- accepted movement closes the prior scene, opens the destination scene, advances the world
+  revision once, emits causal events, and makes prior presences unavailable;
+- six focused M3.1 tests plus the full 102-test normal suite, lint, and zero Alembic drift pass; the
+  opt-in live OpenClaw test remains skipped and no external call or Clawvis change was made.
 
 ### M3.2 — Typed facts, relationships, and reveal
 
@@ -420,5 +438,6 @@ domain validation failure before provider work creates no provider audit.
 
 Each slice is committed only when it crosses migration, ORM, schema, API, service, events, tests,
 and documentation. A later slice that invalidates an earlier visibility, identity, causality, or
-restart guarantee moves that slice back to Rework. M3 planning is complete with this document; M3
-implementation begins at M3.1.
+restart guarantee moves that slice back to Rework. M3 planning is complete with this document. M3.1
+is verified and complete; implementation proceeds to M3.2's typed narrative-only facts,
+relationships, supersession, and controlled reveal.

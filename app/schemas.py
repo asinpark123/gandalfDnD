@@ -17,6 +17,22 @@ from app.resolution import (
 from app.turn_interpretation import TurnIntent
 
 ShortText = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=160)]
+NPCName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=120)]
+
+
+class StartingNPCCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: NPCName
+    public_description: str | None = Field(default=None, max_length=2000)
+
+
+class StartingSceneCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    title: ShortText
+    summary: str | None = Field(default=None, max_length=2000)
+    npcs: list[StartingNPCCreate] = Field(default_factory=list, max_length=8)
 
 
 class CampaignCreate(BaseModel):
@@ -25,6 +41,7 @@ class CampaignCreate(BaseModel):
     name: ShortText
     ruleset_release_id: str = Field(default="srd-5.2.1", pattern=r"^[a-z0-9][a-z0-9.-]{2,79}$")
     starting_location: ShortText = "Roadside Inn"
+    starting_scene: StartingSceneCreate | None = None
 
 
 class CampaignRead(BaseModel):
@@ -38,6 +55,7 @@ class CampaignRead(BaseModel):
     play_mode: str
     party_min_active: int
     party_max_active: int
+    world_revision: int
     created_at: datetime
 
 
@@ -101,6 +119,37 @@ class LocationRead(BaseModel):
     description: str | None
 
 
+class SceneRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    sequence: int
+    title: str
+    summary: str | None
+    status: str
+    revision: int
+    created_at: datetime
+
+
+class NPCRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    name: str
+    public_description: str | None
+    status: str
+    revision: int
+    created_at: datetime
+
+
+class WorldStateRead(BaseModel):
+    campaign_id: uuid.UUID
+    world_revision: int
+    location: LocationRead
+    scene: SceneRead
+    present_npcs: list[NPCRead]
+
+
 class HPDelta(BaseModel):
     type: Literal["hp_delta"]
     amount: int = Field(ge=-999, le=999)
@@ -157,6 +206,7 @@ class TurnExecutionCreate(TurnCreate):
     model_config = ConfigDict(extra="forbid")
 
     command_id: uuid.UUID
+    target_npc_id: uuid.UUID | None = None
 
 
 class TurnExecutionRead(BaseModel):
@@ -168,6 +218,7 @@ class TurnExecutionRead(BaseModel):
     sequence: int
     player_action: str
     actor_character_id: uuid.UUID | None
+    target_npc_id: uuid.UUID | None
     workflow_version: str
     status: str
     failure_stage: str | None
@@ -179,6 +230,8 @@ class TurnExecutionRead(BaseModel):
     resolution_id: uuid.UUID | None
     state_revision_before: int | None
     state_revision_after: int | None
+    world_revision_before: int | None
+    world_revision_after: int | None
     interpretation_prompt_version: str | None
     narration_prompt_version: str | None
     stage_started_at: datetime | None

@@ -99,10 +99,13 @@ class Campaign(TimestampMixin, Base):
     play_mode: Mapped[str] = mapped_column(String(30), nullable=False, default="party_commander")
     party_min_active: Mapped[int] = mapped_column(Integer, nullable=False, default=2)
     party_max_active: Mapped[int] = mapped_column(Integer, nullable=False, default=4)
+    world_revision: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
     ruleset_release: Mapped[RulesetRelease] = relationship(back_populates="campaigns")
     characters: Mapped[list["Character"]] = relationship(back_populates="campaign")
     locations: Mapped[list["Location"]] = relationship(back_populates="campaign")
+    scenes: Mapped[list["Scene"]] = relationship(back_populates="campaign")
+    npcs: Mapped[list["NPC"]] = relationship(back_populates="campaign")
 
     __table_args__ = (
         CheckConstraint("status IN ('active', 'archived')", name="campaign_status"),
@@ -114,6 +117,7 @@ class Campaign(TimestampMixin, Base):
             "AND party_max_active <= 4",
             name="campaign_party_size_bounds",
         ),
+        CheckConstraint("world_revision >= 0", name="campaign_world_revision_nonnegative"),
     )
 
 
@@ -137,6 +141,143 @@ class Location(TimestampMixin, Base):
             "campaign_id",
             unique=True,
             postgresql_where=text("is_current"),
+        ),
+    )
+
+
+class Scene(TimestampMixin, Base):
+    __tablename__ = "scenes"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    campaign_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("campaigns.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    location_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("locations.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    sequence: Mapped[int] = mapped_column(Integer, nullable=False)
+    title: Mapped[str] = mapped_column(String(160), nullable=False)
+    summary: Mapped[str | None] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="active")
+    revision: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    opened_by_event_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey(
+            "campaign_events.id",
+            name="scenes_opened_by_event_id_fkey",
+            ondelete="SET NULL",
+            use_alter=True,
+        )
+    )
+    closed_by_event_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey(
+            "campaign_events.id",
+            name="scenes_closed_by_event_id_fkey",
+            ondelete="SET NULL",
+            use_alter=True,
+        )
+    )
+
+    campaign: Mapped[Campaign] = relationship(back_populates="scenes")
+    location: Mapped[Location] = relationship()
+    presences: Mapped[list["SceneNPCPresence"]] = relationship(back_populates="scene")
+
+    __table_args__ = (
+        UniqueConstraint("campaign_id", "sequence", name="uq_scenes_campaign_sequence"),
+        CheckConstraint("sequence > 0", name="scene_sequence_positive"),
+        CheckConstraint("status IN ('active', 'closed')", name="scene_status"),
+        CheckConstraint("revision >= 0", name="scene_revision_nonnegative"),
+        Index(
+            "uq_scenes_one_active_per_campaign",
+            "campaign_id",
+            unique=True,
+            postgresql_where=text("status = 'active'"),
+        ),
+    )
+
+
+class NPC(TimestampMixin, Base):
+    __tablename__ = "npcs"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    campaign_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("campaigns.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    public_description: Mapped[str | None] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="active")
+    visibility: Mapped[str] = mapped_column(String(20), nullable=False, default="player")
+    revision: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    introduced_by_event_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey(
+            "campaign_events.id",
+            name="npcs_introduced_by_event_id_fkey",
+            ondelete="SET NULL",
+            use_alter=True,
+        )
+    )
+
+    campaign: Mapped[Campaign] = relationship(back_populates="npcs")
+    presences: Mapped[list["SceneNPCPresence"]] = relationship(back_populates="npc")
+
+    __table_args__ = (
+        CheckConstraint("status IN ('active', 'inactive')", name="npc_status"),
+        CheckConstraint("visibility IN ('player', 'dm_only')", name="npc_visibility"),
+        CheckConstraint("revision >= 0", name="npc_revision_nonnegative"),
+    )
+
+
+class SceneNPCPresence(TimestampMixin, Base):
+    __tablename__ = "scene_npc_presences"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    campaign_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("campaigns.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    scene_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("scenes.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    npc_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("npcs.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="present")
+    revision: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    arrived_by_event_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey(
+            "campaign_events.id",
+            name="scene_npc_presences_arrived_by_event_id_fkey",
+            ondelete="SET NULL",
+            use_alter=True,
+        )
+    )
+    departed_by_event_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey(
+            "campaign_events.id",
+            name="scene_npc_presences_departed_by_event_id_fkey",
+            ondelete="SET NULL",
+            use_alter=True,
+        )
+    )
+
+    scene: Mapped[Scene] = relationship(back_populates="presences")
+    npc: Mapped[NPC] = relationship(back_populates="presences")
+
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('present', 'departed')", name="scene_npc_presence_status"
+        ),
+        CheckConstraint("revision >= 0", name="scene_npc_presence_revision_nonnegative"),
+        Index(
+            "uq_scene_npc_one_present_scene",
+            "scene_id",
+            "npc_id",
+            unique=True,
+            postgresql_where=text("status = 'present'"),
+        ),
+        Index(
+            "uq_scene_npc_one_current_presence",
+            "npc_id",
+            unique=True,
+            postgresql_where=text("status = 'present'"),
         ),
     )
 
@@ -208,6 +349,9 @@ class Turn(TimestampMixin, Base):
     actor_character_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("characters.id", ondelete="SET NULL"), index=True
     )
+    target_npc_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("npcs.id", ondelete="SET NULL"), index=True
+    )
     workflow_version: Mapped[str] = mapped_column(String(40), nullable=False)
     status: Mapped[str] = mapped_column(String(30), nullable=False)
     failure_stage: Mapped[str | None] = mapped_column(String(30))
@@ -227,6 +371,8 @@ class Turn(TimestampMixin, Base):
     )
     state_revision_before: Mapped[int | None] = mapped_column(Integer)
     state_revision_after: Mapped[int | None] = mapped_column(Integer)
+    world_revision_before: Mapped[int | None] = mapped_column(Integer)
+    world_revision_after: Mapped[int | None] = mapped_column(Integer)
     interpretation_prompt_version: Mapped[str | None] = mapped_column(String(60))
     narration_prompt_version: Mapped[str | None] = mapped_column(String(60))
     stage_started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -256,6 +402,14 @@ class Turn(TimestampMixin, Base):
         CheckConstraint(
             "state_revision_after IS NULL OR state_revision_after >= 0",
             name="turn_state_revision_after_nonnegative",
+        ),
+        CheckConstraint(
+            "world_revision_before IS NULL OR world_revision_before >= 0",
+            name="turn_world_revision_before_nonnegative",
+        ),
+        CheckConstraint(
+            "world_revision_after IS NULL OR world_revision_after >= 0",
+            name="turn_world_revision_after_nonnegative",
         ),
         CheckConstraint(
             "(status = 'failed' AND failure_stage IS NOT NULL AND error_code IS NOT NULL) OR "

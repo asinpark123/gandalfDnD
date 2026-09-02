@@ -44,8 +44,9 @@ and complete level-one character state are Done. M1.4 authoritative ability-chec
 resolution is also Done after automated and owner runtime verification. The complete M1 gate is
 Done. M2 is also Done: the resumable two-stage workflow, deterministic Lantern suite, private
 OpenClaw activation, and three passing ten-scenario live model-authored runs are verified. Direct
-paid API integration remains deferred and paid model calls remain disabled. M3 is Ready;
-implementation begins with exact scene/NPC presence, explicit target IDs, and world-revision safety.
+paid API integration remains deferred and paid model calls remain disabled. M3.1 is Done with exact
+scene/NPC presence, explicit target IDs, and world-revision safety; M3.2 typed narrative facts,
+relationships, supersession, and controlled reveal is Ready.
 
 ## Versioned rulesets
 

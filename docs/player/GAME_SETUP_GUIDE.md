@@ -101,6 +101,8 @@ campaign preferences. GandalfDnD keeps those concepts separate:
 
 The API and frontend do not yet expose these setup selectors. The accepted M2.5 values are currently
 development/evaluation policy, and OpenClaw's optional model/style settings are global deployment
-configuration rather than per-campaign player choices. When campaign setup is implemented, this
-guide must be updated with the exact fields, defaults, validation errors, supported model list, and
-interface steps before ordinary-player testing.
+configuration rather than per-campaign player choices. The owner's private deployment has passed
+the classic-heroic live evaluation, but that does not make every model/profile combination
+supported. When campaign setup is implemented, this guide must be updated with the exact fields,
+defaults, validation errors, evaluated model list, and interface steps before ordinary-player
+testing.

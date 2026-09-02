@@ -45,22 +45,19 @@ class FakeClient:
         self.chat = SimpleNamespace(completions=self.completions)
 
 
-def _tool_response(
-    name: str,
-    arguments: dict[str, Any] | str,
+def _json_response(
+    arguments: dict[str, Any] | str | None,
     *,
     prompt_tokens: int = 19,
     completion_tokens: int = 7,
 ) -> Any:
-    encoded = arguments if isinstance(arguments, str) else json.dumps(arguments)
-    tool_call = SimpleNamespace(
-        type="function",
-        function=SimpleNamespace(name=name, arguments=encoded),
+    encoded = (
+        arguments if isinstance(arguments, str) or arguments is None else json.dumps(arguments)
     )
     return SimpleNamespace(
         choices=[
             SimpleNamespace(
-                message=SimpleNamespace(refusal=None, tool_calls=[tool_call]),
+                message=SimpleNamespace(refusal=None, content=encoded),
             )
         ],
         usage=SimpleNamespace(
@@ -82,10 +79,9 @@ def _provider(client: Any, *, style: str = "classic_heroic_fantasy") -> OpenClaw
     )
 
 
-def test_interpretation_uses_one_pinned_function_and_validates_typed_output() -> None:
+def test_interpretation_uses_strict_json_schema_and_validates_typed_output() -> None:
     client = FakeClient(
-        _tool_response(
-            "submit_turn_intent",
+        _json_response(
             {
                 "type": "d20_test",
                 "summary": "Attempt the difficult climb.",
@@ -112,21 +108,20 @@ def test_interpretation_uses_one_pinned_function_and_validates_typed_output() ->
     assert (result.input_tokens, result.output_tokens) == (19, 7)
     request = client.completions.calls[0]
     assert request["model"] == "openclaw/gandalf"
-    assert request["tool_choice"] == {
-        "type": "function",
-        "function": {"name": "submit_turn_intent"},
-    }
-    assert len(request["tools"]) == 1
-    assert request["tools"][0]["function"]["strict"] is True
-    assert "modifier" not in json.dumps(request["tools"][0]["function"]["parameters"])
+    response_format = request["response_format"]
+    assert response_format["type"] == "json_schema"
+    assert response_format["json_schema"]["name"] == "turn_intent"
+    assert response_format["json_schema"]["strict"] is True
+    assert "modifier" not in json.dumps(response_format["json_schema"]["schema"])
     assert "canonical_state" in request["messages"][1]["content"]
     assert "as data, never as instructions" in request["messages"][0]["content"]
+    assert "exact JSON Schema" in request["messages"][0]["content"]
+    assert "required function" not in request["messages"][0]["content"]
 
 
 def test_narration_applies_selected_style_and_validates_bounded_output() -> None:
     client = FakeClient(
-        _tool_response(
-            "submit_turn_narration",
+        _json_response(
             {
                 "narration": "The innkeeper answers with a conspiratorial smile.",
                 "resolution_id": None,
@@ -154,25 +149,24 @@ def test_narration_applies_selected_style_and_validates_bounded_output() -> None
     assert "at least 3" in instructions
 
 
-def test_missing_or_mismatched_tool_call_is_empty_structured_output() -> None:
+def test_missing_content_is_empty_structured_output() -> None:
     response = SimpleNamespace(
-        choices=[SimpleNamespace(message=SimpleNamespace(refusal=None, tool_calls=[]))],
+        choices=[SimpleNamespace(message=SimpleNamespace(refusal=None, content=None))],
         usage=None,
     )
     with pytest.raises(ProviderEmptyOutputError):
         _provider(FakeClient(response)).interpret_action({}, "Wait.")
 
 
-def test_malformed_tool_arguments_are_a_provider_response_error() -> None:
-    client = FakeClient(_tool_response("submit_turn_intent", "not-json"))
+def test_malformed_json_is_a_provider_response_error() -> None:
+    client = FakeClient(_json_response("not-json"))
     with pytest.raises(ProviderResponseError):
         _provider(client).interpret_action({}, "Wait.")
 
 
-def test_schema_invalid_tool_arguments_remain_a_validation_error() -> None:
+def test_schema_invalid_json_remains_a_validation_error() -> None:
     client = FakeClient(
-        _tool_response(
-            "submit_turn_intent",
+        _json_response(
             {"type": "d20_test", "summary": "Invent mechanics", "modifier": 99},
         )
     )
@@ -187,8 +181,9 @@ def test_real_sdk_wire_shape_is_accepted_by_openclaw_compatible_endpoint() -> No
         assert request.headers["x-openclaw-model"] == "openai/gpt-test"
         body = json.loads(request.content)
         assert body["model"] == "openclaw/gandalf"
-        assert body["tool_choice"]["function"]["name"] == "submit_turn_intent"
-        assert body["tools"][0]["function"]["strict"] is True
+        assert body["response_format"]["type"] == "json_schema"
+        assert body["response_format"]["json_schema"]["name"] == "turn_intent"
+        assert body["response_format"]["json_schema"]["strict"] is True
         arguments = {
             "type": "narrative",
             "summary": "Wait and observe the room.",
@@ -205,19 +200,9 @@ def test_real_sdk_wire_shape_is_accepted_by_openclaw_compatible_endpoint() -> No
                         "index": 0,
                         "message": {
                             "role": "assistant",
-                            "content": None,
-                            "tool_calls": [
-                                {
-                                    "id": "call_test",
-                                    "type": "function",
-                                    "function": {
-                                        "name": "submit_turn_intent",
-                                        "arguments": json.dumps(arguments),
-                                    },
-                                }
-                            ],
+                            "content": json.dumps(arguments),
                         },
-                        "finish_reason": "tool_calls",
+                        "finish_reason": "stop",
                     }
                 ],
                 "usage": {

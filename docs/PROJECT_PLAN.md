@@ -4,9 +4,9 @@
 - **Last updated:** 2026-09-02
 - **Rules baseline:** SRD 5.2.1 (pinned; character-state and check/save-resolution catalogs pass
   integrity and schema verification)
-- **Current delivery stage:** M2 Verification — M2.1–M2.4 are Done; the M2.5A OpenClaw adapter is
-  implemented and offline-verified, while live Clawvis activation and the Lantern evaluation are
-  pending; direct paid-provider integration is deferred and not authorized
+- **Current delivery stage:** M2 Done — the private OpenClaw activation and three ten-scenario live
+  Lantern runs passed; M3 persistent-world planning is next, while direct paid-provider integration
+  remains deferred and not authorized
 - **Canonical repository:** `~/Git/gandalfDnD`
 
 ## 1. Purpose of this document
@@ -96,6 +96,7 @@ Current documentation index:
 | M1.4 raw owner acceptance evidence | [`testM1_4_ACCEPTANCE_CHECKLIST_RESULTS.md`](testM1_4_ACCEPTANCE_CHECKLIST_RESULTS.md) |
 | M2 two-stage turn engineering and acceptance strategy | [`M2_IMPLEMENTATION_STRATEGY.md`](M2_IMPLEMENTATION_STRATEGY.md) |
 | OpenClaw provider topology, security, activation, and model/GM-style policy | [`OPENCLAW_INTEGRATION.md`](OPENCLAW_INTEGRATION.md) |
+| M2.5A live OpenClaw evaluation and usage/latency evidence | [`M2_5_OPENCLAW_EVALUATION.md`](M2_5_OPENCLAW_EVALUATION.md) |
 
 ## 2. Product objective
 
@@ -279,7 +280,7 @@ results, known limitations, and where observations will be recorded.
 | M1.2 guided creation | None; the supported slice and deferrals are already accepted | Optional API/Swagger review of valid creation, rejected invalid choices, finalized sheet, and provenance |
 | M1.3 Party Commander and complete character state | Completed 2026-09-01; no further input required | Owner confirmed the API exposes the correct structured values; presentation clarity and end-user corrective guidance are deferred to the M7 interface checkpoint |
 | M1.4 deterministic resolution | Completed 2026-09-02; no further input required | All nine owner actions passed, including canonical modifiers, modifier rejection, Advantage/Disadvantage, actor attribution, and confirmed post-restart replay |
-| M2 model-authored feasibility | Content settings and the OpenClaw direction are accepted. Explicit authorization is now required for the narrow Clawvis mutation: dedicated restricted agent plus authenticated HTTP endpoint. Any direct paid-provider test still needs separate authorization and a cap | Critical live OpenClaw Lantern Test covering dialogue, movement, inventory, check, damage, restart, resume, and narration/mechanics agreement; manual fallback and direct paid transport remain separately classified evidence |
+| M2 model-authored feasibility | Completed 2026-09-02; no further input required. Any optional direct paid-provider test still needs separate authorization and a cap | The private OpenClaw activation, smoke checks, and three ten-scenario live Lantern runs passed; manual fallback and direct paid transport remain separately classified evidence |
 | M3 persistent world | Provide campaign-structure preferences when they affect consequence and quest design | Multi-session play test confirming decisions, NPC relationships, quests, and revealed facts persist coherently across restarts |
 | M1.5 content expansion | Prioritize desired species, backgrounds, classes, feats, equipment routes, spellcasting, and play styles | Create contrasting supported characters and confirm their choices produce understandable, distinct state and later gameplay |
 | M5 party combat | Provide difficulty/lethality feedback for standard party play; companion autonomy and lone-hero compensation remain later decisions | Repeated Party Commander combat tests across favorable, difficult, defeat, recovery, and restart scenarios |
@@ -316,7 +317,7 @@ Use these values consistently:
 | --- | --- | --- | --- |
 | M0 | Persistence and safety foundation | Done | Canonical state and auditable turn skeleton |
 | M1 | Party character creation and deterministic mechanics | Done | The selected acting character's choices drive calculated outcomes |
-| M2 | Two-stage AI turn and model-authored feasibility | Verification (M2.1–M2.4 Done; M2.5A adapter offline-verified, live activation pending) | Real DM-authored output uses recorded dice results safely through a private provider boundary |
+| M2 | Two-stage AI turn and model-authored feasibility | Done | Real DM-authored output uses recorded dice results safely through a private provider boundary |
 | M3 | Persistent world model | Proposed | NPCs, quests, scenes, clues, time, and visibility |
 | M4 | Long-term memory and retrieval | Proposed | Coherent recall without full history in context |
 | M5 | Basic deterministic combat | Proposed | Reproducible initiative, actions, attacks, and damage |
@@ -824,8 +825,8 @@ Review findings and decision:
 
 ### M2 — Two-stage AI turn and model-authored feasibility
 
-- **Status:** Verification — M2.1–M2.4 Done; M2.5A OpenClaw adapter implemented and
-  offline-verified, live activation pending
+- **Status:** Done
+- **Completed:** 2026-09-02
 - **Depends on:** M1
 - **Detailed strategy:** [`M2_IMPLEMENTATION_STRATEGY.md`](M2_IMPLEMENTATION_STRATEGY.md)
 
@@ -898,22 +899,30 @@ outside changes is terminal. Ten consecutive deterministic two-character Lantern
 compilation, catalog/schema checks, applied development migration, and zero Alembic drift pass, and
 no external or paid call was made. The owner then selected a no-extra-cost M2.5A path, accepted the
 initial content profile and fixed non-lethal environmental harm, and subsequently approved OpenClaw
-as the preferred provider transport. A read-only Clawvis audit confirmed a usable OpenAI OAuth
-profile, loopback token-authenticated gateway, compatible HTTP endpoint implementation, and allowed
-models, but also confirmed that the endpoint is disabled and no dedicated `gandalf` agent exists.
-No Clawvis setting was changed and no live model call was made.
+as the preferred provider transport. A read-only Clawvis audit first confirmed a usable OpenAI
+OAuth profile, loopback token-authenticated gateway, compatible HTTP endpoint implementation, and
+allowed models. After the owner's explicit authorization, the endpoint was enabled without changing
+its loopback/token boundary and a dedicated restricted `gandalf` agent was provisioned with no
+channels, skills, memory search, or workspace context injection.
 
-The Gandalf-side OpenClaw adapter now implements both typed stages through pinned function tools,
-strict Pydantic validation, independent model and GM-style configuration, private bearer routing,
-and stable authentication/rate-limit/response/connection/timeout error mapping. Mocked SDK and wire
-tests pass alongside existing failure-hardening fixtures: 25 focused tests and all 95 repository
-tests pass, with lint, format, compilation, ruleset/catalog, generated-schema, and zero Alembic
-drift gates green. Live activation, a smoke test, and ten consecutive model-authored Lantern
-scenarios remain the M2.5A exit work. The deterministic reference narrator continues to enforce the
-accepted 1 HP floor.
+The Gandalf-side OpenClaw adapter now implements both typed stages through an exact JSON Schema in
+the request and prompt plus mandatory strict Pydantic validation, independent model and GM-style
+configuration, private bearer routing, and stable authentication/rate-limit/response/connection/
+timeout error mapping. Required client-defined tool calls were not reliable on the installed
+OpenClaw/Codex routes, so layered JSON validation replaced that transport shape without changing
+the application authority boundary. Real interpretation/narration smoke calls and three complete
+ten-scenario live runs passed. The optimized run completed 10 turns with 20 successful live calls
+and one deliberately injected/recovered timeout; exact dice reuse, outcome acknowledgement, event
+order, actor isolation, HP/inventory bounds, and restart/resume all passed. Compact provider context
+reduced input usage from 754,469 to approximately 419,800 tokens (44.4%) without regression. See
+[`M2_5_OPENCLAW_EVALUATION.md`](M2_5_OPENCLAW_EVALUATION.md).
+The final normal repository gate passed all 96 tests with the opt-in live test correctly skipped,
+plus formatting, lint, compilation, ruleset/catalog integrity, generated-schema freshness, zero
+Alembic drift, and diff checks.
 
-Exit gate: ten consecutive Lantern Test runs complete without impossible state, invented dice,
-partial commits, or contradictory resume output. Failures are categorized before proceeding.
+Exit gate: Passed. Ten consecutive live Lantern Test runs completed three times without impossible state,
+invented dice, partial commits, actor leakage, rerolls, or contradictory resume output. The optional
+direct paid-provider route remains deferred and is not required for M2 acceptance.
 
 ### M3 — Persistent world model
 
@@ -1005,9 +1014,9 @@ agent direct database or unvalidated state-mutation access.
 | GAP-001 | Product | Resolved | M1.3 supports an ordered 2–4 character Party Commander party with independently derived equipment/defense/resource state and actor isolation | Party Commander foundation now exists; character content breadth remains intentionally narrow | Migration `0004`, automated evidence, owner acceptance, and final M1 review passed; broader breadth remains deferred to M1.5 |
 | GAP-002 | Product | Open | No deterministic quest/world decision model | Decisions have limited lasting effects | M3 |
 | TEST-001 | Validation | Deferred | The direct automated OpenAI provider has no paid live evaluation and API spend is not authorized | Direct API authentication, billing/cap behavior, SDK compatibility, and usage accounting remain unproven | Optional M2.5B after explicit provider/cap authorization |
-| TEST-002 | Validation | Open | The OpenClaw two-stage adapter passes offline contract tests but has not completed a real model-authored Lantern evaluation | Live gateway/model behavior, narrative quality, latency, subscription limits, and real schema/rules compliance remain unproven | Activate the private endpoint and restricted agent, smoke-test, then pass ten consecutive M2.5A scenarios |
+| TEST-002 | Validation | Resolved | The private OpenClaw route passed real interpretation/narration smokes and three ten-scenario model-authored Lantern runs | Gateway authentication, model behavior, structured output, latency/usage audits, restart/resume, and application boundaries now have live evidence | `M2_5_OPENCLAW_EVALUATION.md`; M2.5A |
 | GAP-005 | Provider integration | Open | The two-stage provider factory supports OpenClaw but intentionally rejects direct OpenAI; the existing OpenAI adapter serves only the legacy Phase 0 contract | Subscription-backed automated play can proceed through OpenClaw after activation, while direct paid API play remains unavailable by design | M2.5B only after explicit authorization: implement direct-provider deadline plus failure/usage mapping, then run its separately capped evaluation |
-| GAP-006 | OpenClaw activation | Open | Clawvis has a usable OAuth-backed private gateway and compatible installed endpoint code, but Chat Completions is disabled and no dedicated restricted `gandalf` agent exists | Gandalf cannot make a live OpenClaw call yet; Clawvis remains unchanged | Obtain explicit Clawvis change authorization, provision the restricted agent, enable only the required endpoint, tunnel privately, and record smoke/Lantern evidence; M2.5A |
+| GAP-006 | OpenClaw activation | Resolved | The owner authorized a dedicated restricted `gandalf` agent and authenticated Chat Completions endpoint while retaining loopback binding and the OAuth-only route | Gandalf can now use the owner's private Clawvis deployment without exposing it publicly or granting database access | Health, smoke, restart, and three passing live Lantern runs recorded in `M2_5_OPENCLAW_EVALUATION.md`; M2.5A |
 | WARN-001 | Dependency | Monitoring | Current TestClient emits an `httpx` deprecation warning | No functional failure today | Reassess FastAPI/Starlette test client during dependency maintenance |
 | OPS-001 | Source control | Resolved | Initial push was blocked because HTTPS lacked credentials and Git did not automatically select the nonstandard SSH key filename | GitHub was temporarily behind local `main` | Registered the existing Ed25519 key, verified GitHub's host fingerprint, configured this repository's SSH command, and synchronized `main`; 2026-08-30 |
 | OPS-002 | Infrastructure | Deferred | pgvector is unavailable on `postgresvm` | No semantic memory yet | Evaluate/install only at M4 |
@@ -1020,6 +1029,8 @@ agent direct database or unvalidated state-mutation access.
 | ISSUE-005 | Concurrency | Resolved | The first M2.2 stale-state fixture showed that an ORM identity-map value could mask a character revision changed while interpretation ran outside the transaction | A delayed interpretation could otherwise proceed against a stale pre-state | Force a fresh locked character read after interpretation and before resolution; the stale-state fixture now records a safe terminal failure without rolling |
 | ISSUE-006 | Provider audit persistence | Resolved | The first M2.3 malformed-narration fixture explicitly assigned Python `None` to a PostgreSQL JSONB field, which persisted JSON `null` rather than SQL `NULL` and violated the failed-call result-shape constraint | A malformed narration response could mask the intended safe 502 response with a database integrity error | Leave failed structured output unset and assign JSON only for validated successful output; the malformed-output regression and full 69-test suite pass |
 | ISSUE-007 | Turn recovery/concurrency | Resolved | Before M2.4, a process interruption during `interpreting` could strand a campaign and a repeated call during `narrating` could invoke a competing provider without an expiry boundary | A campaign could remain blocked after restart or incur duplicate provider work | Migration `0007` adds constrained stage leases; fresh work rejects competition, expired work restores a safe checkpoint, hidden recovery events retain operational evidence, and resolution recovery reuses exact dice |
+| ISSUE-008 | Provider compatibility | Resolved | The installed OpenClaw/Codex routes accepted required client functions but did not reliably emit the required call; `response_format` alone also did not enforce arbitrary schema output | The initially implemented pinned-function transport could not complete a real call | Send the exact strict JSON Schema in both request and prompt, parse one JSON object, and retain mandatory Pydantic validation; live smokes and all three Lantern runs pass |
+| ISSUE-009 | Provider efficiency | Resolved/Monitoring | The first passing live run sent full provenance-heavy character state and consumed 754,469 input tokens across 20 calls | Subscription usage was unnecessarily high and would worsen as state grows | Compact mechanically complete context reduced the same run to 419,727 input tokens (44.4% less); retain `RISK-008` budgets and revisit during M3/M4 |
 | ISSUE-004 | Character-state provenance | Resolved | The first M1.3 owner run showed empty projected source/acquisition provenance for Dice Set and GP; ordinary package items were unaffected | The visible equipment projection did not meet GF-004 even though canonical grants remained intact | The corrected projection and exhaustive regression passed 39 automated tests; the 2026-09-01 owner retest confirmed complete Dice Set/GP definition, source, and acquisition-event provenance for both existing characters |
 | UX-001 | Player interface | Deferred | Backend errors are adequate for developer diagnosis but do not yet provide contextual, player-oriented recovery guidance; JSON also cannot validate visual actor/state clarity | Ordinary players may not know what happened or how to correct an invalid action when the frontend is introduced | In M7, map stable typed API errors to actionable messages and test actor visibility, calculated-value explanations, and isolated character changes through the full player journey |
 
@@ -1037,7 +1048,7 @@ because a workaround exists; record both the workaround and the permanent resolu
 | RISK-005 | Provider outage partially commits a turn | Medium | High | Turn state machine, idempotency, atomic finalization |
 | RISK-006 | Concurrent turns create ordering conflicts | Medium | Medium | Campaign locking, unique sequences, idempotency keys |
 | RISK-007 | Rules corpus, attribution, or adaptations drift from the licensed source | Medium | High | Immutable source artifact, CC-BY attribution, checksummed manifests, source references, and regeneration tests |
-| RISK-008 | Context/token cost grows with campaign age | High | Medium | Filtered state, summaries, retrieval budgets, usage logging |
+| RISK-008 | Context/token cost grows with campaign age | High | Medium | Compact provider projection already cut the M2.5A run by 44.4%; retain filtered state, summaries, retrieval budgets, and usage logging for M3/M4 |
 | RISK-009 | SSH tunnel interrupts local development | Medium | Low | Clear health errors and tunnel runbook; later private app VM |
 | RISK-010 | Overbuilding infrastructure delays gameplay proof | Medium | Medium | Vertical slices and milestone gates; defer optional systems |
 | RISK-011 | Binary rules documents make Git history unnecessarily large | Medium | Low | Store official PDFs as versioned GitHub Release assets; keep only manifests and derived data in Git |
@@ -1074,6 +1085,7 @@ because a workaround exists; record both the workaround and the permanent resolu
 | ADR-016 | 2026-08-31 | Deliver solo-player control modes in the order Party Commander, Protagonist with Companions, then Lone Hero | Direct control of a normal adventuring party aligns most closely with D&D's party mechanics; delegated companions can then reuse that trusted foundation, while exceptional single-character balance should be designed last from measured party and companion evidence | Revisit sequencing only if executable evidence shows Party Commander cannot establish the common mechanical foundation |
 | ADR-017 | 2026-09-01 | Add check/save definitions as a separately identified immutable supplemental catalog that explicitly extends the pinned character-state catalog | Existing campaigns must gain a compatible resolver without rewriting their historical catalog identity, while resolution records still need an exact machine-readable rules version | When catalog composition or an explicit campaign conversion workflow is designed |
 | ADR-018 | 2026-09-02 | Support OpenClaw as an optional two-stage provider and keep model route, GM narrative profile, and deterministic ruleset as independent axes | This can use a deployment's supported OAuth-backed models and offer different GM flavours without granting model output mechanical authority or requiring direct paid API use | If OpenClaw removes the required private structured-output boundary, or campaign-level provider/profile persistence is designed |
+| ADR-019 | 2026-09-02 | Treat provider structured-output controls as hints layered beneath exact prompt schemas and mandatory local Pydantic validation | The live OpenClaw route did not reliably emit required client-defined tool calls and `response_format` alone was insufficient; the layered contract passed without weakening application authority | If a future provider offers independently verified native schema enforcement, while retaining local validation |
 
 ## 14. Milestone review template
 
@@ -1162,19 +1174,17 @@ Destination milestone:
 
 ## 17. Immediate next actions
 
-1. Obtain explicit authorization for the minimal Clawvis-side M2.5A change set: create the dedicated
-   restricted `gandalf` agent and enable only the authenticated Chat Completions endpoint while
-   retaining loopback binding and no paid API fallback.
-2. Establish the private SSH tunnel, configure Gandalf's ignored `.env`, and run a non-mutating
-   structured-output smoke test; record OpenClaw/agent/model/profile versions and safe failure
-   evidence without credentials or personal account data.
-3. Run ten consecutive M2.5A Lantern scenarios using the accepted classic-heroic/non-graphic,
-   player-agency-preserving profile and non-lethal minor environmental consequence; classify every
-   failure and rework rather than weaken no-reroll, no-partial-write, exact-outcome,
-   actor-isolation, or event-order guarantees.
-4. Close `TEST-002` and `GAP-006` only if activation and all ten live model-authored scenarios pass.
-   Keep `TEST-001` and direct-provider `GAP-005` deferred/open unless M2.5B and its spend cap receive
-   separate authorization.
+1. Prepare the M3 persistent-world implementation strategy and trace every proposed field to the
+   smallest executable slice: current scene, present NPCs, relationship facts, objectives, world
+   time, clues/knowledge, and visibility.
+2. Start M3 with structured scene/NPC presence and target validation so the game can distinguish a
+   reachable character from an absent one before narration; preserve the M2 deterministic turn and
+   provider boundaries unchanged.
+3. Add persistent player decisions and explainable consequences incrementally, with restart,
+   branching, player/DM visibility, actor-isolation, and rollback fixtures at every slice.
+4. Provide an owner acceptance checkpoint only after a complete minimal world-decision loop works
+   through the API. Keep `TEST-001` and direct-provider `GAP-005` deferred unless M2.5B and its spend
+   cap receive separate authorization.
 
 ## 18. Documentation change log
 
@@ -1204,3 +1214,4 @@ Destination milestone:
 | 2026-09-02 | DOC-022 | Completed M2.4, resolved ISSUE-007, added migration `0007`, and advanced M2 to Verification at the M2.5 owner gate | Stable provider errors include turn IDs; optional tokens and latency are audited; stage leases recover expired work without rerolls; invalid proposals resume safely; ten consecutive deterministic Lantern scenarios and all 80 tests pass at 90% coverage with zero drift and no external calls | Obtain the combined owner gate, implement the live two-stage adapter, and run the capped ten-scenario live Lantern evaluation |
 | 2026-09-02 | DOC-023 | Replaced the paid-by-default M2.5 path with M2.5A no-cost subscription-assisted evaluation and separately deferred M2.5B automation; added the beginner setup guide, accepted content/consequence rulings, and the deterministic non-lethal fallback | The owner wants to maximize an existing ChatGPT/Codex subscription without separate API charges and accepted classic heroic fantasy, non-graphic/player-agency boundaries, fixed 2 HP minor harm, and a 1 HP non-lethal floor. The focused 10-test finalization suite and all 81 regressions pass | Superseded by DOC-024 after OpenClaw became the preferred M2.5A transport; manual transfer remains a fallback |
 | 2026-09-02 | DOC-024 | Adopted OpenClaw as the preferred subscription-backed M2.5A transport, implemented and offline-verified the Gandalf adapter, documented the read-only Clawvis audit and activation boundary, separated model from GM profile, and retained manual/direct-API fallbacks as distinct evidence paths | The owner approved the direction; Clawvis exposes a compatible private OAuth-backed gateway, and 25 focused plus all 95 repository tests pass with lint/format/compilation/ruleset/schema/migration-drift gates green, without a live call or Clawvis mutation | Obtain explicit authorization for the narrow Clawvis change set, activate privately, smoke-test, and run the ten-scenario live Lantern gate; keep direct API spend deferred |
+| 2026-09-02 | DOC-025 | Activated and hardened the private Clawvis/OpenClaw route, replaced the incompatible required-function transport with layered exact-schema validation, compacted provider context, passed three live Lantern runs, and closed M2 with permanent evidence | The exact final prompt versions completed 10 turns and 20 real calls plus one injected/recovered timeout; all deterministic boundaries passed, input use remained 44.4% below baseline at 419,782 tokens, and all 96 normal tests plus static/schema/migration gates passed | Commit and push M2 closure, then prepare the M3 strategy |

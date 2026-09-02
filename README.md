@@ -34,15 +34,15 @@ maintained in the [living development plan](docs/PROJECT_PLAN.md).
   authoritative resolution, failure safety, and live-evaluation gates
 - [OpenClaw provider integration](docs/OPENCLAW_INTEGRATION.md) — subscription-backed transport,
   deployment boundary, security, activation, and model/GM-style strategy
+- [M2.5A OpenClaw evaluation](docs/M2_5_OPENCLAW_EVALUATION.md) — live deployment, compatibility,
+  ten-scenario acceptance, recovery, usage, and latency evidence
 
 Documentation distinguishes planned behavior from verified implementation. M1.3 Party Commander
 and complete level-one character state are Done. M1.4 authoritative ability-check and saving-throw
 resolution is also Done after automated and owner runtime verification. The complete M1 gate is
-Done; M2 is in Verification. M2.1–M2.4 are complete, including failure/retry, restart,
-observability, concurrency hardening, and ten consecutive deterministic Lantern scenarios. The M2.5
-content and environmental-consequence settings are accepted. An optional OpenClaw two-stage adapter
-is implemented and offline-verified; live Clawvis activation and model-authored evaluation remain
-pending. Direct paid API integration remains deferred and paid model calls remain disabled.
+Done. M2 is also Done: the resumable two-stage workflow, deterministic Lantern suite, private
+OpenClaw activation, and three passing ten-scenario live model-authored runs are verified. Direct paid
+API integration remains deferred and paid model calls remain disabled.
 
 ## Versioned rulesets
 
@@ -89,8 +89,9 @@ checksum, size, license, attribution, normalized-data catalogs, and schema versi
 - auditable application dice rolls, including internally logged hidden rolls
 - provider-neutral DM interface
 - deterministic offline provider for development and repeatable tests
-- optional OpenClaw two-stage provider with pinned structured-output tools, stable transport errors,
-  and independently configurable model route and GM style; live activation is not yet complete
+- optional OpenClaw two-stage provider with layered strict-JSON/Pydantic validation, stable
+  transport errors, a compact provider context, and independently configurable model route and GM
+  style; the owner's private deployment passed the live ten-scenario gate
 - legacy Phase 0 OpenAI Responses adapter with Pydantic structured output; the two-stage automated
   direct-API adapter remains disabled because API spend is not authorized
 
@@ -132,7 +133,8 @@ The safe default is `GANDALF_LLM_PROVIDER=deterministic`, which performs no exte
 OpenClaw can provide an optional subscription-backed transport through its private authenticated
 gateway. This is not an OpenAI API credential and does not guarantee unlimited or free use;
 subscription limits and the deployment's provider configuration still apply. A dedicated,
-restricted OpenClaw agent is required. After the documented activation gate, configure the ignored
+restricted OpenClaw agent is required. After completing the documented activation and verification
+checklist for the operator's deployment, configure the ignored
 `.env` file:
 
 ```text

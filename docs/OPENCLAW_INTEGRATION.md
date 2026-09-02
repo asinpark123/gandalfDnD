@@ -1,6 +1,6 @@
 # OpenClaw Provider Integration
 
-- **Status:** Gandalf adapter implemented and offline-verified; live Clawvis activation pending
+- **Status:** Active and live-verified for the owner's private development deployment
 - **Last updated:** 2026-09-02
 - **Scope:** Optional M2 provider transport, independent of the future M9 Clawvis player client
 
@@ -31,7 +31,7 @@ GandalfDnD API
     -> private/loopback OpenClaw HTTP endpoint
     -> dedicated restricted OpenClaw agent
     -> deployment-selected model/provider authentication
-    -> typed tool call returned to Gandalf
+    -> schema-constrained JSON returned to Gandalf
     -> Gandalf schema/rules/state validation
 ```
 
@@ -69,33 +69,37 @@ gateway to use a specific model allowed by that agent. Supported GM-style values
 - `epic_high_fantasy`
 - `dark_fantasy`
 
-The adapter calls OpenClaw's OpenAI-compatible Chat Completions endpoint and requires one pinned
-structured-output tool in each stage: `submit_turn_intent` or `submit_turn_narration`. Gandalf
-validates the returned JSON using its existing strict Pydantic contracts. Authentication,
-rate-limit, response, connection, timeout, malformed-output, and empty-output failures become
-stable recoverable turn errors.
+The adapter calls OpenClaw's OpenAI-compatible Chat Completions endpoint. It supplies the strict
+JSON Schema through `response_format`, embeds the same exact schema in the system instruction, and
+requires one JSON object. Gandalf then parses and validates that object using its existing strict
+Pydantic contracts. The gateway's schema setting is a transport aid, not an authority boundary.
+Authentication, rate-limit, response, connection, timeout, malformed-output, and empty-output
+failures become stable recoverable turn errors.
 
 The legacy `/turns` API does not use OpenClaw. OpenClaw is supported only through the authoritative
 two-stage `/turn-executions` workflow.
 
-## 4. Clawvis audit on 2026-09-02
+## 4. Verified Clawvis state on 2026-09-02
 
-The audit was read-only; no Clawvis file, agent, service, model, or gateway setting was changed.
+The initial audit was read-only. After the owner explicitly authorized the narrow activation, the
+following state was established and verified:
 
 - OpenClaw `2026.7.1-2` is installed and its gateway is reachable on loopback port `18789`.
 - Gateway authentication uses a bearer token.
 - A supported OpenAI OAuth profile is usable and there is no API-key profile or paid API fallback.
-- The current default route is `openai/gpt-5.5`; `openai/gpt-5.5` and
-  `openai/gpt-5.6-sol` are currently allowed.
-- The installed bundle contains the required Chat Completions endpoint and pinned/required tool
-  selection support.
-- The Chat Completions HTTP endpoint is disabled, and a dedicated `gandalf` agent has not yet been
-  provisioned. Therefore no live Gandalf-to-Clawvis request has been made.
+- A dedicated `gandalf` agent uses the `openai/gpt-5.5` default route, has no channel bindings,
+  uses the minimal built-in tool profile, has no skills or memory search, and never injects its
+  workspace context.
+- The Chat Completions endpoint is enabled while the gateway remains loopback-only and
+  token-authenticated.
+- Health, interpretation, narration, restart/recovery, and ten-scenario live Lantern checks pass.
+- The system-managed gateway service returned healthy after its authorized restart and retained
+  the loopback boundary.
 
 Model availability is deployment state, not a Gandalf guarantee. Re-audit it before every live
 evaluation or documented deployment example.
 
-## 5. Required activation work
+## 5. Activation and verification checklist
 
 Activation is a small but security-sensitive OpenClaw configuration change:
 
@@ -110,9 +114,16 @@ Activation is a small but security-sensitive OpenClaw configuration change:
 8. record provider/model/profile, result, failures, and subscription-limit behavior without
    recording credentials or private account data.
 
-The original requirement to keep Clawvis untouched remains in force until the owner explicitly
-authorizes these Clawvis-side changes. The adapter and all local contract tests require no such
-mutation.
+This checklist was completed for the owner's private Clawvis deployment on 2026-09-02. Other
+operators must complete it against their own OpenClaw installation and credentials. Activation does
+not authorize exposing the gateway publicly, enabling broader agent tools, or adding a paid
+provider fallback.
+
+The installed OpenClaw/Codex routes did not reliably issue a required client-defined function call,
+even though the endpoint accepted the tool definition. `response_format` alone also did not enforce
+the requested schema. The verified Gandalf adapter therefore combines prompt-embedded exact JSON
+Schema, the response-format hint, and mandatory local Pydantic validation. See the
+[M2.5A evaluation record](M2_5_OPENCLAW_EVALUATION.md) for the categorized evidence and usage data.
 
 ## 6. Security and cost policy
 

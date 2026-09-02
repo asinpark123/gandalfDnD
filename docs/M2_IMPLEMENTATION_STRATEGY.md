@@ -1,11 +1,10 @@
 # M2 Two-Stage AI Turn Implementation Strategy
 
-- **Status:** Verification — M2.1–M2.4 Done; M2.5A OpenClaw adapter implemented and offline-verified,
-  live activation pending
+- **Status:** Done — M2.1–M2.5A passed; optional direct paid-provider M2.5B remains deferred
 - **Prepared:** 2026-09-02
 - **Depends on:** M1 Party character creation and deterministic mechanics (Done)
-- **Owner input required now:** Yes — authorize the documented minimal Clawvis change set before
-  enabling its disabled HTTP endpoint and provisioning the restricted `gandalf` agent
+- **Owner input required now:** No — the owner authorized and the project completed the private
+  OpenClaw activation and live evaluation
 - **Paid external model calls:** Not authorized; a later automated provider test requires a new,
   explicit authorization and cap
 
@@ -310,10 +309,10 @@ distinct authorization gate.
 
 ### M2.5A — Subscription-backed OpenClaw Lantern evaluation
 
-**Status: Gandalf adapter implemented and offline-verified; live Clawvis activation pending.**
+**Status: Done — private activation and three ten-scenario live runs passed.**
 
 - route interpretation and narration through a private OpenClaw Chat Completions endpoint using a
-  dedicated restricted agent and one pinned structured-output tool per stage;
+  dedicated restricted agent and layered JSON-Schema/Pydantic validation per stage;
 - use the OpenClaw deployment's supported Codex OAuth route without adding an API-key fallback;
 - retain the exact schema, acknowledgement, validator, resolver, audit, resume, and
   atomic-finalization rules already used by the deterministic provider;
@@ -342,12 +341,17 @@ narration. Record the exact OpenClaw version, agent, model route, GM profile, pr
 subscription-limit behavior; distinguish gateway, authentication, model, schema, rules, and
 application failures.
 
-The offline adapter suite already establishes request shape, bearer/model routing, pinned-tool
-selection, strict parsing, factory selection, and stable failure mapping without contacting a live
-model. On 2026-09-02, 25 focused OpenClaw/hardening tests and all 95 repository tests passed with
-lint, format, compilation, ruleset/catalog, generated-schema, and zero-migration-drift gates green.
-The live run is still required to establish actual gateway authentication, provider/model behavior,
-latency, subscription limits, and end-to-end narration quality.
+The offline adapter suite establishes request shape, bearer/model routing, strict-schema prompting,
+local validation, factory selection, and stable failure mapping. The live deployment then passed
+interpretation and narration smoke calls plus three complete ten-scenario runs. The exact final
+prompt versions recorded 20 successful OpenClaw calls, one deliberately injected and safely resumed
+timeout, 419,782 input tokens, 3,162 output tokens, 7,409 ms average latency, and 10,402 ms maximum
+latency.
+Compact provider context reduced input usage by 44.4% from the first passing run without changing
+behavior. Full evidence is in [`M2_5_OPENCLAW_EVALUATION.md`](M2_5_OPENCLAW_EVALUATION.md).
+The final non-live repository gate then passed all 96 tests with the opt-in live test correctly
+skipped, alongside formatting, lint, compilation, ruleset/catalog, generated-schema, zero-migration-
+drift, and diff checks.
 
 ### M2.5B — Optional direct paid-provider Lantern evaluation
 
@@ -391,10 +395,9 @@ The owner decided on 2026-09-02:
 4. proceed with OpenClaw as the preferred provider transport and allow different supported models to
    provide different GM flavour while deterministic rules remain invariant.
 
-The Gandalf-side M2.5A implementation required no Clawvis mutation and is complete. Because the
-original project constraint says to keep Clawvis untouched, live activation requires explicit owner
-authorization for the narrow change set in `OPENCLAW_INTEGRATION.md`. M2.5B requires a separate new
-decision on provider, authorization, and maximum spend.
+The owner explicitly authorized the narrow Clawvis change set. The dedicated restricted agent,
+private endpoint, health checks, smoke calls, and Lantern gate are complete. M2.5B still requires a
+separate new decision on provider, authorization, and maximum spend.
 
 ## 7. Explicit non-goals
 
@@ -409,9 +412,8 @@ decision on provider, authorization, and maximum spend.
 
 ## 8. Completion and rework rule
 
-M2 is not Done on deterministic or mocked transport tests alone. It reaches Verification after
-M2.1–M2.4. M2.5A closes only when ten consecutive live OpenClaw model-authored runs pass. A manual
-fallback can prove content and schema feasibility but must not be presented as unattended transport
-evidence. Direct paid-provider work remains explicitly deferred as `TEST-001`/`GAP-005`; it is not a
-condition for closing M2 if the OpenClaw route passes. A model or provider failure is evidence to
-classify and fix, not permission to weaken deterministic state, retry, or audit guarantees.
+M2 is Done because M2.1–M2.4 and three ten-scenario live OpenClaw model-authored runs pass. The manual
+fallback remains separately classified and was not used as transport evidence. Direct paid-provider
+work remains explicitly deferred as `TEST-001`/`GAP-005`; it was not a condition for closing M2.
+Future model/provider failures remain evidence to classify and fix, not permission to weaken
+deterministic state, retry, or audit guarantees.

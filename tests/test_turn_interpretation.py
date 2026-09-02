@@ -1,3 +1,4 @@
+import json
 import uuid
 from typing import Any
 
@@ -12,8 +13,8 @@ from app.db import get_engine
 from app.dice import DiceService, get_dice_service
 from app.llm.deterministic import DeterministicDMProvider
 from app.llm.factory import get_dm_provider, get_turn_interpreter
-from app.schemas import DiceRequest, DMTurnOutput
-from app.services import interpret_turn_execution
+from app.schemas import CampaignState, DiceRequest, DMTurnOutput
+from app.services import _provider_context, interpret_turn_execution
 from app.turn_interpretation import (
     D20ResolutionRequest,
     D20TestIntent,
@@ -115,6 +116,25 @@ def _execution(client: TestClient, campaign_id: str, actor_id: str, action: str)
     )
     assert response.status_code == 201, response.text
     return response.json()["id"]
+
+
+def test_provider_context_is_compact_but_mechanically_complete(client: TestClient) -> None:
+    campaign_id, characters = _ready_campaign(client)
+    state = CampaignState.model_validate(client.get(f"/campaigns/{campaign_id}/state").json())
+
+    context = _provider_context(state)
+    encoded = json.dumps(context)
+
+    assert len(context["characters"]) == 2
+    assert {character["id"] for character in context["characters"]} == set(characters)
+    assert context["location"]["name"] == "Roadside Inn"
+    assert context["characters"][0]["hp"] == 12
+    assert context["characters"][0]["mechanics"]["skills"]["athletics"]["modifier"] == 5
+    assert context["characters"][0]["mechanics"]["armor_class"] == 17
+    assert "provenance" not in encoded
+    assert "created_at" not in encoded
+    assert "finalized_at" not in encoded
+    assert len(encoded) < 15_000
 
 
 def test_interpretation_contract_forbids_modifier_and_dice_results() -> None:

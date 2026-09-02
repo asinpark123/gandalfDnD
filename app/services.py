@@ -2018,7 +2018,106 @@ def replay_rule_resolution(
 
 
 def _provider_context(state: CampaignState) -> dict[str, Any]:
-    return state.model_dump(mode="json")
+    campaign = state.campaign.model_dump(
+        mode="json",
+        include={
+            "id",
+            "name",
+            "ruleset_release_id",
+            "ruleset_data_catalog_id",
+            "status",
+            "play_mode",
+        },
+    )
+    characters: list[dict[str, Any]] = []
+    for character in state.characters:
+        compact_character: dict[str, Any] = character.model_dump(
+            mode="json",
+            include={
+                "id",
+                "name",
+                "creation_status",
+                "revision",
+                "hp",
+                "max_hp",
+                "inventory",
+                "party_position",
+                "control_mode",
+                "party_status",
+                "state_revision",
+                "equipped_items",
+                "resources",
+            },
+        )
+        if character.character_sheet is not None:
+            compact_character["identity"] = character.character_sheet.model_dump(
+                mode="json",
+                include={
+                    "level",
+                    "species_definition_key",
+                    "background_definition_key",
+                    "class_definition_key",
+                    "size",
+                    "alignment",
+                    "languages",
+                    "feature_definition_keys",
+                },
+            )
+        if character.mechanical_state is not None:
+            mechanics = character.mechanical_state.model_dump(mode="json")
+            compact_character["mechanics"] = {
+                "abilities": mechanics["abilities"],
+                "ability_modifiers": {
+                    ability: derived["value"]
+                    for ability, derived in mechanics["ability_modifiers"].items()
+                },
+                "proficiency_bonus": mechanics["proficiency_bonus"]["value"],
+                "saving_throws": {
+                    ability: {
+                        "modifier": modifier["value"],
+                        "proficient": modifier["proficient"],
+                    }
+                    for ability, modifier in mechanics["saving_throws"].items()
+                },
+                "skills": {
+                    skill: {
+                        "modifier": modifier["value"],
+                        "ability": modifier["ability"],
+                        "proficient": modifier["proficient"],
+                    }
+                    for skill, modifier in mechanics["skills"].items()
+                },
+                "armor_class": mechanics["armor_class"]["value"],
+                "initiative": mechanics["initiative"]["value"],
+                "passive_perception": mechanics["passive_perception"]["value"],
+                "speed_feet": mechanics["speed_feet"]["value"],
+                "equipment": [
+                    {
+                        "item_id": item["item_id"],
+                        "name": item["name"],
+                        "quantity": item["quantity"],
+                        "equipped_quantity": item["equipped_quantity"],
+                        "position": item["position"],
+                    }
+                    for item in mechanics["equipment"]
+                ],
+                "resources": {
+                    resource_id: {
+                        "current": resource["current"],
+                        "maximum": resource["maximum"],
+                        "die": resource["die"],
+                    }
+                    for resource_id, resource in mechanics["resources"].items()
+                },
+            }
+        characters.append(compact_character)
+    return {
+        "campaign": campaign,
+        "characters": characters,
+        "party_ready": state.party_ready,
+        "location": state.location.model_dump(mode="json"),
+        "turn_count": state.turn_count,
+    }
 
 
 def _apply_state_changes(

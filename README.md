@@ -32,15 +32,17 @@ maintained in the [living development plan](docs/PROJECT_PLAN.md).
   nine-action runtime evidence
 - [M2 implementation strategy](docs/M2_IMPLEMENTATION_STRATEGY.md) — resumable two-stage turns,
   authoritative resolution, failure safety, and live-evaluation gates
+- [OpenClaw provider integration](docs/OPENCLAW_INTEGRATION.md) — subscription-backed transport,
+  deployment boundary, security, activation, and model/GM-style strategy
 
 Documentation distinguishes planned behavior from verified implementation. M1.3 Party Commander
 and complete level-one character state are Done. M1.4 authoritative ability-check and saving-throw
 resolution is also Done after automated and owner runtime verification. The complete M1 gate is
 Done; M2 is in Verification. M2.1–M2.4 are complete, including failure/retry, restart,
 observability, concurrency hardening, and ten consecutive deterministic Lantern scenarios. The M2.5
-content and environmental-consequence settings are accepted. M2.5A will use a no-cost,
-subscription-assisted manual evaluation; unattended paid API integration remains deferred and paid
-model calls remain disabled.
+content and environmental-consequence settings are accepted. An optional OpenClaw two-stage adapter
+is implemented and offline-verified; live Clawvis activation and model-authored evaluation remain
+pending. Direct paid API integration remains deferred and paid model calls remain disabled.
 
 ## Versioned rulesets
 
@@ -87,8 +89,10 @@ checksum, size, license, attribution, normalized-data catalogs, and schema versi
 - auditable application dice rolls, including internally logged hidden rolls
 - provider-neutral DM interface
 - deterministic offline provider for development and repeatable tests
+- optional OpenClaw two-stage provider with pinned structured-output tools, stable transport errors,
+  and independently configurable model route and GM style; live activation is not yet complete
 - legacy Phase 0 OpenAI Responses adapter with Pydantic structured output; the two-stage automated
-  adapter remains disabled because API spend is not authorized
+  direct-API adapter remains disabled because API spend is not authorized
 
 Not included yet: RAG/pgvector, the spoiler-safe Guide, combat, a web UI, Redis, Celery, or a
 permanent application VM.
@@ -123,11 +127,29 @@ The API is then available at `http://127.0.0.1:8000`; interactive API documentat
 
 ## Model provider
 
-The safe default is `GANDALF_LLM_PROVIDER=deterministic`, which performs no external calls. A
-ChatGPT or Codex subscription is not an application API credential; automated use requires a
-separately authenticated provider API and may incur separate charges. No such spend is currently
-authorized. The legacy OpenAI adapter can be configured only for a future explicitly approved test
-by setting these values in the ignored `.env` file:
+The safe default is `GANDALF_LLM_PROVIDER=deterministic`, which performs no external calls.
+
+OpenClaw can provide an optional subscription-backed transport through its private authenticated
+gateway. This is not an OpenAI API credential and does not guarantee unlimited or free use;
+subscription limits and the deployment's provider configuration still apply. A dedicated,
+restricted OpenClaw agent is required. After the documented activation gate, configure the ignored
+`.env` file:
+
+```text
+GANDALF_LLM_PROVIDER=openclaw
+GANDALF_OPENCLAW_BASE_URL=http://127.0.0.1:18790/v1
+GANDALF_OPENCLAW_GATEWAY_TOKEN=...
+GANDALF_OPENCLAW_AGENT_ID=gandalf
+GANDALF_OPENCLAW_MODEL=
+GANDALF_OPENCLAW_GM_STYLE=classic_heroic_fantasy
+```
+
+See the [OpenClaw integration guide](docs/OPENCLAW_INTEGRATION.md) before enabling it. The gateway
+token must remain private and must never be committed.
+
+Direct OpenAI API use still requires separate API authentication and may incur separate charges.
+No such spend is currently authorized. The legacy OpenAI adapter can be configured only for a
+future explicitly approved test:
 
 ```text
 GANDALF_LLM_PROVIDER=openai
@@ -135,8 +157,9 @@ GANDALF_OPENAI_API_KEY=...
 GANDALF_OPENAI_MODEL=gpt-5.4
 ```
 
-The adapter uses the Responses API's Pydantic parsing path. Its output is never written directly to
-canonical state: all proposed changes pass through `StateChangeValidator` first.
+The legacy adapter uses the Responses API's Pydantic parsing path. No model output is written
+directly to canonical state: all proposed changes pass through Gandalf's typed validation and
+authoritative deterministic services first.
 
 ## API surface
 

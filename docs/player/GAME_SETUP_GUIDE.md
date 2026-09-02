@@ -43,6 +43,19 @@ offer. It does not grant modifiers, change dice, or override canonical state.
 Profiles are composable guidance rather than different rulesets. Future setup may let a player add
 a short custom tone note while retaining safety and mechanics boundaries.
 
+### Model flavour is a separate choice
+
+When a deployment offers more than one model through OpenClaw, the model and narrative profile are
+two independent settings. The model can affect writing voice, responsiveness, reasoning quality,
+and how reliably ambiguous actions are interpreted. The narrative profile tells that model what
+kind of GM presentation the player wants. Neither setting may alter Gandalf's dice, character
+modifiers, legal mechanics, or stored ruleset.
+
+Beginner tip: use the deployment's tested default model with **Classic heroic fantasy**. Advanced
+players may try another supported model or profile for a different GM flavour, but only combinations
+that have passed the project's structured-output and gameplay evaluation should be presented as
+supported. Model availability differs between deployments and may change with provider access.
+
 ## 3. Choose content boundaries
 
 The intended controls are independent so a player can tune them without changing the ruleset:
@@ -87,5 +100,7 @@ campaign preferences. GandalfDnD keeps those concepts separate:
 ## 6. Current limitation
 
 The API and frontend do not yet expose these setup selectors. The accepted M2.5 values are currently
-development/evaluation policy. When campaign setup is implemented, this guide must be updated with
-the exact fields, defaults, validation errors, and interface steps before ordinary-player testing.
+development/evaluation policy, and OpenClaw's optional model/style settings are global deployment
+configuration rather than per-campaign player choices. When campaign setup is implemented, this
+guide must be updated with the exact fields, defaults, validation errors, supported model list, and
+interface steps before ordinary-player testing.

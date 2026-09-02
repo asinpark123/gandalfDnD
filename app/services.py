@@ -25,9 +25,12 @@ from app.character_state import (
 from app.dice import DiceService
 from app.llm.base import (
     DMProvider,
+    ProviderAuthenticationError,
     ProviderConnectionError,
     ProviderEmptyOutputError,
+    ProviderRateLimitError,
     ProviderRefusalError,
+    ProviderResponseError,
     ProviderResult,
     ProviderTimeoutError,
     TurnInterpretationProvider,
@@ -129,6 +132,15 @@ def _provider_failure(stage: str, exc: Exception) -> tuple[str, str]:
         return "provider_timeout", f"{stage.title()} provider timed out"
     if isinstance(exc, (ProviderConnectionError, ConnectionError)):
         return "provider_connection_error", f"{stage.title()} provider could not be reached"
+    if isinstance(exc, ProviderAuthenticationError):
+        return (
+            "provider_authentication_error",
+            f"{stage.title()} provider authentication failed",
+        )
+    if isinstance(exc, ProviderRateLimitError):
+        return "provider_rate_limit", f"{stage.title()} provider quota is unavailable"
+    if isinstance(exc, ProviderResponseError):
+        return "provider_response_error", f"{stage.title()} provider returned an error"
     if isinstance(exc, ProviderRefusalError):
         return "provider_refusal", f"{stage.title()} provider refused the request"
     if isinstance(exc, ProviderEmptyOutputError):

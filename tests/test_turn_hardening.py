@@ -10,8 +10,11 @@ from app.api import app
 from app.db import get_engine
 from app.dice import DiceService, get_dice_service
 from app.llm.base import (
+    ProviderAuthenticationError,
     ProviderConnectionError,
+    ProviderRateLimitError,
     ProviderRefusalError,
+    ProviderResponseError,
     ProviderResult,
     ProviderTimeoutError,
 )
@@ -154,6 +157,21 @@ class FailingInterpreter:
             ProviderConnectionError(),
             "provider_connection_error",
             "Interpretation provider could not be reached",
+        ),
+        (
+            ProviderAuthenticationError(),
+            "provider_authentication_error",
+            "Interpretation provider authentication failed",
+        ),
+        (
+            ProviderRateLimitError(),
+            "provider_rate_limit",
+            "Interpretation provider quota is unavailable",
+        ),
+        (
+            ProviderResponseError(),
+            "provider_response_error",
+            "Interpretation provider returned an error",
         ),
         (
             ProviderRefusalError(),

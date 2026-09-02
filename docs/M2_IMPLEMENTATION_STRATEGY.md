@@ -1,10 +1,11 @@
 # M2 Two-Stage AI Turn Implementation Strategy
 
-- **Status:** Verification — M2.1–M2.4 Done; M2.5A settings accepted and Ready to implement
+- **Status:** Verification — M2.1–M2.4 Done; M2.5A OpenClaw adapter implemented and offline-verified,
+  live activation pending
 - **Prepared:** 2026-09-02
 - **Depends on:** M1 Party character creation and deterministic mechanics (Done)
-- **Owner input required now:** No — the owner selected the no-extra-cost evaluation path and
-  accepted the initial content and environmental-consequence settings
+- **Owner input required now:** Yes — authorize the documented minimal Clawvis change set before
+  enabling its disabled HTTP endpoint and provisioning the restricted `gandalf` agent
 - **Paid external model calls:** Not authorized; a later automated provider test requires a new,
   explicit authorization and cap
 
@@ -16,20 +17,24 @@ modifiers, directly write canonical state, or cause partial game-state changes w
 fails.
 
 The milestone proves real model-authored structured-output feasibility with the existing
-Human/Soldier/Fighter Party Commander slice. The first evaluation is a manual subscription-assisted
-handoff so it incurs no provider API charge. This proves the typed content and deterministic game
-boundary, but not unattended provider transport. It does not broaden character content, implement
-combat, or create the persistent world model.
+Human/Soldier/Fighter Party Commander slice. The preferred first evaluation uses the owner's private
+OpenClaw deployment and its supported Codex OAuth session, avoiding separately billed OpenAI API
+calls while exercising unattended transport. A manual subscription-assisted export/import bridge
+remains the fallback if live activation is unavailable. It does not broaden character content,
+implement combat, or create the persistent world model.
 
 ### 1.1 Subscription and API boundary
 
-The [OpenAI developer quickstart](https://platform.openai.com/docs/quickstart/make-your-first-api-request)
-requires an API key and directs API users to add platform credits. The
-[API reference](https://developers.openai.com/api/reference/overview) likewise defines API
-key authentication. A ChatGPT/Codex subscription is therefore not treated as a server-side
-GandalfDnD credential. The project will not automate the ChatGPT web interface or invoke a Codex CLI
-as a disguised production provider; those paths are brittle, do not prove the supported API
-contract, and risk coupling gameplay to an interactive developer session.
+Direct OpenAI API use still requires API authentication and separate platform billing. A
+ChatGPT/Codex subscription is not treated as a Gandalf API key. OpenClaw, however, provides a
+documented OpenAI-compatible gateway backed by its supported Codex OAuth authentication, and Codex
+documents a managed ChatGPT OAuth path through app-server. Gandalf may therefore use OpenClaw as an
+independent private provider gateway without browser automation, credential scraping, or treating a
+raw interactive CLI session as an application protocol. Subscription limits still apply, and a
+deployment may incur charges if its operator configures API-key or paid-provider fallbacks.
+
+The exact topology, security boundary, audit result, activation gate, and references are maintained
+in [`OPENCLAW_INTEGRATION.md`](OPENCLAW_INTEGRATION.md).
 
 ## 2. Required turn flow
 
@@ -298,21 +303,24 @@ Implemented evidence:
   generated-schema freshness, migration application, and zero Alembic drift pass; no external or
   paid model call was made.
 
-M2.4 completes deterministic hardening. The two-stage OpenAI adapter remains deliberately disabled.
-The owner does not authorize additional API spend, so M2.5 is split into a no-cost manual evaluation
-and a separately gated automated-provider evaluation.
+M2.4 completes deterministic hardening. The direct two-stage OpenAI API adapter remains deliberately
+disabled. M2.5 now uses an optional OpenClaw adapter as the preferred subscription-backed evaluation
+route, retains manual transfer as a fallback, and keeps separately billed direct API work behind a
+distinct authorization gate.
 
-### M2.5A — No-cost subscription-assisted Lantern evaluation
+### M2.5A — Subscription-backed OpenClaw Lantern evaluation
 
-**Status: Ready; owner settings accepted 2026-09-02.**
+**Status: Gandalf adapter implemented and offline-verified; live Clawvis activation pending.**
 
-- export the exact typed interpretation or narration request as a human-transferable evaluation
-  package with prompt-contract version, canonical context, schema, and correlation identifiers;
-- have the owner submit each package to this Codex/ChatGPT conversation and save the returned JSON;
-- import the response through an explicit evaluation-only boundary that applies the same schema,
-  acknowledgement, validator, resolver, audit, resume, and atomic-finalization rules as a provider;
+- route interpretation and narration through a private OpenClaw Chat Completions endpoint using a
+  dedicated restricted agent and one pinned structured-output tool per stage;
+- use the OpenClaw deployment's supported Codex OAuth route without adding an API-key fallback;
+- retain the exact schema, acknowledgement, validator, resolver, audit, resume, and
+  atomic-finalization rules already used by the deterministic provider;
 - run ten consecutive two-character Lantern scenarios covering dialogue, movement, inventory use,
   check, bounded damage, character switching, restart, resume, and narration/outcome agreement;
+- if OpenClaw activation is unavailable, export/import the same exact typed packages manually and
+  classify that evidence separately because it does not test live transport;
 - categorize every failure and rework before acceptance.
 
 Accepted evaluation settings:
@@ -324,32 +332,36 @@ Accepted evaluation settings:
 - at insufficient HP, use a lost-position/time narrative setback with no HP change;
 - no combat, conditions, unconsciousness, death, or recovery mechanics.
 
-The deterministic reference fixture now enforces the 1 HP floor, including a regression proving
-that a character at 2 HP receives the narrative fallback rather than being reduced to 0 HP.
+The deterministic reference fixture enforces the 1 HP floor, including a regression proving that a
+character at 2 HP receives the narrative fallback rather than being reduced to 0 HP. The OpenClaw
+adapter supplies the same policy in its narration prompt and still relies on application validation.
 
 Exit: all ten consecutive model-authored runs complete without impossible state, invented
 dice/modifiers, partial gameplay commits, actor leakage, rerolls on retry, or contradictory resume
-narration. Record the manual-transfer procedure and distinguish human transfer errors from model,
-schema, rules, or application failures.
+narration. Record the exact OpenClaw version, agent, model route, GM profile, prompt contracts, and
+subscription-limit behavior; distinguish gateway, authentication, model, schema, rules, and
+application failures.
 
-This evaluation can establish narrative quality, typed-output compliance, outcome acknowledgement,
-state safety, and restart/resume behavior with real model-authored responses. It cannot establish
-API authentication, SDK compatibility, network timeout behavior, provider latency, token accounting,
-rate-limit behavior, or unattended play.
+The offline adapter suite already establishes request shape, bearer/model routing, pinned-tool
+selection, strict parsing, factory selection, and stable failure mapping without contacting a live
+model. On 2026-09-02, 25 focused OpenClaw/hardening tests and all 95 repository tests passed with
+lint, format, compilation, ruleset/catalog, generated-schema, and zero-migration-drift gates green.
+The live run is still required to establish actual gateway authentication, provider/model behavior,
+latency, subscription limits, and end-to-end narration quality.
 
-### M2.5B — Optional automated-provider Lantern evaluation
+### M2.5B — Optional direct paid-provider Lantern evaluation
 
 **Status: Deferred; not authorized.**
 
 - select and verify a supported provider/model only at implementation time;
-- require a separately authenticated provider API; a ChatGPT/Codex or Claude subscription is not
-  treated as an application credential;
+- require a separately authenticated provider API; OpenClaw OAuth success does not authorize a
+  paid API key or cost-bearing fallback;
 - agree on a strict request/cost cap before any live call;
 - implement provider-specific deadline, connection, refusal, empty-output, and usage mapping;
 - rerun the same ten scenarios without manual transfer.
 
-Exit: all M2.5A guarantees pass through the real network/provider path and the operational gaps
-listed above have direct evidence.
+Exit: all M2.5A guarantees pass through the separately billed direct provider path and its distinct
+authentication, SDK, usage, and cost controls have direct evidence.
 
 ## 5. Automated verification matrix
 
@@ -375,10 +387,14 @@ The owner decided on 2026-09-02:
 1. do not incur separate model API charges while subscription-assisted evaluation can provide useful
    evidence;
 2. use the classic heroic-fantasy, non-graphic, player-agency-preserving profile above;
-3. keep the M2 damage fixture as non-lethal bounded environmental harm rather than combat.
+3. keep the M2 damage fixture as non-lethal bounded environmental harm rather than combat;
+4. proceed with OpenClaw as the preferred provider transport and allow different supported models to
+   provide different GM flavour while deterministic rules remain invariant.
 
-No further input is required before M2.5A implementation. M2.5B requires a new owner decision on
-provider, authorization, and maximum spend; a consumer subscription does not satisfy that gate.
+The Gandalf-side M2.5A implementation required no Clawvis mutation and is complete. Because the
+original project constraint says to keep Clawvis untouched, live activation requires explicit owner
+authorization for the narrow change set in `OPENCLAW_INTEGRATION.md`. M2.5B requires a separate new
+decision on provider, authorization, and maximum spend.
 
 ## 7. Explicit non-goals
 
@@ -389,13 +405,13 @@ provider, authorization, and maximum spend; a consumer subscription does not sat
 - companion autonomy or lone-hero compensation;
 - frontend usability work (M7);
 - Redis, Celery, Docker, background workers, or deployment infrastructure;
-- any Clawvis change or integration.
+- using Clawvis as a player-facing Gandalf client, which remains the separate M9 concern.
 
 ## 8. Completion and rework rule
 
-M2 is not Done on deterministic tests alone. It reaches Verification after M2.1–M2.4. M2.5A may
-close the model-authored content-and-rules feasibility portion when ten consecutive manual runs
-pass, while the automated-provider claim remains explicitly open as `TEST-001`/`GAP-005`. M2 may be
-closed only with wording that does not claim unattended provider feasibility; otherwise it remains
-in Verification until M2.5B. A model or provider failure is evidence to classify and fix, not
-permission to weaken deterministic state, retry, or audit guarantees.
+M2 is not Done on deterministic or mocked transport tests alone. It reaches Verification after
+M2.1–M2.4. M2.5A closes only when ten consecutive live OpenClaw model-authored runs pass. A manual
+fallback can prove content and schema feasibility but must not be presented as unattended transport
+evidence. Direct paid-provider work remains explicitly deferred as `TEST-001`/`GAP-005`; it is not a
+condition for closing M2 if the OpenClaw route passes. A model or provider failure is evidence to
+classify and fix, not permission to weaken deterministic state, retry, or audit guarantees.

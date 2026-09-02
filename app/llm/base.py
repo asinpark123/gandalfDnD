@@ -30,6 +30,18 @@ class ProviderConnectionError(ConnectionError):
     """The provider could not be reached."""
 
 
+class ProviderAuthenticationError(RuntimeError):
+    """The provider rejected the configured application credential."""
+
+
+class ProviderRateLimitError(RuntimeError):
+    """The provider rejected the operation because its current quota was exhausted."""
+
+
+class ProviderResponseError(RuntimeError):
+    """The provider gateway returned an unsuccessful or unsupported response."""
+
+
 class ProviderRefusalError(RuntimeError):
     """The provider explicitly refused the requested structured operation."""
 

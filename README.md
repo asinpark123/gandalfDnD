@@ -22,6 +22,8 @@ maintained in the [living development plan](docs/PROJECT_PLAN.md).
   policies, adjudications, house rules, and unresolved decisions
 - [Player character-creation guide](docs/player/CHARACTER_CREATION.md) — supported choices,
   step-by-step API workflow, limitations, and rules-source notes
+- [Beginner game-setup guide](docs/player/GAME_SETUP_GUIDE.md) — party modes, narrative profiles,
+  content boundaries, environmental consequences, and the current evaluation preset
 - [M1.3 owner acceptance checklist](docs/player/M1_3_ACCEPTANCE_CHECKLIST.md) — hands-on Party
   Commander verification and feedback record
 - [M1.4 owner acceptance checklist](docs/player/M1_4_ACCEPTANCE_CHECKLIST.md) — authoritative
@@ -35,8 +37,10 @@ Documentation distinguishes planned behavior from verified implementation. M1.3 
 and complete level-one character state are Done. M1.4 authoritative ability-check and saving-throw
 resolution is also Done after automated and owner runtime verification. The complete M1 gate is
 Done; M2 is in Verification. M2.1–M2.4 are complete, including failure/retry, restart,
-observability, concurrency hardening, and ten consecutive deterministic Lantern scenarios. M2.5
-requires the owner-approved live-evaluation gate. Paid model calls remain disabled until that gate.
+observability, concurrency hardening, and ten consecutive deterministic Lantern scenarios. The M2.5
+content and environmental-consequence settings are accepted. M2.5A will use a no-cost,
+subscription-assisted manual evaluation; unattended paid API integration remains deferred and paid
+model calls remain disabled.
 
 ## Versioned rulesets
 
@@ -83,8 +87,8 @@ checksum, size, license, attribution, normalized-data catalogs, and schema versi
 - auditable application dice rolls, including internally logged hidden rolls
 - provider-neutral DM interface
 - deterministic offline provider for development and repeatable tests
-- legacy Phase 0 OpenAI Responses adapter with Pydantic structured output; the two-stage live adapter
-  remains disabled until M2.5 adds deadline/error/usage mapping and the owner authorizes evaluation
+- legacy Phase 0 OpenAI Responses adapter with Pydantic structured output; the two-stage automated
+  adapter remains disabled because API spend is not authorized
 
 Not included yet: RAG/pgvector, the spoiler-safe Guide, combat, a web UI, Redis, Celery, or a
 permanent application VM.
@@ -119,8 +123,11 @@ The API is then available at `http://127.0.0.1:8000`; interactive API documentat
 
 ## Model provider
 
-The safe default is `GANDALF_LLM_PROVIDER=deterministic`, which performs no external calls. To use
-the OpenAI adapter, set these only in the ignored `.env` file:
+The safe default is `GANDALF_LLM_PROVIDER=deterministic`, which performs no external calls. A
+ChatGPT or Codex subscription is not an application API credential; automated use requires a
+separately authenticated provider API and may incur separate charges. No such spend is currently
+authorized. The legacy OpenAI adapter can be configured only for a future explicitly approved test
+by setting these values in the ignored `.env` file:
 
 ```text
 GANDALF_LLM_PROVIDER=openai

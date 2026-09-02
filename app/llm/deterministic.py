@@ -22,7 +22,7 @@ class DeterministicDMProvider:
     provider_name = "deterministic"
     model_name = None
     interpretation_prompt_version = "deterministic-intent-1.0.0"
-    narration_prompt_version = "deterministic-narration-1.0.0"
+    narration_prompt_version = "deterministic-narration-1.1.0"
 
     def interpret_action(self, context: dict[str, Any], player_action: str) -> TurnIntent:
         """Provide stable offline adjudications for M2 development fixtures."""
@@ -93,12 +93,30 @@ class DeterministicDMProvider:
                     else []
                 )
             else:
-                narration = "The attempt fails, and the character suffers a minor setback."
-                changes = (
-                    [HPDelta(type="hp_delta", amount=-2, reason="Minor fall from the wall")]
-                    if "climb" in normalized
-                    else []
+                actor_hp = next(
+                    (
+                        character.get("hp")
+                        for character in context.get("characters", [])
+                        if str(character.get("id")) == str(resolution.actor_character_id)
+                    ),
+                    None,
                 )
+                nonlethal_climb_setback = (
+                    "climb" in normalized and isinstance(actor_hp, int) and actor_hp <= 2
+                )
+                if nonlethal_climb_setback:
+                    narration = (
+                        "The attempt fails, and the character loses position and time but avoids "
+                        "further injury."
+                    )
+                    changes = []
+                else:
+                    narration = "The attempt fails, and the character suffers a minor setback."
+                    changes = (
+                        [HPDelta(type="hp_delta", amount=-2, reason="Minor fall from the wall")]
+                        if "climb" in normalized
+                        else []
+                    )
             return TurnNarrationOutput(
                 narration=narration,
                 resolution_id=resolution_id,

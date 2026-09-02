@@ -4,8 +4,9 @@
 - **Last updated:** 2026-09-02
 - **Rules baseline:** SRD 5.2.1 (pinned; character-state and check/save-resolution catalogs pass
   integrity and schema verification)
-- **Current delivery stage:** M2 Verification — M2.1–M2.4 are Done; M2.5 requires the combined
-  owner authorization/content/damage-fixture gate before live-provider implementation or paid calls
+- **Current delivery stage:** M2 Verification — M2.1–M2.4 are Done; M2.5A no-cost
+  subscription-assisted evaluation is Ready with accepted settings; paid provider integration is
+  deferred and not authorized
 - **Canonical repository:** `~/Git/gandalfDnD`
 
 ## 1. Purpose of this document
@@ -90,6 +91,7 @@ Current documentation index:
 | Character state and deterministic rules engineering contract | [`rules/CHARACTER_AND_RULES_SPEC.md`](rules/CHARACTER_AND_RULES_SPEC.md) |
 | Rules interpretations, product policies, adjudications, and house rules | [`rules/RULINGS.md`](rules/RULINGS.md) |
 | Supported player character-creation workflow and limitations | [`player/CHARACTER_CREATION.md`](player/CHARACTER_CREATION.md) |
+| Beginner campaign setup, party modes, narrative profiles, and consequence settings | [`player/GAME_SETUP_GUIDE.md`](player/GAME_SETUP_GUIDE.md) |
 | M1.4 deterministic-resolution owner verification | [`player/M1_4_ACCEPTANCE_CHECKLIST.md`](player/M1_4_ACCEPTANCE_CHECKLIST.md) |
 | M1.4 raw owner acceptance evidence | [`testM1_4_ACCEPTANCE_CHECKLIST_RESULTS.md`](testM1_4_ACCEPTANCE_CHECKLIST_RESULTS.md) |
 | M2 two-stage turn engineering and acceptance strategy | [`M2_IMPLEMENTATION_STRATEGY.md`](M2_IMPLEMENTATION_STRATEGY.md) |
@@ -253,8 +255,10 @@ A slice is done only when:
 | Security/visibility | Hidden records never cross a boundary | Guide spoiler-isolation tests |
 | Manual play test | Experience is coherent and teachable | The Lantern Test and longer campaigns |
 
-Tests involving randomness must inject a seeded or fixed source. Tests involving an external model
-must separate deterministic provider-contract tests from explicitly paid live evaluations.
+Tests involving randomness must inject a seeded or fixed source. Tests involving a model must
+separate deterministic provider-contract tests, manual subscription-assisted model evaluation, and
+explicitly authorized paid API evaluation. Evidence from one category must not be used to claim
+that another category passed.
 
 ### 7.6 Project-owner input and player acceptance checkpoints
 
@@ -274,7 +278,7 @@ results, known limitations, and where observations will be recorded.
 | M1.2 guided creation | None; the supported slice and deferrals are already accepted | Optional API/Swagger review of valid creation, rejected invalid choices, finalized sheet, and provenance |
 | M1.3 Party Commander and complete character state | Completed 2026-09-01; no further input required | Owner confirmed the API exposes the correct structured values; presentation clarity and end-user corrective guidance are deferred to the M7 interface checkpoint |
 | M1.4 deterministic resolution | Completed 2026-09-02; no further input required | All nine owner actions passed, including canonical modifiers, modifier rejection, Advantage/Disadvantage, actor attribution, and confirmed post-restart replay |
-| M2 live AI feasibility | Approve any paid live-model evaluation and provide desired narrative tone/content boundaries | Critical Lantern Test covering dialogue, movement, inventory, check, damage, restart, resume, and narration/mechanics agreement |
+| M2 model-authored feasibility | No further input for M2.5A: no extra API spend, classic heroic fantasy/non-graphic boundaries, player agency, and non-lethal minor environmental harm were accepted 2026-09-02. Any automated provider test needs separate authorization and a cap | Critical manual-transfer Lantern Test covering dialogue, movement, inventory, check, damage, restart, resume, and narration/mechanics agreement; automated transport evidence remains separate |
 | M3 persistent world | Provide campaign-structure preferences when they affect consequence and quest design | Multi-session play test confirming decisions, NPC relationships, quests, and revealed facts persist coherently across restarts |
 | M1.5 content expansion | Prioritize desired species, backgrounds, classes, feats, equipment routes, spellcasting, and play styles | Create contrasting supported characters and confirm their choices produce understandable, distinct state and later gameplay |
 | M5 party combat | Provide difficulty/lethality feedback for standard party play; companion autonomy and lone-hero compensation remain later decisions | Repeated Party Commander combat tests across favorable, difficult, defeat, recovery, and restart scenarios |
@@ -311,7 +315,7 @@ Use these values consistently:
 | --- | --- | --- | --- |
 | M0 | Persistence and safety foundation | Done | Canonical state and auditable turn skeleton |
 | M1 | Party character creation and deterministic mechanics | Done | The selected acting character's choices drive calculated outcomes |
-| M2 | Two-stage AI turn and live feasibility | Verification (M2.1–M2.4 Done; M2.5 owner gate) | Real DM uses recorded dice results safely |
+| M2 | Two-stage AI turn and model-authored feasibility | Verification (M2.1–M2.4 Done; M2.5A Ready) | Real DM-authored output uses recorded dice results safely; unattended transport remains separately evidenced |
 | M3 | Persistent world model | Proposed | NPCs, quests, scenes, clues, time, and visibility |
 | M4 | Long-term memory and retrieval | Proposed | Coherent recall without full history in context |
 | M5 | Basic deterministic combat | Proposed | Reproducible initiative, actions, attacks, and damage |
@@ -817,9 +821,9 @@ Review findings and decision:
 - all M1.1–M1.4 implementation, automated, runtime, artifact, migration, and owner gates pass.
   **Decision: Go. M1 is Done and M2 may begin.**
 
-### M2 — Two-stage AI turn and live feasibility
+### M2 — Two-stage AI turn and model-authored feasibility
 
-- **Status:** Verification — M2.1–M2.4 Done; M2.5 owner gate required
+- **Status:** Verification — M2.1–M2.4 Done; M2.5A Ready with owner settings accepted
 - **Depends on:** M1
 - **Detailed strategy:** [`M2_IMPLEMENTATION_STRATEGY.md`](M2_IMPLEMENTATION_STRATEGY.md)
 
@@ -842,14 +846,14 @@ Planned work:
 - handle provider timeout, retry, refusal, malformed output, and cancellation safely;
 - record provider, model, prompt version, latency, and token usage;
 - ensure a provider failure never partially changes canonical state;
-- run the real-model Lantern Test with at least two player-controlled characters: dialogue,
+- run the model-authored Lantern Test with at least two player-controlled characters: dialogue,
   movement, inventory use, check, damage, character switching, restart, and resume;
 - compare model narration with the recorded mechanical outcome.
 
 Delivery sequence: M2.1 persisted lifecycle/idempotency, M2.2 typed interpretation plus M1.4
 resolution, M2.3 outcome narration plus atomic finalization, M2.4 failure/retry/restart hardening,
-then M2.5 owner-approved paid Lantern evaluation. No owner input or paid call is required before
-M2.5.
+then M2.5A no-cost subscription-assisted Lantern evaluation. M2.5B automated provider transport is
+deferred until separately authorized; no paid call is currently permitted.
 
 M2.1 completed on 2026-09-02 with migration `0006_turn_lifecycle`, legacy backfill, an explicit
 resumable state machine, campaign-scoped command idempotency, one-active-turn enforcement,
@@ -889,7 +893,11 @@ Invalid proposals resume without partial state or duplicate final events, while 
 outside changes is terminal. Ten consecutive deterministic two-character Lantern scenarios and all
 80 tests pass at 90% coverage, with correct event order and actor isolation. Formatting, lint,
 compilation, catalog/schema checks, applied development migration, and zero Alembic drift pass, and
-no external or paid call was made. M2 is now in Verification pending M2.5's owner-approved live gate.
+no external or paid call was made. The owner then selected a no-extra-cost M2.5A manual handoff,
+accepted the initial content profile, and selected fixed non-lethal environmental harm. The manual
+evaluation bridge is the next implementation slice; unattended provider transport remains open.
+The deterministic reference narrator now enforces the accepted 1 HP floor, and the focused 10-test
+finalization suite plus all 81 regression tests pass.
 
 Exit gate: ten consecutive Lantern Test runs complete without impossible state, invented dice,
 partial commits, or contradictory resume output. Failures are categorized before proceeding.
@@ -981,8 +989,9 @@ deployable if Clawvis is offline.
 | DEBT-002 | Architecture | Resolved | M2.3 narration receives the stored intent and immutable resolution only after M1.4 resolution, and must echo the exact resolution ID/outcome | Narration can no longer precede or silently contradict an accepted check/save result; prose alone cannot change mechanics | Typed narration contract, contradiction and prose-only fixtures, atomic finalization, and no-open-transaction assertion; M2.3 |
 | GAP-001 | Product | Resolved | M1.3 supports an ordered 2–4 character Party Commander party with independently derived equipment/defense/resource state and actor isolation | Party Commander foundation now exists; character content breadth remains intentionally narrow | Migration `0004`, automated evidence, owner acceptance, and final M1 review passed; broader breadth remains deferred to M1.5 |
 | GAP-002 | Product | Open | No deterministic quest/world decision model | Decisions have limited lasting effects | M3 |
-| TEST-001 | Validation | Open | OpenAI provider has no paid live evaluation | Real structured behavior unproven | Lantern Test; M2 |
-| GAP-005 | Provider integration | Open | The two-stage provider factory intentionally rejects OpenAI; the existing OpenAI adapter serves only the legacy Phase 0 contract | M2 cannot make a live two-stage turn, which prevents accidental paid calls before approval | After the M2.5 owner gate, implement SDK-enforced deadline plus timeout/connection/refusal/empty-output/usage mapping, then run the capped live Lantern evaluation |
+| TEST-001 | Validation | Deferred | Automated OpenAI provider has no paid live evaluation and API spend is not authorized | API authentication, SDK behavior, network latency/timeouts, rate limits, token accounting, and unattended play remain unproven | Optional M2.5B after explicit provider/cap authorization |
+| TEST-002 | Validation | Open | No real model-authored two-stage Lantern evaluation has been imported through the application boundary | Narrative quality and real model schema/rules compliance remain unproven despite deterministic fixtures | Build the manual evaluation bridge and pass ten consecutive M2.5A scenarios |
+| GAP-005 | Provider integration | Open | The two-stage provider factory intentionally rejects OpenAI; the existing OpenAI adapter serves only the legacy Phase 0 contract | Automated two-stage play is unavailable, while the disabled path prevents accidental paid calls | M2.5B only after explicit authorization: implement SDK-enforced deadline plus timeout/connection/refusal/empty-output/usage mapping, then run the capped automated Lantern evaluation |
 | WARN-001 | Dependency | Monitoring | Current TestClient emits an `httpx` deprecation warning | No functional failure today | Reassess FastAPI/Starlette test client during dependency maintenance |
 | OPS-001 | Source control | Resolved | Initial push was blocked because HTTPS lacked credentials and Git did not automatically select the nonstandard SSH key filename | GitHub was temporarily behind local `main` | Registered the existing Ed25519 key, verified GitHub's host fingerprint, configured this repository's SSH command, and synchronized `main`; 2026-08-30 |
 | OPS-002 | Infrastructure | Deferred | pgvector is unavailable on `postgresvm` | No semantic memory yet | Evaluate/install only at M4 |
@@ -1134,15 +1143,16 @@ Destination milestone:
 
 ## 17. Immediate next actions
 
-1. Obtain the combined M2.5 owner decision on paid evaluation authorization/cap,
-   narrative/content boundaries, and the non-combat environmental-damage fixture.
-2. After approval, verify the currently available supported OpenAI model from official sources,
-   implement the two-stage adapter with SDK-enforced request deadlines and stable error/usage
-   mapping, and keep the deterministic provider as the safe default.
-3. Run the capped ten-scenario live Lantern evaluation, classify every failure, and rework rather
+1. Implement an evaluation-only export/import bridge for exact typed interpretation and narration
+   packages; retain correlation IDs, prompt-contract versions, schemas, and provider-call audits.
+2. Prepare an owner checklist for transferring each package through this Codex/ChatGPT conversation
+   and importing only JSON that passes the same production validators.
+3. Run ten consecutive M2.5A Lantern scenarios using the accepted classic-heroic/non-graphic,
+   player-agency-preserving profile and non-lethal minor environmental consequence; classify every
+   failure and rework rather
    than weaken no-reroll, no-partial-write, exact-outcome, actor-isolation, or event-order guarantees.
-4. Close M2 and `TEST-001` only if all ten consecutive live scenarios pass; otherwise record the
-   evidence and return the affected slice to Rework.
+4. Close `TEST-002` only if all ten consecutive model-authored scenarios pass. Keep `TEST-001` and
+   `GAP-005` deferred/open unless a later M2.5B automated-provider test is explicitly authorized.
 
 ## 18. Documentation change log
 
@@ -1170,3 +1180,4 @@ Destination milestone:
 | 2026-09-02 | DOC-020 | Completed M2.2, closed DEBT-001, and advanced M2.3 to Ready | Strict typed interpretation excludes modifiers/dice; checks and saves use M1.4; retry preserves exact dice; provider attempts are audited; invalid skill and stale state fail before resolution; legacy provider dice requests fail before writes; nine focused and 60 total tests pass at 90% coverage with no open provider transaction, zero schema drift, and no external calls | Implement typed post-outcome narration and atomic finalization in M2.3; keep DEBT-002 open until narration can only follow recorded outcomes |
 | 2026-09-02 | DOC-021 | Completed M2.3, closed DEBT-002, resolved ISSUE-006, and advanced M2.4 to Ready | Strict narration echoes immutable outcomes, rejects untyped mechanics and contradictions, runs outside database transactions, and atomically finalizes bounded state/events after stale-state validation; nine focused and 69 total tests pass at 90% coverage with catalog/schema freshness, zero Alembic drift, and no external calls | Harden failure, retry, restart, observability, and concurrency behavior and run ten consecutive deterministic Lantern scenarios in M2.4 |
 | 2026-09-02 | DOC-022 | Completed M2.4, resolved ISSUE-007, added migration `0007`, and advanced M2 to Verification at the M2.5 owner gate | Stable provider errors include turn IDs; optional tokens and latency are audited; stage leases recover expired work without rerolls; invalid proposals resume safely; ten consecutive deterministic Lantern scenarios and all 80 tests pass at 90% coverage with zero drift and no external calls | Obtain the combined owner gate, implement the live two-stage adapter, and run the capped ten-scenario live Lantern evaluation |
+| 2026-09-02 | DOC-023 | Replaced the paid-by-default M2.5 path with M2.5A no-cost subscription-assisted evaluation and separately deferred M2.5B automation; added the beginner setup guide, accepted content/consequence rulings, and the deterministic non-lethal fallback | The owner wants to maximize an existing ChatGPT/Codex subscription without separate API charges and accepted classic heroic fantasy, non-graphic/player-agency boundaries, fixed 2 HP minor harm, and a 1 HP non-lethal floor. The focused 10-test finalization suite and all 81 regressions pass | Implement the manual evaluation bridge and run the ten-scenario M2.5A checklist; keep automated provider work unimplemented until newly authorized |

@@ -1,11 +1,12 @@
 # M2 Two-Stage AI Turn Implementation Strategy
 
-- **Status:** Verification — M2.1–M2.4 Done; M2.5 owner gate required
+- **Status:** Verification — M2.1–M2.4 Done; M2.5A settings accepted and Ready to implement
 - **Prepared:** 2026-09-02
 - **Depends on:** M1 Party character creation and deterministic mechanics (Done)
-- **Owner input required now:** Yes — M2.5 authorization/cap, content profile, and damage-fixture
-  confirmation
-- **Paid external model calls:** Forbidden until the M2.5 owner gate is explicitly approved
+- **Owner input required now:** No — the owner selected the no-extra-cost evaluation path and
+  accepted the initial content and environmental-consequence settings
+- **Paid external model calls:** Not authorized; a later automated provider test requires a new,
+  explicit authorization and cap
 
 ## 1. Objective
 
@@ -14,8 +15,21 @@ interpret intent and narrate an already-recorded outcome, but cannot invent dice
 modifiers, directly write canonical state, or cause partial game-state changes when a provider call
 fails.
 
-The milestone proves live feasibility with the existing Human/Soldier/Fighter Party Commander
-slice. It does not broaden character content, implement combat, or create the persistent world model.
+The milestone proves real model-authored structured-output feasibility with the existing
+Human/Soldier/Fighter Party Commander slice. The first evaluation is a manual subscription-assisted
+handoff so it incurs no provider API charge. This proves the typed content and deterministic game
+boundary, but not unattended provider transport. It does not broaden character content, implement
+combat, or create the persistent world model.
+
+### 1.1 Subscription and API boundary
+
+The [OpenAI developer quickstart](https://platform.openai.com/docs/quickstart/make-your-first-api-request)
+requires an API key and directs API users to add platform credits. The
+[API reference](https://developers.openai.com/api/reference/overview) likewise defines API
+key authentication. A ChatGPT/Codex subscription is therefore not treated as a server-side
+GandalfDnD credential. The project will not automate the ChatGPT web interface or invoke a Codex CLI
+as a disguised production provider; those paths are brittle, do not prove the supported API
+contract, and risk coupling gameplay to an interactive developer session.
 
 ## 2. Required turn flow
 
@@ -284,22 +298,58 @@ Implemented evidence:
   generated-schema freshness, migration application, and zero Alembic drift pass; no external or
   paid model call was made.
 
-M2.4 completes deterministic hardening. The two-stage OpenAI adapter remains deliberately disabled;
-M2.5 must add provider-specific deadline/refusal/usage mapping and may make paid calls only after the
-owner accepts the gate below.
+M2.4 completes deterministic hardening. The two-stage OpenAI adapter remains deliberately disabled.
+The owner does not authorize additional API spend, so M2.5 is split into a no-cost manual evaluation
+and a separately gated automated-provider evaluation.
 
-### M2.5 — Owner-approved live Lantern evaluation
+### M2.5A — No-cost subscription-assisted Lantern evaluation
 
-**Status: Awaiting owner gate.**
+**Status: Ready; owner settings accepted 2026-09-02.**
 
-- select the configured OpenAI model at evaluation time;
-- agree on a strict cost/request cap and narrative/content boundaries;
+- export the exact typed interpretation or narration request as a human-transferable evaluation
+  package with prompt-contract version, canonical context, schema, and correlation identifiers;
+- have the owner submit each package to this Codex/ChatGPT conversation and save the returned JSON;
+- import the response through an explicit evaluation-only boundary that applies the same schema,
+  acknowledgement, validator, resolver, audit, resume, and atomic-finalization rules as a provider;
 - run ten consecutive two-character Lantern scenarios covering dialogue, movement, inventory use,
   check, bounded damage, character switching, restart, resume, and narration/outcome agreement;
 - categorize every failure and rework before acceptance.
 
-Exit: all ten consecutive live runs complete without impossible state, invented dice/modifiers,
-partial gameplay commits, actor leakage, rerolls on retry, or contradictory resume narration.
+Accepted evaluation settings:
+
+- classic heroic fantasy;
+- non-graphic violence and no explicit sexual content;
+- respect player agency and never infer an irreversible major player decision;
+- a failed minor climb proposes fixed 2 HP environmental harm only when at least 1 HP remains;
+- at insufficient HP, use a lost-position/time narrative setback with no HP change;
+- no combat, conditions, unconsciousness, death, or recovery mechanics.
+
+The deterministic reference fixture now enforces the 1 HP floor, including a regression proving
+that a character at 2 HP receives the narrative fallback rather than being reduced to 0 HP.
+
+Exit: all ten consecutive model-authored runs complete without impossible state, invented
+dice/modifiers, partial gameplay commits, actor leakage, rerolls on retry, or contradictory resume
+narration. Record the manual-transfer procedure and distinguish human transfer errors from model,
+schema, rules, or application failures.
+
+This evaluation can establish narrative quality, typed-output compliance, outcome acknowledgement,
+state safety, and restart/resume behavior with real model-authored responses. It cannot establish
+API authentication, SDK compatibility, network timeout behavior, provider latency, token accounting,
+rate-limit behavior, or unattended play.
+
+### M2.5B — Optional automated-provider Lantern evaluation
+
+**Status: Deferred; not authorized.**
+
+- select and verify a supported provider/model only at implementation time;
+- require a separately authenticated provider API; a ChatGPT/Codex or Claude subscription is not
+  treated as an application credential;
+- agree on a strict request/cost cap before any live call;
+- implement provider-specific deadline, connection, refusal, empty-output, and usage mapping;
+- rerun the same ten scenarios without manual transfer.
+
+Exit: all M2.5A guarantees pass through the real network/provider path and the operational gaps
+listed above have direct evidence.
 
 ## 5. Automated verification matrix
 
@@ -318,17 +368,17 @@ partial gameplay commits, actor leakage, rerolls on retry, or contradictory resu
 | Migration | legacy backfill, full-chain upgrade, guarded downgrade, and zero Alembic drift |
 | Regression | all M0/M1 ruleset, creation, party, provenance, validation, and resolution tests remain green |
 
-## 6. Owner decision gate
+## 6. Owner decision record and future gate
 
-No owner input is needed for M2.1–M2.4. Before M2.5, request these decisions together:
+The owner decided on 2026-09-02:
 
-1. authorization for paid live-model calls and an agreed cap;
-2. desired narrative tone and content boundaries;
-3. confirmation that M2's damage fixture remains bounded environmental harm rather than combat.
+1. do not incur separate model API charges while subscription-assisted evaluation can provide useful
+   evidence;
+2. use the classic heroic-fantasy, non-graphic, player-agency-preserving profile above;
+3. keep the M2 damage fixture as non-lethal bounded environmental harm rather than combat.
 
-Recommended starting content profile: classic heroic fantasy, non-graphic violence, no explicit
-sexual content, respect player agency, and never infer an irreversible major player decision. This
-is a recommendation only until the owner accepts or changes it.
+No further input is required before M2.5A implementation. M2.5B requires a new owner decision on
+provider, authorization, and maximum spend; a consumer subscription does not satisfy that gate.
 
 ## 7. Explicit non-goals
 
@@ -343,6 +393,9 @@ is a recommendation only until the owner accepts or changes it.
 
 ## 8. Completion and rework rule
 
-M2 is not Done on deterministic tests alone. It reaches Verification after M2.1–M2.4 and becomes
-Done only after the explicitly authorized ten-run live gate passes. A provider failure is evidence
-to classify and fix, not permission to weaken deterministic state, retry, or audit guarantees.
+M2 is not Done on deterministic tests alone. It reaches Verification after M2.1–M2.4. M2.5A may
+close the model-authored content-and-rules feasibility portion when ten consecutive manual runs
+pass, while the automated-provider claim remains explicitly open as `TEST-001`/`GAP-005`. M2 may be
+closed only with wording that does not claim unattended provider feasibility; otherwise it remains
+in Verification until M2.5B. A model or provider failure is evidence to classify and fix, not
+permission to weaken deterministic state, retry, or audit guarantees.

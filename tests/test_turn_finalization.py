@@ -135,7 +135,7 @@ def test_dialogue_finalizes_once_with_audited_narration(client: TestClient) -> N
     body = response.json()
     assert body["turn"]["status"] == "completed"
     assert body["turn"]["completed_at"] is not None
-    assert body["turn"]["narration_prompt_version"] == "deterministic-narration-1.0.0"
+    assert body["turn"]["narration_prompt_version"] == "deterministic-narration-1.1.0"
     assert "innkeeper" in body["turn"]["narration"].casefold()
     assert body["resolution"] is None
     assert _turn_event_types(turn_id) == ["player_action", "dm_response"]
@@ -221,6 +221,30 @@ def test_check_outcome_controls_success_movement_and_failure_damage(
         _character(before, characters[1])["hp"] - 2
     )
     assert failure["state"]["location"]["name"] == "Wall Top"
+
+
+def test_minor_environmental_harm_preserves_one_hp_floor(client: TestClient) -> None:
+    campaign_id, characters = _ready_campaign(client)
+    with get_engine().begin() as connection:
+        connection.execute(
+            text(
+                "UPDATE characters SET hp = 2, state_revision = state_revision + 1 "
+                "WHERE id = :character_id"
+            ),
+            {"character_id": uuid.UUID(characters[1])},
+        )
+
+    _fixed_dice([9])
+    turn_id = _execution(client, campaign_id, characters[1], "Bryn climbs the wall.")
+    failed = client.post(f"/campaigns/{campaign_id}/turn-executions/{turn_id}/finalize")
+
+    assert failed.status_code == 200, failed.text
+    body = failed.json()
+    assert body["resolution"]["outcome"] == "failure"
+    assert "loses position and time" in body["turn"]["narration"].casefold()
+    assert body["turn"]["structured_output"]["state_changes"] == []
+    assert _character(body["state"], characters[1])["hp"] == 2
+    assert _turn_event_types(turn_id) == ["player_action", "rule_resolved", "dm_response"]
 
 
 class InvalidAtomicNarrator:

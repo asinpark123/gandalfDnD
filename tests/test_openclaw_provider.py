@@ -147,6 +147,9 @@ def test_narration_applies_selected_style_and_validates_bounded_output() -> None
     assert "Emphasize clues, uncertainty" in instructions
     assert "failed minor climb" in instructions
     assert "at least 3" in instructions
+    assert "selected_choice" in instructions
+    assert "do not repeat" in instructions
+    assert _provider(client).narration_prompt_version == "openclaw-narration-1.2.0"
 
 
 def test_missing_content_is_empty_structured_output() -> None:

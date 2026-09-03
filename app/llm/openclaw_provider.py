@@ -56,8 +56,10 @@ _NARRATION_INSTRUCTIONS = f"""You are GandalfDnD's outcome narrator.
 {_SHARED_BOUNDARY}
 Narrate only the supplied accepted intent and immutable resolution. When a resolution exists,
 acknowledge its exact ID and outcome. Propose only bounded typed state changes that directly follow
-from that outcome. A failed minor climb may propose a 2 HP loss only when the supplied actor HP is
-at least 3; otherwise use a lost-position or time setback with no HP change. Do not introduce
+from that outcome. When canonical_state.world.selected_choice is present, its listed consequences
+are applied automatically by the application: acknowledge them in narration but do not repeat any
+of them in state_changes. A failed minor climb may propose a 2 HP loss only when the supplied actor
+HP is at least 3; otherwise use a lost-position or time setback with no HP change. Do not introduce
 combat, conditions, unconsciousness, death, or recovery mechanics.
 """
 
@@ -67,7 +69,7 @@ class OpenClawTurnProvider:
 
     provider_name = "openclaw"
     interpretation_prompt_version = "openclaw-intent-1.1.0"
-    narration_prompt_version = "openclaw-narration-1.1.0"
+    narration_prompt_version = "openclaw-narration-1.2.0"
 
     def __init__(
         self,

@@ -422,6 +422,56 @@ def test_branch_consequence_cannot_overlap_narrator_attitude_proposal(
     assert world["facts"] == []
 
 
+def test_branch_consequence_cannot_duplicate_narrator_fact_proposal(
+    client: TestClient,
+) -> None:
+    campaign_id, characters, _npcs = _ready_world(client)
+    discovery = "The party lit the Old Tower beacon for the Lantern Watch."
+    opened = _run_turn(
+        client,
+        campaign_id,
+        characters[0],
+        [
+            DecisionOpen(
+                type="decision_open",
+                decision_key="tower_beacon",
+                prompt="Should the party light the beacon?",
+                options=[
+                    {
+                        "option_key": "light",
+                        "label": "Light the beacon",
+                        "consequences": [
+                            {
+                                "type": "record_fact",
+                                "fact_type": "discovery",
+                                "value": discovery,
+                            }
+                        ],
+                    },
+                    {"option_key": "leave_dark", "label": "Leave it dark", "consequences": []},
+                ],
+            )
+        ],
+    )
+    assert opened.status_code == 200
+    decision = client.get(f"/campaigns/{campaign_id}/world").json()["decisions"][0]
+
+    rejected = _run_turn(
+        client,
+        campaign_id,
+        characters[0],
+        [DiscoveryRecord(type="discovery_record", discovery=discovery)],
+        decision_id=decision["id"],
+        option_key="light",
+    )
+
+    assert rejected.status_code == 422
+    assert "cannot duplicate a narrator fact proposal" in rejected.json()["detail"]
+    world = client.get(f"/campaigns/{campaign_id}/world").json()
+    assert world["decisions"][0]["status"] == "open"
+    assert world["facts"] == []
+
+
 def test_migration_refuses_to_discard_quest_or_decision_data(client: TestClient) -> None:
     campaign_id, characters, _npcs = _ready_world(client)
     _create_quest(client, campaign_id, characters[0])

@@ -1,8 +1,8 @@
 # OpenClaw Provider Integration
 
 - **Status:** Active and live-verified for the owner's private development deployment
-- **Last updated:** 2026-09-02
-- **Scope:** Optional M2 provider transport, independent of the future M9 Clawvis player client
+- **Last updated:** 2026-09-04
+- **Scope:** Optional M2/M3 provider transport, independent of the future M9 Clawvis player client
 
 ## 1. Purpose and boundary
 
@@ -76,6 +76,10 @@ Pydantic contracts. The gateway's schema setting is a transport aid, not an auth
 Authentication, rate-limit, response, connection, timeout, malformed-output, and empty-output
 failures become stable recoverable turn errors.
 
+Narration prompt `openclaw-narration-1.2.0` also distinguishes model-proposed state changes from
+selected decision consequences that Gandalf applies automatically. Gandalf independently rejects
+an identical normalized fact identity if both sources still propose it.
+
 The legacy `/turns` API does not use OpenClaw. OpenClaw is supported only through the authoritative
 two-stage `/turn-executions` workflow.
 
@@ -124,6 +128,8 @@ even though the endpoint accepted the tool definition. `response_format` alone a
 the requested schema. The verified Gandalf adapter therefore combines prompt-embedded exact JSON
 Schema, the response-format hint, and mandatory local Pydantic validation. See the
 [M2.5A evaluation record](M2_5_OPENCLAW_EVALUATION.md) for the categorized evidence and usage data.
+The later [M3 live evaluation](M3_OPENCLAW_EVALUATION.md) verifies persistent branch recall,
+presence boundaries, selected choices, restart continuity, and the duplicate-fact hardening.
 
 ## 6. Security and cost policy
 

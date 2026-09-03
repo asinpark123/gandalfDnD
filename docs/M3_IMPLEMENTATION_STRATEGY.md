@@ -3,9 +3,8 @@
 - **Status:** Done (2026-09-04)
 - **Prepared:** 2026-09-03
 - **Depends on:** M2 two-stage AI turn and model-authored feasibility (Done)
-- **Owner input required now:** None for M3 closure; separate authorization is required only for the
-  optional capped live OpenClaw supplement
-- **Owner checkpoint:** M3.5 passed on 2026-09-04
+- **Owner input required now:** None; M3 and its authorized live supplement are complete
+- **Owner checkpoint:** M3.5 and the capped live OpenClaw supplement passed on 2026-09-04
 
 ## 1. Objective
 
@@ -457,9 +456,9 @@ focuses on whether decisions, NPC continuity, and quest consequences feel cohere
 remain responsible for exact IDs, visibility, revisions, state transitions, rollback, and migration
 safety. Request separate permission before a capped OpenClaw version of the scenario.
 
-M3 reached Done after the deterministic scenario and owner API gate passed. A live OpenClaw run is
-optional additional evidence and requires separate authorization; any model failure is classified
-and corrected and never weakens the canonical state or visibility boundary.
+M3 reached Done after the deterministic scenario and owner API gate passed. The separately
+authorized live OpenClaw run then added supplemental evidence; its one discovered application edge
+case was classified, corrected, and retested without weakening canonical state or visibility.
 
 Automated evidence:
 
@@ -502,6 +501,17 @@ Both final worlds remained at Old Tower, revision 20, after 90 minutes. The real
 returned documented HTTP 409 with `world_target_not_present` and recovery guidance, and all four
 subjective questions passed. The raw result is preserved as
 `testM3_5_TARGETED_RETEST_RESULTS.md`; no further M3 retest is required.
+
+Live OpenClaw supplement (2026-09-04): after explicit owner authorization for at most 50 real
+attempts, two branches each completed live recap, choice, and post-restart follow-up turns. The
+first 12/12-call run revealed that narrator proposals could repeat deterministic decision facts.
+Gandalf now rejects identical normalized fact identities across those two sources and prompt
+`openclaw-narration-1.2.0` makes the division explicit. The corrected 12/12-call run retained the
+right present guide, recalled rescue and collapse separately, applied each follow-up fact once,
+survived database-engine disposal, and rejected absent targets before any provider work. Including
+one harness diagnostic, 25 of the authorized 50 attempts were used. All 126 normal tests and the
+static, ruleset/schema, and dual-database drift gates pass. See
+`M3_OPENCLAW_EVALUATION.md` for the metrics and categorized evidence.
 
 ## 8. Verification matrix
 
@@ -565,5 +575,6 @@ and documentation. A later slice that invalidates an earlier visibility, identit
 restart guarantee moves that slice back to Rework. M3 planning is complete with this document.
 M3.1–M3.4 and M3.5 are verified and complete. The corrected deterministic branching Lantern
 scenario, lifecycle, restart, event replay, guided choice flow, recoverable absent-target contract,
-and owner checkpoint pass. M3 is Done; a capped live OpenClaw run remains optional supplemental
-evidence and requires separate authorization.
+and owner checkpoint pass. M3 is Done, and its separately authorized capped live OpenClaw
+supplement passed after one discovered duplicate-fact edge case was deterministically hardened and
+retested.

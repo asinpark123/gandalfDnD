@@ -749,6 +749,7 @@ def _validated_turn_choice(
     occupied_quests: set[uuid.UUID] | None = None,
     occupied_objectives: set[uuid.UUID] | None = None,
     occupied_attitude_subjects: set[uuid.UUID] | None = None,
+    occupied_fact_records: set[tuple[str, uuid.UUID | None, str]] | None = None,
 ) -> tuple[DecisionPoint, DecisionOption, list[DecisionConsequence]] | None:
     if decision_id is None or option_key is None:
         return None
@@ -775,6 +776,7 @@ def _validated_turn_choice(
         occupied_quests=occupied_quests,
         occupied_objectives=occupied_objectives,
         occupied_attitude_subjects=occupied_attitude_subjects,
+        occupied_fact_records=occupied_fact_records,
     )
     return decision, option, consequences
 
@@ -1640,9 +1642,12 @@ def finalize_turn_execution(
         StateChangeValidator().validate(
             _character_snapshot(campaign, character), output.state_changes
         )
-        touched_quests, touched_objectives, attitude_subjects = _validate_world_changes(
-            session, campaign_id, output.state_changes
-        )
+        (
+            touched_quests,
+            touched_objectives,
+            attitude_subjects,
+            proposed_fact_records,
+        ) = _validate_world_changes(session, campaign_id, output.state_changes)
         choice = _validated_turn_choice(
             session,
             campaign_id,
@@ -1651,6 +1656,7 @@ def finalize_turn_execution(
             occupied_quests=touched_quests,
             occupied_objectives=touched_objectives,
             occupied_attitude_subjects=attitude_subjects,
+            occupied_fact_records=proposed_fact_records,
         )
     except InvalidStateChange as exc:
         _record_narration_failure(
@@ -3016,10 +3022,12 @@ def _validate_decision_consequences(
     occupied_quests: set[uuid.UUID] | None = None,
     occupied_objectives: set[uuid.UUID] | None = None,
     occupied_attitude_subjects: set[uuid.UUID] | None = None,
+    occupied_fact_records: set[tuple[str, uuid.UUID | None, str]] | None = None,
 ) -> None:
     touched_quests = set(occupied_quests or set())
     touched_objectives = set(occupied_objectives or set())
     attitude_subjects = set(occupied_attitude_subjects or set())
+    fact_records = set(occupied_fact_records or set())
     for consequence in consequences:
         if isinstance(consequence, DecisionFactConsequence):
             npc = _validate_fact_subject(
@@ -3033,6 +3041,12 @@ def _validate_decision_consequences(
                     "Decision consequence NPC must be active and player-visible"
                 )
             value = _validate_fact_value(consequence.fact_type, consequence.value)
+            identity = (consequence.fact_type, consequence.subject_npc_id, value)
+            if identity in fact_records:
+                raise InvalidStateChange(
+                    "A decision consequence cannot duplicate a narrator fact proposal"
+                )
+            fact_records.add(identity)
             if consequence.fact_type == "npc_attitude":
                 assert consequence.subject_npc_id is not None
                 if consequence.subject_npc_id in attitude_subjects:
@@ -3172,9 +3186,15 @@ def _faction_relationship_for_change(
 
 def _validate_world_changes(
     session: Session, campaign_id: uuid.UUID, changes: list
-) -> tuple[set[uuid.UUID], set[uuid.UUID], set[uuid.UUID]]:
+) -> tuple[
+    set[uuid.UUID],
+    set[uuid.UUID],
+    set[uuid.UUID],
+    set[tuple[str, uuid.UUID | None, str]],
+]:
     touched_facts: set[uuid.UUID] = set()
     attitude_subjects: set[uuid.UUID] = set()
+    proposed_fact_records: set[tuple[str, uuid.UUID | None, str]] = set()
     touched_quests: set[uuid.UUID] = set()
     touched_objectives: set[uuid.UUID] = set()
     new_quest_keys: set[str] = set()
@@ -3197,7 +3217,11 @@ def _validate_world_changes(
         if parts is not None:
             fact_type, subject_npc_id, value = parts
             _require_provider_fact_subject(session, campaign_id, fact_type, subject_npc_id)
-            _validate_fact_value(fact_type, value)
+            normalized_value = _validate_fact_value(fact_type, value)
+            identity = (fact_type, subject_npc_id, normalized_value)
+            if identity in proposed_fact_records:
+                raise InvalidStateChange("A turn cannot record the same world fact more than once")
+            proposed_fact_records.add(identity)
             if fact_type == "npc_attitude":
                 assert subject_npc_id is not None
                 if subject_npc_id in attitude_subjects:
@@ -3346,8 +3370,9 @@ def _validate_world_changes(
                 occupied_quests=touched_quests,
                 occupied_objectives=touched_objectives,
                 occupied_attitude_subjects=attitude_subjects,
+                occupied_fact_records=proposed_fact_records,
             )
-    return touched_quests, touched_objectives, attitude_subjects
+    return touched_quests, touched_objectives, attitude_subjects, proposed_fact_records
 
 
 def _record_fact_projection(

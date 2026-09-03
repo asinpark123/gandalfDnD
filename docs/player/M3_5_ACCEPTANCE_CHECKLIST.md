@@ -82,4 +82,5 @@ Record concise answers after the six actions:
 
 The complete result and four positive subjective answers are stored in
 `docs/testM3_5_TARGETED_RETEST_RESULTS.md`. M3 is Done. The optional capped live OpenClaw run is a
-separate supplemental evaluation and still requires explicit authorization.
+separate supplemental evaluation; it was later authorized, passed after hardening, and is recorded
+in `docs/M3_OPENCLAW_EVALUATION.md`.

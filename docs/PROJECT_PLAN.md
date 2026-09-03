@@ -6,8 +6,8 @@
   integrity and schema verification)
 - **Current delivery stage:** M3 Done — deterministic and owner-guided gates confirm persistent NPC
   identity, quests, explicit branching decisions, facts, factions, time, visibility, restart, causal
-  replay, and recoverable target errors. The separately authorized live OpenClaw supplement is the
-  immediate optional decision; M4 long-term-memory strategy follows
+  replay, and recoverable target errors. The authorized live OpenClaw supplement also passed after
+  exposing and resolving duplicate decision-fact protection. M4 long-term-memory strategy follows
 - **Canonical repository:** `~/Git/gandalfDnD`
 
 ## 1. Purpose of this document
@@ -102,6 +102,7 @@ Current documentation index:
 | OpenClaw provider topology, security, activation, and model/GM-style policy | [`OPENCLAW_INTEGRATION.md`](OPENCLAW_INTEGRATION.md) |
 | M2.5A live OpenClaw evaluation and usage/latency evidence | [`M2_5_OPENCLAW_EVALUATION.md`](M2_5_OPENCLAW_EVALUATION.md) |
 | M3 persistent-world architecture, slices, and acceptance strategy | [`M3_IMPLEMENTATION_STRATEGY.md`](M3_IMPLEMENTATION_STRATEGY.md) |
+| M3 supplemental live OpenClaw branching evaluation | [`M3_OPENCLAW_EVALUATION.md`](M3_OPENCLAW_EVALUATION.md) |
 
 ## 2. Product objective
 
@@ -286,7 +287,7 @@ results, known limitations, and where observations will be recorded.
 | M1.3 Party Commander and complete character state | Completed 2026-09-01; no further input required | Owner confirmed the API exposes the correct structured values; presentation clarity and end-user corrective guidance are deferred to the M7 interface checkpoint |
 | M1.4 deterministic resolution | Completed 2026-09-02; no further input required | All nine owner actions passed, including canonical modifiers, modifier rejection, Advantage/Disadvantage, actor attribution, and confirmed post-restart replay |
 | M2 model-authored feasibility | Completed 2026-09-02; no further input required. Any optional direct paid-provider test still needs separate authorization and a cap | The private OpenClaw activation, smoke checks, and three ten-scenario live Lantern runs passed; manual fallback and direct paid transport remain separately classified evidence |
-| M3 persistent world | Completed 2026-09-04; optional live OpenClaw supplement requires separate authorization | Owner-guided retest passed NPC continuity, distinct decisions and branches, restart persistence, and corrective error guidance |
+| M3 persistent world | Completed 2026-09-04; authorized live OpenClaw supplement also complete | Owner-guided retest passed NPC continuity, distinct decisions and branches, restart persistence, and corrective error guidance; the live two-branch supplement passed after resolving ISSUE-011 |
 | M1.5 content expansion | Prioritize desired species, backgrounds, classes, feats, equipment routes, spellcasting, and play styles | Create contrasting supported characters and confirm their choices produce understandable, distinct state and later gameplay |
 | M5 party combat | Provide difficulty/lethality feedback for standard party play; companion autonomy and lone-hero compensation remain later decisions | Repeated Party Commander combat tests across favorable, difficult, defeat, recovery, and restart scenarios |
 | Protagonist with Companions | Choose desired companion autonomy, instruction granularity, personality influence, and player override behavior after Party Commander is proven | Compare delegated companion proposals with direct Party Commander control and verify the same deterministic rules constrain both |
@@ -1040,7 +1041,20 @@ was safely rejected and reprompted without state impact; the monitored TestClien
 warning was the only warning. Evidence is preserved in
 `testM3_5_TARGETED_RETEST_RESULTS.md` with SHA-256
 `f3ae86541da10e05b94265cd5bb071ab54bc34119ea187f66db3753672af2447`. No further M3 retest is
-required; the optional live OpenClaw run remains supplemental and separately authorized.
+required.
+
+M3 live OpenClaw supplement (2026-09-04): the owner authorized at most 50 real attempts. A
+credential-free opt-in harness evaluated two persistent branches through live recap, explicit
+follow-up choice, absent-target rejection, and a post-engine-disposal follow-up. The first complete
+12-call run succeeded but exposed duplicate narrator facts matching deterministic decision
+consequences. Prompt `openclaw-narration-1.2.0` now tells the model not to repeat application-applied
+choice consequences, and finalization independently rejects the same normalized fact identity
+across both sources. The regression leaves the decision and facts untouched on rejection. The
+corrected run passed all 12 calls: both branch facts were recalled accurately, the same present
+guide was used, absent targets failed before provider work, restart continuity held, and each
+follow-up fact occurred once. Total use was 25/50 attempts, including one harness diagnostic call;
+all 126 normal tests and the static, integrity, generated-schema, and dual-database drift gates pass.
+Full metrics and narrative findings are preserved in `M3_OPENCLAW_EVALUATION.md`.
 
 World state is relational and causal. Names are display data; UUIDs are authoritative. Narrative
 facts are mechanically inert unless a separately implemented rule or versioned house-rule resolver
@@ -1149,6 +1163,7 @@ agent direct database or unvalidated state-mutation access.
 | ISSUE-009 | World lifecycle | Resolved | M3.5 found that movement hid old-scene NPCs by closing the scene but left their presence rows marked `present`, preventing a later valid arrival and omitting the departure event | Long-running NPC continuity could not be causally replayed across locations | Movement now atomically departs every old-scene presence; strict introduce/arrive/depart proposals, rollback fixtures, full Lantern replay, and 125-test regression gate pass |
 | PERF-001 | Provider efficiency | Resolved/Monitoring | The first passing live run sent full provenance-heavy character state and consumed 754,469 input tokens across 20 calls | Subscription usage was unnecessarily high and would worsen as state grows | Compact mechanically complete context reduced the same run to 419,727 input tokens (44.4% less); retain `RISK-008` budgets and revisit during M3/M4 |
 | ISSUE-010 | Acceptance fixture | Resolved | The initial M3.5 fixture selected duplicate-name NPCs by nondeterministic UUID order and preselected both player decisions | One branch could show the wrong Mira returning, and passive final-state inspection could not validate subjective continuity or player choice | Stable role lookup, promise/attitude identity assertions, guided decision checkpoints, corrected focused/full gates, and the 2026-09-04 targeted owner retest all pass |
+| ISSUE-011 | Decision/fact finalization | Resolved | The first live M3 OpenClaw run repeated each selected decision's deterministic discovery as a narrator fact proposal | The same canonical fact could be recorded twice and inflate world history/revisions | Narration prompt `1.2.0`, normalized cross-source fact-identity validation, atomic regression, and corrected 12/12-call live rerun all pass; `M3_OPENCLAW_EVALUATION.md` |
 | ISSUE-004 | Character-state provenance | Resolved | The first M1.3 owner run showed empty projected source/acquisition provenance for Dice Set and GP; ordinary package items were unaffected | The visible equipment projection did not meet GF-004 even though canonical grants remained intact | The corrected projection and exhaustive regression passed 39 automated tests; the 2026-09-01 owner retest confirmed complete Dice Set/GP definition, source, and acquisition-event provenance for both existing characters |
 | UX-001 | Player interface | Deferred/partially prepared | M3 absent/inactive/hidden-target conflicts now provide stable codes and safe recovery text, but JSON cannot validate visual actor/state clarity and other endpoints still need error normalization | Ordinary players may not know what happened or how to correct every invalid action when the frontend is introduced | In M7, map stable typed API errors to actionable messages, normalize remaining error contracts, and test actor visibility, calculated-value explanations, and isolated character changes through the full player journey |
 
@@ -1307,13 +1322,13 @@ Destination milestone:
 
 ## 17. Immediate next actions
 
-1. Request the owner's separate authorization for one capped live OpenClaw M3 scenario. Do not make
-   a real provider call until that authorization is explicit.
-2. If authorized, verify the private gateway/configuration without changing Clawvis, run the capped
-   world scenario, classify any model failure, and preserve latency/usage and coherence evidence.
-3. Regardless of whether the optional supplement runs, prepare the M4 long-term-memory and retrieval
-   implementation strategy from M3's verified relational/visibility foundation before installing
-   pgvector or changing infrastructure.
+1. Prepare the M4 long-term-memory and retrieval implementation strategy from M3's verified
+   relational, causal, and visibility foundation.
+2. Audit `postgresvm` read-only for PostgreSQL/extension compatibility and document the smallest
+   safe pgvector provisioning plan; do not install or change infrastructure before that plan is
+   reviewed against least privilege and existing services.
+3. Define M4's synthetic 500-event retrieval corpus, hidden-record exclusion gates, embedding
+   versioning, re-index behavior, and usage/quality measurements before implementing retrieval.
 
 ## 18. Documentation change log
 
@@ -1352,3 +1367,4 @@ Destination milestone:
 | 2026-09-03 | DOC-031 | Passed M3.5's automated gate, corrected the missing causal NPC-departure lifecycle, and advanced M3 to Verification with an owner fixture/checklist | Two complete campaigns diverge at an explicit route choice, survive restart, and replay exact player state plus revisions 0–20 from events; absent targets fail pre-provider, presence/move overlap rolls back, all 125 normal tests and integrity/static/schema/drift gates pass, and no external call occurred | Run and analyze the M3.5 owner checklist; close M3 if accepted, then separately decide whether to authorize the capped OpenClaw supplement |
 | 2026-09-03 | DOC-032 | Preserved and analyzed the initial M3.5 owner evidence, corrected nondeterministic duplicate-name fixture identity and passive choice review, added documented recoverable target conflicts, and narrowed the owner gate | The technical actions passed, but the subjective answers correctly identified that final JSON inspection was not a playthrough; audit then proved the returned NPC could differ from the promise subject. Stable role lookup, identity assertions, staged owner choices, 125 tests, integrity/static/schema checks, dual-database zero drift, and an end-to-end guided dry run pass without external calls | Run the six-action targeted owner retest, analyze it, and close or rework M3 from that evidence |
 | 2026-09-04 | DOC-033 | Preserved and analyzed the successful targeted owner evidence, resolved ISSUE-010, passed the M3 exit gate, and closed M3 | Both owner-selected branches retained the same promise-bearing guide through restart, produced the exact opposing objective/discovery outcomes, returned the documented recoverable 409, and received four positive subjective answers; no further M3 retest is required | Ask for separate authorization for the optional capped live OpenClaw supplement, then prepare the M4 strategy |
+| 2026-09-04 | DOC-034 | Completed the authorized capped live M3 OpenClaw supplement, resolved ISSUE-011, and preserved its credential-free evaluation record | 25/50 real attempts included one harmless harness diagnostic plus two 12-call runs; the first exposed duplicate decision facts, while prompt `1.2.0`, deterministic overlap validation, regression coverage, and the corrected 12/12-call branching/restart run passed | Prepare M4's strategy and infrastructure audit before installing pgvector |

@@ -1,11 +1,12 @@
 # RES-001 Character-System Research Review and Adoption Record
 
 - **Review date:** 2026-08-30
+- **Last traceability update:** 2026-09-04
 - **Research source:** [RES-001 verbatim report](sources/2026-08-30-gandalfdnd-character-system-deep-research.md)
 - **Decision:** Adopt the architectural recommendations with an intentionally narrower delivery
   sequence.
-- **Implementation status:** Planning only. No rule ingestion, character schema, or deterministic
-  resolution implementation is claimed by this review.
+- **Implementation status:** This review is a decision record rather than implementation evidence.
+  M1–M3 are now Done and M4 is Ready; the living project plan links their executable evidence.
 
 ## Why the research was commissioned
 
@@ -80,6 +81,16 @@ criteria for M1.
 - Comprehensive character options and spellcasting are tracked as deferred expansion, not hidden
   requirements of the first playable proof.
 - The rules specification and rulings register become required inputs to future rule changes.
+
+## M4 traceability update
+
+The adopted separation of narrative memory from mechanical effects is now concrete in the M4
+strategy. Completed player-visible turns/events become source-cited, rebuildable memory documents;
+embeddings, retrieval scores, and summaries remain derived and mechanically inert. Exact M3 state
+is supplied separately, and campaign/audience/profile filters apply before ranking. The 500-event
+gate, local versioned embedding policy, re-index behavior, and pgvector operator boundary are
+recorded in `docs/M4_IMPLEMENTATION_STRATEGY.md` and
+`docs/M4_POSTGRES_PGVECTOR_AUDIT.md`. This update records traceability, not completed M4 behavior.
 
 ## Research limitations and safeguards
 

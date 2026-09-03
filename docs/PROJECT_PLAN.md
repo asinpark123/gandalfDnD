@@ -4,10 +4,9 @@
 - **Last updated:** 2026-09-04
 - **Rules baseline:** SRD 5.2.1 (pinned; character-state and check/save-resolution catalogs pass
   integrity and schema verification)
-- **Current delivery stage:** M3 Done — deterministic and owner-guided gates confirm persistent NPC
-  identity, quests, explicit branching decisions, facts, factions, time, visibility, restart, causal
-  replay, and recoverable target errors. The authorized live OpenClaw supplement also passed after
-  exposing and resolving duplicate decision-fact protection. M4 long-term-memory strategy follows
+- **Current delivery stage:** M4 Ready — the long-term-memory architecture, 500-event retrieval
+  gate, local-embedding policy, and read-only PostgreSQL/pgvector audit are documented. M3 remains
+  Done. M4.1 awaits explicit authorization for narrowly scoped shared-VM pgvector provisioning
 - **Canonical repository:** `~/Git/gandalfDnD`
 
 ## 1. Purpose of this document
@@ -103,6 +102,8 @@ Current documentation index:
 | M2.5A live OpenClaw evaluation and usage/latency evidence | [`M2_5_OPENCLAW_EVALUATION.md`](M2_5_OPENCLAW_EVALUATION.md) |
 | M3 persistent-world architecture, slices, and acceptance strategy | [`M3_IMPLEMENTATION_STRATEGY.md`](M3_IMPLEMENTATION_STRATEGY.md) |
 | M3 supplemental live OpenClaw branching evaluation | [`M3_OPENCLAW_EVALUATION.md`](M3_OPENCLAW_EVALUATION.md) |
+| M4 long-term-memory architecture, slices, and acceptance strategy | [`M4_IMPLEMENTATION_STRATEGY.md`](M4_IMPLEMENTATION_STRATEGY.md) |
+| M4 PostgreSQL/pgvector read-only readiness and provisioning gate | [`M4_POSTGRES_PGVECTOR_AUDIT.md`](M4_POSTGRES_PGVECTOR_AUDIT.md) |
 
 ## 2. Product objective
 
@@ -207,7 +208,7 @@ presented separately from the immutable SRD baseline.
 | `gandalfdnd_test` | Automated integration-test state | Provisioned and migrated |
 | Clawvis VM | Existing services plus the restricted private OpenClaw provider route | No Gandalf application/database deployment; loopback-only gateway integration |
 | Gandalf application VM | Future persistent runtime | Deferred |
-| pgvector | Future semantic memory | Not installed; deferred to Milestone 4 |
+| pgvector | M4 semantic-memory index | Not installed; read-only M4 audit complete and owner provisioning approval required |
 
 Database roles are separate, non-superuser, non-`CREATEDB`, non-`CREATEROLE`, non-replication
 accounts. Public database connectivity is revoked, and cross-database isolation has been tested.
@@ -288,6 +289,7 @@ results, known limitations, and where observations will be recorded.
 | M1.4 deterministic resolution | Completed 2026-09-02; no further input required | All nine owner actions passed, including canonical modifiers, modifier rejection, Advantage/Disadvantage, actor attribution, and confirmed post-restart replay |
 | M2 model-authored feasibility | Completed 2026-09-02; no further input required. Any optional direct paid-provider test still needs separate authorization and a cap | The private OpenClaw activation, smoke checks, and three ten-scenario live Lantern runs passed; manual fallback and direct paid transport remain separately classified evidence |
 | M3 persistent world | Completed 2026-09-04; authorized live OpenClaw supplement also complete | Owner-guided retest passed NPC continuity, distinct decisions and branches, restart persistence, and corrective error guidance; the live two-branch supplement passed after resolving ISSUE-011 |
+| M4 long-term memory | Approve or reject the narrow pgvector package/per-database extension plan; a simulation showing unrelated upgrades stops the work | At M4.5, review whether cited recall is relevant, non-repetitive, branch-correct, and continuous after restart; live OpenClaw evaluation remains separately capped |
 | M1.5 content expansion | Prioritize desired species, backgrounds, classes, feats, equipment routes, spellcasting, and play styles | Create contrasting supported characters and confirm their choices produce understandable, distinct state and later gameplay |
 | M5 party combat | Provide difficulty/lethality feedback for standard party play; companion autonomy and lone-hero compensation remain later decisions | Repeated Party Commander combat tests across favorable, difficult, defeat, recovery, and restart scenarios |
 | Protagonist with Companions | Choose desired companion autonomy, instruction granularity, personality influence, and player override behavior after Party Commander is proven | Compare delegated companion proposals with direct Party Commander control and verify the same deterministic rules constrain both |
@@ -325,7 +327,7 @@ Use these values consistently:
 | M1 | Party character creation and deterministic mechanics | Done | The selected acting character's choices drive calculated outcomes |
 | M2 | Two-stage AI turn and model-authored feasibility | Done | Real DM-authored output uses recorded dice results safely through a private provider boundary |
 | M3 | Persistent world model | Done | NPCs, quests, scenes, clues, time, decisions, and visibility |
-| M4 | Long-term memory and retrieval | Proposed | Coherent recall without full history in context |
+| M4 | Long-term memory and retrieval | Ready | Coherent recall without full history in context |
 | M5 | Basic deterministic combat | Proposed | Reproducible initiative, actions, attacks, and damage |
 | M6 | Spoiler-safe Guide | Proposed | Beginner help with enforceable knowledge boundaries |
 | M7 | Play interface and campaign administration | Proposed | Usable play, recap, correction, and export workflows |
@@ -1067,15 +1069,47 @@ while DM-only facts remain absent from player-visible APIs.
 
 ### M4 — Long-term memory and retrieval
 
-- **Status:** Proposed
+- **Status:** Ready (2026-09-04)
 - **Depends on:** M3
+- **Detailed strategy:** [`M4_IMPLEMENTATION_STRATEGY.md`](M4_IMPLEMENTATION_STRATEGY.md)
+- **Infrastructure audit:** [`M4_POSTGRES_PGVECTOR_AUDIT.md`](M4_POSTGRES_PGVECTOR_AUDIT.md)
 
-Install pgvector only here. Add semantic memory for prose and conversations, structured filters,
-summaries, embedding versioning, retrieval logs, and re-indexing. Exact state must continue to come
-from relational tables, not vector retrieval.
+Add player-visible, source-cited narrative memory for completed turns/events, a local embedding
+provider, versioned profiles, durable idempotent indexing, exact-vector plus lexical hybrid search,
+bounded retrieval context, source-bound summaries, retrieval audits, and atomic side-by-side
+re-indexing. Exact state continues to come from relational tables rather than retrieval.
+
+Delivery sequence:
+
+1. M4.0 completes the architecture and read-only PostgreSQL/pgvector audit without changing the VM.
+2. M4.1 provisions a pinned prebuilt pgvector package only after explicit owner approval and a
+   package simulation showing no unrelated upgrade, then adds the guarded memory foundation.
+3. M4.2 adds player-safe source extraction, a deterministic test provider, one pinned local CPU
+   embedding model, durable leased jobs, backfill, failure recovery, and side-by-side re-indexing.
+4. M4.3 implements campaign/audience/profile filtering before versioned hybrid ranking and stores
+   reconstructable retrieval audits under strict count/character budgets.
+5. M4.4 adds cited player-visible summaries and supplies retrieved history to both provider stages
+   as explicitly untrusted, mechanically inert data alongside separate exact M3 state.
+6. M4.5 runs the 500-event, adversarial visibility/injection, restart, stale-index, and re-index
+   gates plus owner relevance review. Any live OpenClaw supplement requires a separate call cap.
+
+M4.0 readiness evidence (2026-09-04): `postgresvm` runs Debian 12 and PostgreSQL 15.14 on 2 CPUs,
+3.8 GiB RAM, and 32 GiB free storage. Both small isolated Gandalf databases contain only `plpgsql`;
+`vector` is neither installed nor available from the configured Debian repositories. Application
+roles remain separate login owners without superuser, `CREATEDB`, or `CREATEROLE`. A no-change
+simulation for PostgreSQL headers would upgrade 14 packages—including PostgreSQL and libc—and add
+26, so source compilation is not an incidental safe path. M4 instead prefers one pinned prebuilt
+PostgreSQL-15 pgvector package from the official PostgreSQL APT source, but will proceed only if a
+fresh exact simulation adds pgvector without unrelated upgrades/replacements. The upstream
+`v0.8.6` tag resolved to commit `8ee86c96f0fd72390f890aa8a336fda6d3ab4c6c`; package/version state
+will be rechecked at execution. No host, service, database, package, repository, role, or
+configuration changed during the audit.
 
 Exit gate: in a synthetic campaign of at least 500 events, a relevant early clue is retrieved late
-without placing full history in the prompt, while irrelevant/hidden records remain excluded.
+without placing full history in the prompt, while irrelevant/hidden/cross-campaign records remain
+excluded. Critical Recall@8 must be 100%, overall Recall@8 at least 0.90, mean reciprocal rank at
+least 0.65, memory context at most 8 items/6,000 characters, and re-index activation atomic. Exact
+search database p95 must remain at most 250 ms on the audited VM.
 
 ### M5 — Basic deterministic combat
 
@@ -1149,7 +1183,7 @@ agent direct database or unvalidated state-mutation access.
 | GAP-006 | OpenClaw activation | Resolved | The owner authorized a dedicated restricted `gandalf` agent and authenticated Chat Completions endpoint while retaining loopback binding and the OAuth-only route | Gandalf can now use the owner's private Clawvis deployment without exposing it publicly or granting database access | Health, smoke, restart, and three passing live Lantern runs recorded in `M2_5_OPENCLAW_EVALUATION.md`; M2.5A |
 | WARN-001 | Dependency | Monitoring | Current TestClient emits an `httpx` deprecation warning | No functional failure today | Reassess FastAPI/Starlette test client during dependency maintenance |
 | OPS-001 | Source control | Resolved | Initial push was blocked because HTTPS lacked credentials and Git did not automatically select the nonstandard SSH key filename | GitHub was temporarily behind local `main` | Registered the existing Ed25519 key, verified GitHub's host fingerprint, configured this repository's SSH command, and synchronized `main`; 2026-08-30 |
-| OPS-002 | Infrastructure | Deferred | pgvector is unavailable on `postgresvm` | No semantic memory yet | Evaluate/install only at M4 |
+| OPS-002 | Infrastructure | Approval required | Read-only M4 audit confirms pgvector is absent and unavailable from configured Debian repositories; installing server headers would upgrade 14 system/server packages and add 26 | M4 tables cannot use vectors yet, and an incidental source-build setup could disturb shared VM services | Prefer a pinned prebuilt PostgreSQL-15 pgvector package only if a fresh exact simulation shows no unrelated upgrades; then enable it only in both Gandalf databases; `M4_POSTGRES_PGVECTOR_AUDIT.md` |
 | DOC-001 | Documentation | Open | RES-001's verbatim export contains temporary Deep Research citation tokens | Tokens are not durable implementation citations | Preserve the source unchanged; use official URLs and SRD pages in specifications and rule definitions; M1.1 onward |
 | GAP-003 | Rules | Resolved | Authoritative ability checks and saving throws now derive from actor-bound canonical state and preserve exact dice, rules/catalog provenance, typed outcomes, and replay evidence | Character choices now produce reproducible check/save outcomes through the dedicated resolution API | Migration `0005`, 45-test suite, fixed-dice/restart replay, modifier rejection, schema/catalog integrity, development runtime checks, and all nine owner acceptance actions passed |
 | GAP-004 | Product | Open | Solo balance has a research framework but no measured product results | Encounter/class support cannot yet claim solo balance | Establish strict-SRD baselines in M5; build balance harness after supported combat |
@@ -1200,6 +1234,10 @@ because a workaround exists; record both the workaround and the permanent resolu
 | RISK-024 | Slow provider work finalizes against stale scene/quest/decision state | Medium | High | Campaign world-revision checkpoint, locked fresh read, safe resume, and atomic rejection without partial writes |
 | RISK-025 | Names are used as identity or generated entities multiply without bounds | Medium | Medium | UUID targets, duplicate-name fixtures, bounded creation proposals, lifecycle constraints, and campaign isolation |
 | RISK-026 | Narrative relationships, time, or milestones silently create mechanics | High | High | Narrative-only defaults, no numeric reputation, no automatic time recovery/rewards, and explicit cited rule or house-rule resolver for every mechanical semantic |
+| RISK-027 | pgvector provisioning upgrades/restarts shared PostgreSQL or unrelated VM packages | Medium | High | Explicit owner gate, Gandalf-only backups, official pinned binary preference, exact pre-install simulation, stop on any unrelated change, no automatic source-build fallback |
+| RISK-028 | Embedding model, dimensions, license, or preprocessing drift silently changes retrieval | High | High | Immutable profiles with artifact checksum/license and adapter/query-format versions; side-by-side re-index plus golden gate before atomic activation |
+| RISK-029 | Failed or lagging indexing makes provider memory incomplete | Medium | Medium | Durable idempotent leased jobs, indexed-through checkpoint, safe retry, freshness metadata, and fail-soft use of exact relational state |
+| RISK-030 | Retrieved prose leaks hidden/cross-campaign data or acts as prompt instructions | Medium | High | Campaign/audience/status/profile SQL filters before ranking, player-only initial index, adversarial injection fixtures, untrusted-data prompt labels, cited bounded context |
 
 ## 13. Architectural decision log
 
@@ -1234,6 +1272,11 @@ because a workaround exists; record both the workaround and the permanent resolu
 | ADR-027 | 2026-09-03 | Represent factions with stable identities and constrained revisioned relationship rows, and represent world time as bounded monotonic elapsed minutes with no implicit mechanics | Membership/attitude continuity and story chronology must persist now, while numeric reputation, automatic modifiers, rests, duration processing, and travel rules are not implemented | When a cited deterministic resolver or versioned house rule adds one exact mechanical semantic |
 | ADR-028 | 2026-09-03 | Use one audience-aware world projection that defaults to player-safe output, keep all M3 providers on that player path, and cap every growing provider collection | A separate DM projection is needed for future orchestration, but hidden values and unbounded history must not reach current player-facing model output | When a tested planner/narrator separation or M4 retrieval layer introduces a narrower hidden-data capability |
 | ADR-029 | 2026-09-03 | Treat an NPC introduction as arrival in the active scene, require explicit validated arrival/departure thereafter, and automatically depart the old cast when movement closes a scene | NPC identity must persist independently of location while every present/departed transition remains legal, visible, causal, and replayable | When a future remote-contact, simultaneous-scene, or GM planning model requires a broader presence operation without weakening target validation |
+| ADR-030 | 2026-09-04 | Keep exact M3 relational state separate from source-cited M4 narrative memory and initially index/retrieve only player-visible completed sources | Semantic similarity is useful for prose recall but cannot safely determine present state or enforce secrecy by prompt | When a separately tested DM planner path has a capability-scoped hidden-memory requirement |
+| ADR-031 | 2026-09-04 | Use immutable embedding profiles, local CPU inference by default, and side-by-side per-campaign re-index before atomic activation | Avoid routine paid/API dependency and prevent dimension/model drift or partial rebuilds from changing live retrieval | When measured quality/latency requires another provider under an explicit cost/privacy review |
+| ADR-032 | 2026-09-04 | Use exact pgvector cosine search plus PostgreSQL lexical search and versioned rank fusion for M4; defer approximate indexes | The 500-event target is small enough for exact scans, while hybrid ranking handles paraphrases and exact names without premature HNSW operations | When measured corpus size or p95 exceeds the recorded gate and an approximate-index plan passes recall/rebuild tests |
+| ADR-033 | 2026-09-04 | Persist idempotent leased memory-index jobs but use bounded in-process/CLI draining rather than Redis, Celery, or an in-memory-only queue | Index work must survive restart and remain outside canonical turn transactions without adding unneeded distributed infrastructure | When deployment throughput and measured backlog cannot meet freshness targets on one application worker |
+| ADR-034 | 2026-09-04 | Treat summaries as mechanically inert, player-visible derived documents that retain immutable source citations and prompt/model versions | Summaries reduce context but can omit or invent details; cited canonical sources must remain reconstructable | When M6 or a future planner defines a separately tested audience and summary policy |
 
 ## 14. Milestone review template
 
@@ -1322,13 +1365,13 @@ Destination milestone:
 
 ## 17. Immediate next actions
 
-1. Prepare the M4 long-term-memory and retrieval implementation strategy from M3's verified
-   relational, causal, and visibility foundation.
-2. Audit `postgresvm` read-only for PostgreSQL/extension compatibility and document the smallest
-   safe pgvector provisioning plan; do not install or change infrastructure before that plan is
-   reviewed against least privilege and existing services.
-3. Define M4's synthetic 500-event retrieval corpus, hidden-record exclusion gates, embedding
-   versioning, re-index behavior, and usage/quality measurements before implementing retrieval.
+1. Obtain explicit owner authorization for the exact pgvector provisioning boundary in
+   `M4_POSTGRES_PGVECTOR_AUDIT.md`; authorization is conditional on a fresh simulation showing no
+   PostgreSQL, libc, or unrelated package changes.
+2. If authorized and the simulation is clean, back up only the Gandalf databases, install the pinned
+   prebuilt extension, enable it only in development/test, and verify cluster/application health.
+3. Implement M4.1's guarded memory foundation without provider-context integration, then run
+   extension, migration, role-isolation, rollback, regression, and dual-database drift gates.
 
 ## 18. Documentation change log
 
@@ -1368,3 +1411,4 @@ Destination milestone:
 | 2026-09-03 | DOC-032 | Preserved and analyzed the initial M3.5 owner evidence, corrected nondeterministic duplicate-name fixture identity and passive choice review, added documented recoverable target conflicts, and narrowed the owner gate | The technical actions passed, but the subjective answers correctly identified that final JSON inspection was not a playthrough; audit then proved the returned NPC could differ from the promise subject. Stable role lookup, identity assertions, staged owner choices, 125 tests, integrity/static/schema checks, dual-database zero drift, and an end-to-end guided dry run pass without external calls | Run the six-action targeted owner retest, analyze it, and close or rework M3 from that evidence |
 | 2026-09-04 | DOC-033 | Preserved and analyzed the successful targeted owner evidence, resolved ISSUE-010, passed the M3 exit gate, and closed M3 | Both owner-selected branches retained the same promise-bearing guide through restart, produced the exact opposing objective/discovery outcomes, returned the documented recoverable 409, and received four positive subjective answers; no further M3 retest is required | Ask for separate authorization for the optional capped live OpenClaw supplement, then prepare the M4 strategy |
 | 2026-09-04 | DOC-034 | Completed the authorized capped live M3 OpenClaw supplement, resolved ISSUE-011, and preserved its credential-free evaluation record | 25/50 real attempts included one harmless harness diagnostic plus two 12-call runs; the first exposed duplicate decision facts, while prompt `1.2.0`, deterministic overlap validation, regression coverage, and the corrected 12/12-call branching/restart run passed | Prepare M4's strategy and infrastructure audit before installing pgvector |
+| 2026-09-04 | DOC-035 | Prepared M4, completed the read-only PostgreSQL/pgvector audit, defined five implementation slices and the 500-event quality/security/re-index gate, and advanced M4 to Ready | PostgreSQL 15.14 is compatible but vector is absent; the direct header/source path would upgrade 14 and add 26 packages. The plan therefore requires a pinned prebuilt package simulation with no unrelated changes, player-only source-cited memory, local versioned embeddings, exact hybrid retrieval, durable jobs, and atomic profile activation | Obtain owner authorization for the conditional pgvector provisioning gate, then implement M4.1 only if the exact simulation remains safe |

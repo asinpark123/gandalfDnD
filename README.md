@@ -40,6 +40,10 @@ maintained in the [living development plan](docs/PROJECT_PLAN.md).
   facts, quests, decisions, time, visibility, and branching acceptance gates
 - [M3 live OpenClaw evaluation](docs/M3_OPENCLAW_EVALUATION.md) — capped persistent-branch,
   presence, restart, coherence, usage, and duplicate-fact hardening evidence
+- [M4 implementation strategy](docs/M4_IMPLEMENTATION_STRATEGY.md) — source-cited long-term memory,
+  local embeddings, hybrid retrieval, re-indexing, and 500-event acceptance gates
+- [M4 PostgreSQL/pgvector audit](docs/M4_POSTGRES_PGVECTOR_AUDIT.md) — read-only readiness findings,
+  least privilege, package-impact boundary, and conditional provisioning plan
 
 Documentation distinguishes planned behavior from verified implementation. M1.3 Party Commander
 and complete level-one character state are Done. M1.4 authoritative ability-check and saving-throw
@@ -53,7 +57,8 @@ branch decisions, typed factions, bounded narrative time, and audience-safe worl
 is Done after its corrected deterministic and owner-guided branching, NPC continuity, restart,
 causal replay, and recoverable-error gates passed. Its separately authorized capped live OpenClaw
 supplement also passed both persistent branches after exposing and resolving an exact duplicate
-decision-fact edge case.
+decision-fact edge case. M4 is Ready at its infrastructure gate: pgvector remains uninstalled, and
+shared-VM provisioning requires explicit approval plus a clean package simulation before M4.1.
 
 ## Versioned rulesets
 

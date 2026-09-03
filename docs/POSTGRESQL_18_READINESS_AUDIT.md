@@ -1,12 +1,14 @@
 # PostgreSQL 18 Readiness Audit
 
-- **Status:** PG18.0 complete; its authorized foundation and test-restore gate subsequently passed
+- **Status:** PG18.0 complete; foundation plus test/development restore acceptance subsequently passed
 - **Audit date:** 2026-09-04
 - **Host:** `postgresvm`
 - **Scope:** Read-only package, cluster, access, recovery, and Gandalf compatibility assessment
 - **Strategy:** [`POSTGRESQL_18_MIGRATION_STRATEGY.md`](POSTGRESQL_18_MIGRATION_STRATEGY.md)
 - **Execution record:**
   [`POSTGRESQL_18_FOUNDATION_EXECUTION.md`](POSTGRESQL_18_FOUNDATION_EXECUTION.md)
+- **Development rehearsal:**
+  [`POSTGRESQL_18_DEVELOPMENT_REHEARSAL.md`](POSTGRESQL_18_DEVELOPMENT_REHEARSAL.md)
 
 ## 1. Outcome and sequencing decision
 
@@ -131,8 +133,10 @@ custom-function expression indexes, or changed interval `ago` syntax.
 The test-database execution subsequently proved a populated PostgreSQL 15→18 logical restore made
 with PostgreSQL 18 client tools; exact row counts, 23 tables, 8 functions, 8 triggers, ownership,
 isolation, and Alembic head; plus the complete 126-test suite, including migrations, deterministic
-Lantern behavior, restart, JSONB/UUID, transaction, trigger, and constraint coverage. Development
-restore/runtime acceptance and pgvector insert/query plus later M4 migrations remain outstanding.
+Lantern behavior, restart, JSONB/UUID, transaction, trigger, and constraint coverage. The later
+development restore also matched all row counts and version-stable integrity properties, and two
+complete dual-runtime comparisons passed across 11 campaigns before and after API restart.
+Active cutover and pgvector insert/query plus later M4 migrations remain outstanding.
 
 PostgreSQL officially recommends concurrent old/new installations for cautious application testing
 and recommends using the newer `pg_dump` for a cross-major logical migration. See
@@ -189,8 +193,8 @@ disablement, database deletion, package downgrade, or PostgreSQL 15 retirement o
 standard schema features, exact binary packages, free parallel port, and logical-restore strategy
 were borne out in execution. PostgreSQL 18.6 `18/gandalf` is loopback-only on port 5433 with
 checksums and manual startup; its restored test database passed the full repository suite. The
-migration remains staged: development restore, application acceptance, cutover, stabilization, and
-retirement are separate decisions.
+development restore/runtime rehearsal subsequently passed as well. The migration remains staged:
+active cutover, stabilization, extension enablement, and retirement are separate decisions.
 
 PostgreSQL 15.14 remains active and authoritative for Gandalf development after this gate. Its
 update to 15.19 for unrelated remaining users is advisable but outside Gandalf's migration scope

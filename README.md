@@ -50,6 +50,8 @@ maintained in the [living development plan](docs/PROJECT_PLAN.md).
   shared-host boundaries, compatibility, isolation finding, and migration recommendation
 - [PostgreSQL 18 foundation execution](docs/POSTGRESQL_18_FOUNDATION_EXECUTION.md) — recovery,
   signed package, parallel-cluster, HBA-isolation, restore, and test evidence
+- [PostgreSQL 18 development rehearsal](docs/POSTGRESQL_18_DEVELOPMENT_REHEARSAL.md) — fresh
+  development restore, exact source comparison, dual-runtime acceptance, and cutover gate
 
 Documentation distinguishes planned behavior from verified implementation. M1.3 Party Commander
 and complete level-one character state are Done. M1.4 authoritative ability-check and saving-throw
@@ -64,12 +66,12 @@ is Done after its corrected deterministic and owner-guided branching, NPC contin
 causal replay, and recoverable-error gates passed. Its separately authorized capped live OpenClaw
 supplement also passed both persistent branches after exposing and resolving an exact duplicate
 decision-fact edge case. M4 is Ready but waits on the staged PostgreSQL 18 migration. Its authorized
-foundation passed: signed pinned packages installed PostgreSQL 18.6 and pgvector 0.8.6 without
-changing PostgreSQL 15 server/client; `18/gandalf` is checksum-enabled and loopback-only; PG15 role
-isolation is hardened; and an exact restored test copy passed 126 tests while PostgreSQL 15 and
-Bluebuild remained healthy. The extension is not enabled, the PG18 development database does not
-exist, and active Gandalf development has not been cut over. Those actions require the next
-explicit authorization before M4.1.
+foundation and restore rehearsals passed: signed pinned packages installed PostgreSQL 18.6 and
+pgvector 0.8.6 without changing PostgreSQL 15 server/client; `18/gandalf` is checksum-enabled and
+loopback-only; PG15 role isolation is hardened; and exact test/development copies passed the full
+suite plus two complete dual-runtime comparisons while PostgreSQL 15 and Bluebuild remained
+healthy. The extension is not enabled and active Gandalf development has not been cut over. The
+active tunnel/application switch requires the next explicit authorization before M4.1.
 
 ## Versioned rulesets
 

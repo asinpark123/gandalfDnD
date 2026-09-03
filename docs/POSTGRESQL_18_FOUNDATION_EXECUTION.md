@@ -1,12 +1,14 @@
 # PostgreSQL 18 Foundation and Test-Restore Record
 
-- **Status:** Complete; development restore and cutover remain separately gated
+- **Status:** Complete; development restore rehearsal subsequently passed and active cutover remains gated
 - **Execution date:** 2026-09-04
 - **Host:** `postgresvm`
 - **Authorized boundary:** Recovery evidence, signed/pinned packages, targeted PostgreSQL 15 HBA
   isolation, a parallel PostgreSQL 18 cluster, and test-database restore/verification only
 - **Readiness audit:** [`POSTGRESQL_18_READINESS_AUDIT.md`](POSTGRESQL_18_READINESS_AUDIT.md)
 - **Migration strategy:** [`POSTGRESQL_18_MIGRATION_STRATEGY.md`](POSTGRESQL_18_MIGRATION_STRATEGY.md)
+- **Development rehearsal:**
+  [`POSTGRESQL_18_DEVELOPMENT_REHEARSAL.md`](POSTGRESQL_18_DEVELOPMENT_REHEARSAL.md)
 
 ## 1. Outcome
 
@@ -123,10 +125,10 @@ The following stopped before causing an uncontrolled change and were corrected w
 These events did not interrupt PostgreSQL 15, Bluebuild, or unrelated databases. They are retained
 here so later operators do not repeat the same diagnostics.
 
-## 7. Remaining authorization gate
+## 7. Follow-up status
 
-Stop here. The next operation requires explicit owner authorization and a fresh pre-change check.
-It may create the PostgreSQL 18 development role/database, take a new source dump after a bounded
-write pause, restore and validate development data, and prepare a reversible Gandalf-only cutover.
-It must not delete the PostgreSQL 15 copies, retire PostgreSQL 15, alter unrelated databases, or
-enable pgvector unless those exact actions are separately included and accepted.
+The separately authorized development restore and cutover rehearsal subsequently passed; see
+`POSTGRESQL_18_DEVELOPMENT_REHEARSAL.md`. Both PostgreSQL 18 Gandalf databases now exist and have
+accepted relational/runtime evidence. The active application remains on PostgreSQL 15 pending a
+new explicit cutover authorization. PostgreSQL 15 copies and roles remain intact, and pgvector is
+still not enabled in either database.

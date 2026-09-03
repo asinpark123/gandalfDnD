@@ -263,9 +263,7 @@ class SceneNPCPresence(TimestampMixin, Base):
     npc: Mapped[NPC] = relationship(back_populates="presences")
 
     __table_args__ = (
-        CheckConstraint(
-            "status IN ('present', 'departed')", name="scene_npc_presence_status"
-        ),
+        CheckConstraint("status IN ('present', 'departed')", name="scene_npc_presence_status"),
         CheckConstraint("revision >= 0", name="scene_npc_presence_revision_nonnegative"),
         Index(
             "uq_scene_npc_one_present_scene",
@@ -335,21 +333,16 @@ class WorldFact(TimestampMixin, Base):
             name="world_fact_type",
         ),
         CheckConstraint("status IN ('current', 'superseded')", name="world_fact_status"),
-        CheckConstraint(
-            "visibility IN ('player', 'dm_only')", name="world_fact_visibility"
-        ),
+        CheckConstraint("visibility IN ('player', 'dm_only')", name="world_fact_visibility"),
         CheckConstraint("revision >= 0", name="world_fact_revision_nonnegative"),
-        CheckConstraint(
-            "char_length(value) BETWEEN 1 AND 2000", name="world_fact_value_length"
-        ),
+        CheckConstraint("char_length(value) BETWEEN 1 AND 2000", name="world_fact_value_length"),
         CheckConstraint(
             "fact_type NOT IN ('npc_attitude', 'relationship_note', 'promise') "
             "OR subject_npc_id IS NOT NULL",
             name="world_fact_npc_subject_required",
         ),
         CheckConstraint(
-            "fact_type <> 'npc_attitude' "
-            "OR value IN ('friendly', 'neutral', 'wary', 'hostile')",
+            "fact_type <> 'npc_attitude' OR value IN ('friendly', 'neutral', 'wary', 'hostile')",
             name="world_fact_attitude_value",
         ),
         Index(
@@ -364,6 +357,188 @@ class WorldFact(TimestampMixin, Base):
             "subject_npc_id",
             unique=True,
             postgresql_where=text("status = 'current' AND fact_type = 'npc_attitude'"),
+        ),
+    )
+
+
+class Quest(TimestampMixin, Base):
+    __tablename__ = "quests"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    campaign_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("campaigns.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    quest_key: Mapped[str] = mapped_column(String(80), nullable=False)
+    title: Mapped[str] = mapped_column(String(160), nullable=False)
+    summary: Mapped[str | None] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="active")
+    visibility: Mapped[str] = mapped_column(String(20), nullable=False, default="player")
+    revision: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    created_by_event_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey(
+            "campaign_events.id",
+            name="quests_created_by_event_id_fkey",
+            ondelete="RESTRICT",
+            use_alter=True,
+        ),
+        nullable=False,
+    )
+    transitioned_by_event_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey(
+            "campaign_events.id",
+            name="quests_transitioned_by_event_id_fkey",
+            ondelete="SET NULL",
+            use_alter=True,
+        )
+    )
+
+    objectives: Mapped[list["QuestObjective"]] = relationship(
+        back_populates="quest", order_by="QuestObjective.position"
+    )
+
+    __table_args__ = (
+        UniqueConstraint("campaign_id", "quest_key", name="uq_quests_campaign_key"),
+        CheckConstraint(
+            "status IN ('active', 'completed', 'failed', 'abandoned')",
+            name="quest_status",
+        ),
+        CheckConstraint("visibility IN ('player', 'dm_only')", name="quest_visibility"),
+        CheckConstraint("revision >= 0", name="quest_revision_nonnegative"),
+        CheckConstraint("quest_key ~ '^[a-z0-9][a-z0-9._-]{0,79}$'", name="quest_key_format"),
+    )
+
+
+class QuestObjective(TimestampMixin, Base):
+    __tablename__ = "quest_objectives"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    campaign_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("campaigns.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    quest_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("quests.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    objective_key: Mapped[str] = mapped_column(String(80), nullable=False)
+    title: Mapped[str] = mapped_column(String(160), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending")
+    position: Mapped[int] = mapped_column(Integer, nullable=False)
+    revision: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    created_by_event_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey(
+            "campaign_events.id",
+            name="quest_objectives_created_by_event_id_fkey",
+            ondelete="RESTRICT",
+            use_alter=True,
+        ),
+        nullable=False,
+    )
+    transitioned_by_event_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey(
+            "campaign_events.id",
+            name="quest_objectives_transitioned_by_event_id_fkey",
+            ondelete="SET NULL",
+            use_alter=True,
+        )
+    )
+
+    quest: Mapped[Quest] = relationship(back_populates="objectives")
+
+    __table_args__ = (
+        UniqueConstraint("quest_id", "objective_key", name="uq_objectives_quest_key"),
+        UniqueConstraint("quest_id", "position", name="uq_objectives_quest_position"),
+        CheckConstraint(
+            "status IN ('pending', 'active', 'completed', 'failed', 'skipped')",
+            name="quest_objective_status",
+        ),
+        CheckConstraint("position BETWEEN 1 AND 10", name="quest_objective_position"),
+        CheckConstraint("revision >= 0", name="quest_objective_revision_nonnegative"),
+        CheckConstraint(
+            "objective_key ~ '^[a-z0-9][a-z0-9._-]{0,79}$'",
+            name="quest_objective_key_format",
+        ),
+    )
+
+
+class DecisionPoint(TimestampMixin, Base):
+    __tablename__ = "decision_points"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    campaign_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("campaigns.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    decision_key: Mapped[str] = mapped_column(String(80), nullable=False)
+    prompt: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="open")
+    visibility: Mapped[str] = mapped_column(String(20), nullable=False, default="player")
+    selected_option_key: Mapped[str | None] = mapped_column(String(80))
+    revision: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    created_by_event_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey(
+            "campaign_events.id",
+            name="decision_points_created_by_event_id_fkey",
+            ondelete="RESTRICT",
+            use_alter=True,
+        ),
+        nullable=False,
+    )
+    selected_by_event_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey(
+            "campaign_events.id",
+            name="decision_points_selected_by_event_id_fkey",
+            ondelete="SET NULL",
+            use_alter=True,
+        )
+    )
+
+    options: Mapped[list["DecisionOption"]] = relationship(
+        back_populates="decision", order_by="DecisionOption.position"
+    )
+
+    __table_args__ = (
+        UniqueConstraint("campaign_id", "decision_key", name="uq_decisions_campaign_key"),
+        CheckConstraint("status IN ('open', 'selected')", name="decision_point_status"),
+        CheckConstraint("visibility IN ('player', 'dm_only')", name="decision_point_visibility"),
+        CheckConstraint("revision >= 0", name="decision_point_revision_nonnegative"),
+        CheckConstraint(
+            "decision_key ~ '^[a-z0-9][a-z0-9._-]{0,79}$'", name="decision_point_key_format"
+        ),
+        CheckConstraint(
+            "(status = 'open' AND selected_option_key IS NULL) OR "
+            "(status = 'selected' AND selected_option_key IS NOT NULL)",
+            name="decision_point_selection_shape",
+        ),
+    )
+
+
+class DecisionOption(TimestampMixin, Base):
+    __tablename__ = "decision_options"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    campaign_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("campaigns.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    decision_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("decision_points.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    option_key: Mapped[str] = mapped_column(String(80), nullable=False)
+    label: Mapped[str] = mapped_column(String(160), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text)
+    position: Mapped[int] = mapped_column(Integer, nullable=False)
+    consequences: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, nullable=False, default=list)
+
+    decision: Mapped[DecisionPoint] = relationship(back_populates="options")
+
+    __table_args__ = (
+        UniqueConstraint("decision_id", "option_key", name="uq_decision_options_key"),
+        UniqueConstraint("decision_id", "position", name="uq_decision_options_position"),
+        CheckConstraint("position BETWEEN 1 AND 4", name="decision_option_position"),
+        CheckConstraint(
+            "option_key ~ '^[a-z0-9][a-z0-9._-]{0,79}$'", name="decision_option_key_format"
+        ),
+        CheckConstraint(
+            "jsonb_typeof(consequences) = 'array' AND jsonb_array_length(consequences) <= 10",
+            name="decision_option_consequences_shape",
         ),
     )
 
@@ -438,6 +613,10 @@ class Turn(TimestampMixin, Base):
     target_npc_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("npcs.id", ondelete="SET NULL"), index=True
     )
+    decision_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("decision_points.id", ondelete="SET NULL"), index=True
+    )
+    decision_option_key: Mapped[str | None] = mapped_column(String(80))
     workflow_version: Mapped[str] = mapped_column(String(40), nullable=False)
     status: Mapped[str] = mapped_column(String(30), nullable=False)
     failure_stage: Mapped[str | None] = mapped_column(String(30))
@@ -498,6 +677,11 @@ class Turn(TimestampMixin, Base):
             name="turn_world_revision_after_nonnegative",
         ),
         CheckConstraint(
+            "(decision_id IS NULL AND decision_option_key IS NULL) OR "
+            "(decision_id IS NOT NULL AND decision_option_key IS NOT NULL)",
+            name="turn_decision_choice_shape",
+        ),
+        CheckConstraint(
             "(status = 'failed' AND failure_stage IS NOT NULL AND error_code IS NOT NULL) OR "
             "(status <> 'failed' AND failure_stage IS NULL AND error_code IS NULL AND "
             "error_detail IS NULL AND resumable = false AND resume_status IS NULL)",
@@ -528,6 +712,35 @@ class Turn(TimestampMixin, Base):
                 "'resolved', 'narrating') OR (status = 'failed' AND resumable)"
             ),
         ),
+    )
+
+
+class DecisionSelection(TimestampMixin, Base):
+    __tablename__ = "decision_selections"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    campaign_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("campaigns.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    decision_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("decision_points.id", ondelete="RESTRICT"), nullable=False, unique=True
+    )
+    option_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("decision_options.id", ondelete="RESTRICT"), nullable=False
+    )
+    turn_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("turns.id", ondelete="RESTRICT"), nullable=False, unique=True
+    )
+    actor_character_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("characters.id", ondelete="SET NULL")
+    )
+    world_revision: Mapped[int] = mapped_column(Integer, nullable=False)
+    event_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("campaign_events.id", ondelete="RESTRICT"), nullable=False
+    )
+
+    __table_args__ = (
+        CheckConstraint("world_revision > 0", name="decision_selection_world_revision_positive"),
     )
 
 

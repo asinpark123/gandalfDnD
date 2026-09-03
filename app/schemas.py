@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
 
 from app.character_creation import CharacterSheet
 from app.character_state import CharacterMechanicalState, Loadout
@@ -21,9 +21,16 @@ NPCName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, 
 NarrativeText = Annotated[
     str, StringConstraints(strip_whitespace=True, min_length=1, max_length=2000)
 ]
-WorldFactType = Literal[
-    "npc_attitude", "relationship_note", "promise", "discovery", "clue"
+StableKey = Annotated[
+    str,
+    StringConstraints(
+        strip_whitespace=True,
+        min_length=1,
+        max_length=80,
+        pattern=r"^[a-z0-9][a-z0-9._-]*$",
+    ),
 ]
+WorldFactType = Literal["npc_attitude", "relationship_note", "promise", "discovery", "clue"]
 
 
 class StartingNPCCreate(BaseModel):
@@ -160,6 +167,54 @@ class WorldFactRead(BaseModel):
     created_at: datetime
 
 
+class QuestObjectiveRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    objective_key: str
+    title: str
+    description: str | None
+    status: str
+    position: int
+    revision: int
+    created_at: datetime
+
+
+class QuestRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    quest_key: str
+    title: str
+    summary: str | None
+    status: str
+    revision: int
+    objectives: list[QuestObjectiveRead]
+    created_at: datetime
+
+
+class DecisionOptionRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    option_key: str
+    label: str
+    description: str | None
+    position: int
+
+
+class DecisionRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    decision_key: str
+    prompt: str
+    status: str
+    selected_option_key: str | None
+    revision: int
+    options: list[DecisionOptionRead]
+    created_at: datetime
+
+
 class WorldStateRead(BaseModel):
     campaign_id: uuid.UUID
     world_revision: int
@@ -167,6 +222,8 @@ class WorldStateRead(BaseModel):
     scene: SceneRead
     present_npcs: list[NPCRead]
     facts: list[WorldFactRead]
+    quests: list[QuestRead]
+    decisions: list[DecisionRead]
 
 
 class HPDelta(BaseModel):
@@ -245,6 +302,108 @@ class WorldFactReveal(BaseModel):
     expected_revision: int = Field(ge=0)
 
 
+class QuestObjectiveCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    objective_key: StableKey
+    title: ShortText
+    description: str | None = Field(default=None, max_length=2000)
+    status: Literal["pending", "active"] = "pending"
+
+
+class QuestCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    type: Literal["quest_create"]
+    quest_key: StableKey
+    title: ShortText
+    summary: str | None = Field(default=None, max_length=2000)
+    objectives: list[QuestObjectiveCreate] = Field(min_length=1, max_length=10)
+
+    @model_validator(mode="after")
+    def unique_objective_keys(self) -> "QuestCreate":
+        keys = [objective.objective_key for objective in self.objectives]
+        if len(keys) != len(set(keys)):
+            raise ValueError("Quest objective keys must be unique")
+        return self
+
+
+class QuestTransition(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    type: Literal["quest_transition"]
+    quest_id: uuid.UUID
+    expected_revision: int = Field(ge=0)
+    status: Literal["completed", "failed", "abandoned"]
+
+
+class QuestObjectiveTransition(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    type: Literal["quest_objective_transition"]
+    objective_id: uuid.UUID
+    expected_revision: int = Field(ge=0)
+    status: Literal["active", "completed", "failed", "skipped"]
+
+
+class DecisionFactConsequence(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    type: Literal["record_fact"]
+    fact_type: WorldFactType
+    subject_npc_id: uuid.UUID | None = None
+    value: NarrativeText
+
+
+class DecisionQuestConsequence(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    type: Literal["transition_quest"]
+    quest_id: uuid.UUID
+    expected_revision: int = Field(ge=0)
+    status: Literal["completed", "failed", "abandoned"]
+
+
+class DecisionObjectiveConsequence(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    type: Literal["transition_objective"]
+    objective_id: uuid.UUID
+    expected_revision: int = Field(ge=0)
+    status: Literal["active", "completed", "failed", "skipped"]
+
+
+DecisionConsequence = Annotated[
+    DecisionFactConsequence | DecisionQuestConsequence | DecisionObjectiveConsequence,
+    Field(discriminator="type"),
+]
+
+
+class DecisionOptionCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    option_key: StableKey
+    label: ShortText
+    description: str | None = Field(default=None, max_length=2000)
+    consequences: list[DecisionConsequence] = Field(default_factory=list, max_length=10)
+
+
+class DecisionOpen(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    type: Literal["decision_open"]
+    decision_key: StableKey
+    prompt: NarrativeText
+    options: list[DecisionOptionCreate] = Field(min_length=2, max_length=4)
+
+    @model_validator(mode="after")
+    def unique_option_keys(self) -> "DecisionOpen":
+        keys = [option.option_key for option in self.options]
+        if len(keys) != len(set(keys)):
+            raise ValueError("Decision option keys must be unique")
+        return self
+
+
 StateChange = Annotated[
     HPDelta
     | MoveLocation
@@ -255,7 +414,11 @@ StateChange = Annotated[
     | DiscoveryRecord
     | ClueRecord
     | WorldFactSupersede
-    | WorldFactReveal,
+    | WorldFactReveal
+    | QuestCreate
+    | QuestTransition
+    | QuestObjectiveTransition
+    | DecisionOpen,
     Field(discriminator="type"),
 ]
 
@@ -292,6 +455,14 @@ class TurnExecutionCreate(TurnCreate):
 
     command_id: uuid.UUID
     target_npc_id: uuid.UUID | None = None
+    decision_id: uuid.UUID | None = None
+    decision_option_key: StableKey | None = None
+
+    @model_validator(mode="after")
+    def complete_decision_choice(self) -> "TurnExecutionCreate":
+        if (self.decision_id is None) != (self.decision_option_key is None):
+            raise ValueError("decision_id and decision_option_key must be provided together")
+        return self
 
 
 class TurnExecutionRead(BaseModel):
@@ -304,6 +475,8 @@ class TurnExecutionRead(BaseModel):
     player_action: str
     actor_character_id: uuid.UUID | None
     target_npc_id: uuid.UUID | None
+    decision_id: uuid.UUID | None
+    decision_option_key: str | None
     workflow_version: str
     status: str
     failure_stage: str | None

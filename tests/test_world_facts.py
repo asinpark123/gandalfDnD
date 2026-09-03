@@ -308,9 +308,10 @@ def test_unknown_or_mechanical_fact_shape_is_rejected_by_provider_contract(
 
     created = _create_turn(client, campaign_id, characters[0], target_npc_id=npcs[0])
     turn_id = created.json()["id"]
-    assert client.post(
-        f"/campaigns/{campaign_id}/turn-executions/{turn_id}/interpret"
-    ).status_code == 200
+    assert (
+        client.post(f"/campaigns/{campaign_id}/turn-executions/{turn_id}/interpret").status_code
+        == 200
+    )
     app.dependency_overrides[get_turn_narrator] = lambda: InvalidNarrator()
     response = client.post(f"/campaigns/{campaign_id}/turn-executions/{turn_id}/finalize")
     assert response.status_code == 502
@@ -357,5 +358,5 @@ def test_migration_refuses_to_discard_world_facts(client: TestClient) -> None:
         command.downgrade(config, "0008_world_presence")
     with get_engine().connect() as connection:
         assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == (
-            "0009_world_facts"
+            "0010_quests_decisions"
         )

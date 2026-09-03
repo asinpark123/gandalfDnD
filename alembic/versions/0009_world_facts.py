@@ -43,28 +43,21 @@ def upgrade() -> None:
             name="world_fact_type",
         ),
         sa.CheckConstraint("status IN ('current', 'superseded')", name="world_fact_status"),
-        sa.CheckConstraint(
-            "visibility IN ('player', 'dm_only')", name="world_fact_visibility"
-        ),
+        sa.CheckConstraint("visibility IN ('player', 'dm_only')", name="world_fact_visibility"),
         sa.CheckConstraint("revision >= 0", name="world_fact_revision_nonnegative"),
-        sa.CheckConstraint(
-            "char_length(value) BETWEEN 1 AND 2000", name="world_fact_value_length"
-        ),
+        sa.CheckConstraint("char_length(value) BETWEEN 1 AND 2000", name="world_fact_value_length"),
         sa.CheckConstraint(
             "fact_type NOT IN ('npc_attitude', 'relationship_note', 'promise') "
             "OR subject_npc_id IS NOT NULL",
             name="world_fact_npc_subject_required",
         ),
         sa.CheckConstraint(
-            "fact_type <> 'npc_attitude' "
-            "OR value IN ('friendly', 'neutral', 'wary', 'hostile')",
+            "fact_type <> 'npc_attitude' OR value IN ('friendly', 'neutral', 'wary', 'hostile')",
             name="world_fact_attitude_value",
         ),
         sa.ForeignKeyConstraint(["campaign_id"], ["campaigns.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(["subject_npc_id"], ["npcs.id"], ondelete="CASCADE"),
-        sa.ForeignKeyConstraint(
-            ["supersedes_fact_id"], ["world_facts.id"], ondelete="RESTRICT"
-        ),
+        sa.ForeignKeyConstraint(["supersedes_fact_id"], ["world_facts.id"], ondelete="RESTRICT"),
         sa.ForeignKeyConstraint(
             ["created_by_event_id"], ["campaign_events.id"], ondelete="RESTRICT"
         ),

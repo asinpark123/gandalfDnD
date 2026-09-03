@@ -150,9 +150,7 @@ def test_target_is_validated_before_provider_and_included_in_context(
             return NarrativeIntent(type="narrative", summary="A direct conversation begins.")
 
     app.dependency_overrides[get_turn_interpreter] = lambda: CapturingInterpreter()
-    created = _create_turn(
-        client, campaign_id, characters[0], target_npc_id=npc_ids[1]
-    )
+    created = _create_turn(client, campaign_id, characters[0], target_npc_id=npc_ids[1])
     assert created.status_code == 201, created.text
     assert created.json()["target_npc_id"] == npc_ids[1]
     assert created.json()["world_revision_before"] == 0
@@ -213,8 +211,7 @@ def test_target_is_validated_before_provider_and_included_in_context(
         )
         connection.execute(
             text(
-                "UPDATE campaigns SET world_revision = world_revision + 1 "
-                "WHERE id = :campaign_id"
+                "UPDATE campaigns SET world_revision = world_revision + 1 WHERE id = :campaign_id"
             ),
             {"campaign_id": uuid.UUID(campaign_id)},
         )
@@ -360,5 +357,5 @@ def test_migration_backfills_default_scene_and_blocks_world_data_loss(
         command.downgrade(config, "0007_turn_stage_recovery")
     with get_engine().connect() as connection:
         assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == (
-            "0009_world_facts"
+            "0010_quests_decisions"
         )

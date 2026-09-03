@@ -44,10 +44,11 @@ and complete level-one character state are Done. M1.4 authoritative ability-chec
 resolution is also Done after automated and owner runtime verification. The complete M1 gate is
 Done. M2 is also Done: the resumable two-stage workflow, deterministic Lantern suite, private
 OpenClaw activation, and three passing ten-scenario live model-authored runs are verified. Direct
-paid API integration remains deferred and paid model calls remain disabled. M3.1–M3.2 are Done with
+paid API integration remains deferred and paid model calls remain disabled. M3.1–M3.3 are Done with
 exact scene/NPC presence, explicit target IDs, world-revision safety, typed narrative facts,
-relationships, supersession, and controlled reveal. M3.3 quests, objectives, and branching
-decisions is Ready; the next live OpenClaw gate remains M3.5.
+relationships, supersession, controlled reveal, durable quests/objectives, and explicit exact-once
+branch decisions. M3.4 factions, narrative time, and full visibility projection is Ready; the next
+live OpenClaw gate remains M3.5.
 
 ## Versioned rulesets
 
@@ -91,6 +92,9 @@ checksum, size, license, attribution, normalized-data catalogs, and schema versi
   acknowledgement, bounded proposals, stage leases, stale-state rejection, safe restart recovery,
   stable provider errors, usage audits, and atomic final events/state commit
 - HP, inventory, and current-location state changes with pre-commit validation
+- durable quests and ordered objectives with revision-checked legal transitions, plus visible
+  two-to-four-option decisions selected explicitly and applied exactly once as typed narrative
+  facts or quest/objective consequences; choices never imply rewards or mechanical effects
 - auditable application dice rolls, including internally logged hidden rolls
 - provider-neutral DM interface
 - deterministic offline provider for development and repeatable tests
@@ -181,6 +185,10 @@ authoritative deterministic services first.
 | `GET` | `/campaigns/{id}/characters/{character_id}/grants` | Read one character's immutable choice/grant provenance |
 | `PUT` | `/campaigns/{id}/characters/{character_id}/loadout` | Select worn armor and held/readied weapons |
 | `GET` | `/campaigns/{id}/state` | Read canonical campaign, party, character, and location state |
+| `GET` | `/campaigns/{id}/world` | Read visible scene, NPCs, facts, quests, objectives, and decisions |
+| `POST` | `/campaigns/{id}/turn-executions` | Start an idempotent typed turn with an explicit actor, target, or decision choice |
+| `POST` | `/campaigns/{id}/turn-executions/{turn_id}/interpret` | Classify the action and resolve any required authoritative check/save |
+| `POST` | `/campaigns/{id}/turn-executions/{turn_id}/finalize` | Narrate and atomically apply validated state or branch consequences |
 | `POST` | `/campaigns/{id}/turns` | Process one actor-attributed player action after party readiness |
 | `POST` | `/campaigns/{id}/resolutions` | Resolve an actor-bound ability check or saving throw from canonical state |
 | `GET` | `/campaigns/{id}/resolutions` | List immutable authoritative resolutions |

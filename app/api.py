@@ -302,6 +302,9 @@ def create_app() -> FastAPI:
         except NotFoundError as exc:
             session.rollback()
             raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except InvalidStateChange as exc:
+            session.rollback()
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
         except (ConflictError, IntegrityError) as exc:
             session.rollback()
             detail = str(exc) if isinstance(exc, ConflictError) else "Campaign turn is busy"

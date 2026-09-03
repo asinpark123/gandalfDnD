@@ -42,7 +42,8 @@ def clean_database(migrated_test_database: None) -> Generator[None, None, None]:
     with get_engine().begin() as connection:
         connection.execute(
             text(
-                "TRUNCATE world_facts, scene_npc_presences, npcs, scenes, "
+                "TRUNCATE decision_selections, decision_options, decision_points, "
+                "quest_objectives, quests, world_facts, scene_npc_presences, npcs, scenes, "
                 "provider_calls, rule_resolutions, character_grants, "
                 "campaign_events, dice_rolls, "
                 "turns, characters, "

@@ -1,6 +1,6 @@
 # M3 Persistent World Implementation Strategy
 
-- **Status:** In progress — M3.1–M3.2 Done; M3.3 Ready
+- **Status:** In progress — M3.1–M3.3 Done; M3.4 Ready
 - **Prepared:** 2026-09-03
 - **Depends on:** M2 two-stage AI turn and model-authored feasibility (Done)
 - **Owner input required now:** No; M3 begins with a neutral, mechanically inert world fixture
@@ -165,27 +165,29 @@ exists.
 
 ### 5.4 Quests, objectives, and decisions
 
-`quests` group player-visible or DM-only objectives. `objectives` use an application-owned state
-machine:
+M3.3 `quests` group ordered objectives under stable campaign-scoped keys. Provider-authored quests
+are player-visible and begin active. Quests and objectives use application-owned state machines:
 
 ```text
-offered -> active -> completed
-                  -> failed
-        -> declined
-active  -> abandoned
+quest:     active -> completed | failed | abandoned
+objective: pending -> active | skipped
+           active  -> completed | failed | skipped
 ```
 
 Illegal transitions fail before any projection or event write. Completion never grants XP, levels,
 items, or other mechanics unless a separate typed rules/reward command is implemented later.
 
-`decision_points` contain a stable ID, bounded prompt, visibility, open/resolved state, and two to
-four typed options. `TurnExecutionCreate` may carry `decision_point_id` and `option_key`; the
-application—not the interpreter—validates that the decision is open, visible, and that the option
-exists. A successful finalization records the selected branch exactly once.
+`decision_points` contain a stable ID and key, bounded prompt, visibility, open/selected state, and
+two to four typed options with stable keys. `TurnExecutionCreate` may carry `decision_id` and
+`decision_option_key`; the application—not the interpreter—validates campaign ownership,
+visibility, open status, option identity, and the stored consequence list before provider work. A
+successful finalization records the selected branch exactly once.
 
-An option may contain a bounded list of prevalidated narrative consequences such as a fact
-supersession, attitude label, objective transition, or reveal. The chosen option cannot contain an
-arbitrary mechanical write.
+An option may contain up to ten prevalidated narrative consequences: a typed fact/attitude record,
+a quest transition, or an objective transition. The immutable list is stored when the decision
+opens, included only in provider context for the explicitly selected option, and applied atomically
+at finalization. It cannot contain an HP, inventory, reward, resource, condition, or other
+mechanical write.
 
 ### 5.5 Factions, time, clues, and knowledge
 
@@ -222,7 +224,7 @@ GET /campaigns/{campaign_id}/world
 ```
 
 It returns the campaign world revision and clock, active scene/location, present visible NPCs,
-visible factions/facts, active/offered quests and objectives, open decisions, and revealed
+visible factions/facts, visible quests/objectives, visible decisions, and revealed
 knowledge. It never accepts an `include_hidden` query switch.
 
 Internal services use an explicit audience enum and separate projection functions. Raw ORM queries
@@ -348,6 +350,8 @@ Implemented evidence:
 
 ### M3.3 — Quests, objectives, and branching decisions
 
+**Status:** Done (2026-09-03)
+
 Player outcome: a visible choice can lead two otherwise identical campaigns to different durable
 facts/objective states, with the selected branch explainable from events.
 
@@ -362,6 +366,30 @@ Deliver:
 Exit evidence: legal/illegal transitions, changed-payload idempotency conflict, double-choice
 rejection, two-campaign branch divergence, restart, partial-proposal rollback, and no implicit reward
 mechanics pass.
+
+Implemented evidence:
+
+- migration `0010_quests_decisions` adds campaign-scoped quests, ordered objectives, open/selected
+  decision points, two-to-four keyed options, immutable JSON consequence lists, exact-once
+  selections, explicit turn choice fields, database constraints, causal links, and a guarded
+  downgrade;
+- strict narration proposals create quests/decisions and perform revision-checked legal quest or
+  objective transitions; terminal, stale, duplicate-key, cross-campaign, and overlapping
+  quest/objective writes fail before mutation;
+- turn creation validates both choice fields, decision visibility/open status, option membership,
+  and all stored narrative consequences before interpretation, while changed-payload retries
+  conflict and identical retries return the original turn;
+- finalization revalidates the choice against the locked world checkpoint, records one selection,
+  then applies ordered typed fact/attitude or quest/objective consequences atomically before the DM
+  response event; provider proposals cannot overlap the selected branch's transitions;
+- the player world projection retains visible quest and decision history without exposing stored
+  consequences, while provider context receives at most 20 active quests and 20 open decisions and
+  receives only the selected option's consequence list;
+- eight focused M3.3 tests prove persistence/restart, legal and illegal transitions, exact-once
+  idempotency, double-choice rejection, two-campaign divergence, ordered causal events, atomic
+  rollback, overlap rejection, guarded migration, and the absence of implicit reward mechanics;
+  all 117 normal tests pass with one opt-in live test skipped, plus lint, compilation, and zero
+  Alembic drift.
 
 ### M3.4 — Factions, narrative clock, and complete visibility projection
 
@@ -461,5 +489,5 @@ domain validation failure before provider work creates no provider audit.
 Each slice is committed only when it crosses migration, ORM, schema, API, service, events, tests,
 and documentation. A later slice that invalidates an earlier visibility, identity, causality, or
 restart guarantee moves that slice back to Rework. M3 planning is complete with this document.
-M3.1–M3.2 are verified and complete; implementation proceeds to M3.3's quests, objectives, and
-explicit branching decisions.
+M3.1–M3.3 are verified and complete; implementation proceeds to M3.4's factions, bounded narrative
+clock, full visibility matrix, and expanded context-budget evidence.

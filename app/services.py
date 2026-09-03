@@ -3,7 +3,7 @@ from datetime import UTC, datetime, timedelta
 from time import perf_counter
 from typing import Any
 
-from pydantic import ValidationError
+from pydantic import TypeAdapter, ValidationError
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -42,9 +42,14 @@ from app.models import (
     CampaignEvent,
     Character,
     CharacterGrant,
+    DecisionOption,
+    DecisionPoint,
+    DecisionSelection,
     DiceRoll,
     Location,
     ProviderCall,
+    Quest,
+    QuestObjective,
     RuleResolution,
     RulesetDataCatalog,
     RulesetRelease,
@@ -74,6 +79,12 @@ from app.schemas import (
     CharacterCreate,
     CharacterRead,
     ClueRecord,
+    DecisionConsequence,
+    DecisionFactConsequence,
+    DecisionObjectiveConsequence,
+    DecisionOpen,
+    DecisionQuestConsequence,
+    DecisionRead,
     DiscoveryRecord,
     HPDelta,
     InventoryChange,
@@ -81,6 +92,11 @@ from app.schemas import (
     MoveLocation,
     NPCAttitudeSet,
     PromiseRecord,
+    QuestCreate,
+    QuestObjectiveRead,
+    QuestObjectiveTransition,
+    QuestRead,
+    QuestTransition,
     RelationshipNoteAdd,
     RuleResolutionRead,
     RuleResolutionReplayRead,
@@ -113,6 +129,9 @@ class ConflictError(ValueError):
 
 
 MAX_PROVIDER_WORLD_FACTS = 50
+MAX_PROVIDER_QUESTS = 20
+MAX_PROVIDER_DECISIONS = 20
+DECISION_CONSEQUENCE_ADAPTER = TypeAdapter(list[DecisionConsequence])
 
 
 class TurnNarrationError(TurnProviderError):
@@ -297,6 +316,39 @@ def get_world_state(session: Session, campaign_id: uuid.UUID) -> WorldStateRead:
             .order_by(WorldFact.created_at, WorldFact.id)
         )
     )
+    quests = list(
+        session.scalars(
+            select(Quest)
+            .where(Quest.campaign_id == campaign_id, Quest.visibility == "player")
+            .order_by(Quest.created_at, Quest.id)
+        ).unique()
+    )
+    quest_reads = [
+        QuestRead(
+            id=quest.id,
+            quest_key=quest.quest_key,
+            title=quest.title,
+            summary=quest.summary,
+            status=quest.status,
+            revision=quest.revision,
+            objectives=[
+                QuestObjectiveRead.model_validate(objective) for objective in quest.objectives
+            ],
+            created_at=quest.created_at,
+        )
+        for quest in quests
+    ]
+    decisions = list(
+        session.scalars(
+            select(DecisionPoint)
+            .where(
+                DecisionPoint.campaign_id == campaign_id,
+                DecisionPoint.visibility == "player",
+            )
+            .order_by(DecisionPoint.created_at, DecisionPoint.id)
+        ).unique()
+    )
+    decision_reads = [DecisionRead.model_validate(decision) for decision in decisions]
     return WorldStateRead(
         campaign_id=campaign.id,
         world_revision=campaign.world_revision,
@@ -304,6 +356,8 @@ def get_world_state(session: Session, campaign_id: uuid.UUID) -> WorldStateRead:
         scene=scene,
         present_npcs=npcs,
         facts=facts,
+        quests=quest_reads,
+        decisions=decision_reads,
     )
 
 
@@ -451,6 +505,62 @@ def _validate_turn_target(
     return npc
 
 
+def _validated_turn_choice(
+    session: Session,
+    campaign_id: uuid.UUID,
+    decision_id: uuid.UUID | None,
+    option_key: str | None,
+    *,
+    occupied_quests: set[uuid.UUID] | None = None,
+    occupied_objectives: set[uuid.UUID] | None = None,
+    occupied_attitude_subjects: set[uuid.UUID] | None = None,
+) -> tuple[DecisionPoint, DecisionOption, list[DecisionConsequence]] | None:
+    if decision_id is None or option_key is None:
+        return None
+    decision = session.get(DecisionPoint, decision_id)
+    if decision is None or decision.campaign_id != campaign_id:
+        raise NotFoundError("Decision not found in campaign")
+    if decision.visibility != "player":
+        raise ConflictError("Decision is not player-visible")
+    if decision.status != "open":
+        raise ConflictError("Decision has already been selected")
+    option = session.scalar(
+        select(DecisionOption).where(
+            DecisionOption.decision_id == decision.id,
+            DecisionOption.option_key == option_key,
+        )
+    )
+    if option is None:
+        raise ConflictError("Decision option is not valid for this decision")
+    consequences = _parse_decision_consequences(option.consequences)
+    _validate_decision_consequences(
+        session,
+        campaign_id,
+        consequences,
+        occupied_quests=occupied_quests,
+        occupied_objectives=occupied_objectives,
+        occupied_attitude_subjects=occupied_attitude_subjects,
+    )
+    return decision, option, consequences
+
+
+def _choice_provider_context(
+    choice: tuple[DecisionPoint, DecisionOption, list[DecisionConsequence]] | None,
+) -> dict[str, Any] | None:
+    if choice is None:
+        return None
+    decision, option, consequences = choice
+    return {
+        "decision_id": str(decision.id),
+        "decision_key": decision.decision_key,
+        "prompt": decision.prompt,
+        "option_key": option.option_key,
+        "label": option.label,
+        "description": option.description,
+        "consequences": [consequence.model_dump(mode="json") for consequence in consequences],
+    }
+
+
 def create_turn_execution(
     session: Session,
     campaign_id: uuid.UUID,
@@ -468,6 +578,8 @@ def create_turn_execution(
             existing.player_action != data.action
             or existing.actor_character_id != data.actor_character_id
             or existing.target_npc_id != data.target_npc_id
+            or existing.decision_id != data.decision_id
+            or existing.decision_option_key != data.decision_option_key
         ):
             raise ConflictError("command_id already exists with different turn input")
         if existing.workflow_version != TURN_WORKFLOW_TWO_STAGE:
@@ -479,6 +591,12 @@ def create_turn_execution(
         raise ConflictError(f"Campaign already has active turn {active.id}")
     character = _validate_turn_actor(session, campaign, data.actor_character_id)
     target = _validate_turn_target(session, campaign_id, data.target_npc_id)
+    _validated_turn_choice(
+        session,
+        campaign_id,
+        data.decision_id,
+        data.decision_option_key,
+    )
     sequence = (
         session.scalar(select(func.max(Turn.sequence)).where(Turn.campaign_id == campaign_id)) or 0
     ) + 1
@@ -489,6 +607,8 @@ def create_turn_execution(
         player_action=data.action,
         actor_character_id=character.id if character else None,
         target_npc_id=target.id if target else None,
+        decision_id=data.decision_id,
+        decision_option_key=data.decision_option_key,
         workflow_version=TURN_WORKFLOW_TWO_STAGE,
         status="received",
         resumable=False,
@@ -505,6 +625,8 @@ def create_turn_execution(
             "action": data.action,
             "actor_character_id": str(character.id) if character else None,
             "target_npc_id": str(target.id) if target else None,
+            "decision_id": str(data.decision_id) if data.decision_id else None,
+            "decision_option_key": data.decision_option_key,
             "command_id": str(data.command_id),
             "workflow_version": TURN_WORKFLOW_TWO_STAGE,
         },
@@ -774,10 +896,17 @@ def interpret_turn_execution(
                 resume_status=None,
             )
             raise ConflictError("Campaign world changed after the turn was received")
+        choice = _validated_turn_choice(
+            session,
+            campaign_id,
+            turn.decision_id,
+            turn.decision_option_key,
+        )
         context = _provider_context(
             get_campaign_state(session, campaign_id),
             get_world_state(session, campaign_id),
             turn.target_npc_id,
+            _choice_provider_context(choice),
         )
         attempt = _next_provider_attempt(session, turn.id, "interpretation")
         player_action = turn.player_action
@@ -1152,10 +1281,17 @@ def finalize_turn_execution(
     if current_location is None:
         raise ConflictError("Campaign has no current location")
     location_id_before = current_location.id
+    choice = _validated_turn_choice(
+        session,
+        campaign_id,
+        turn.decision_id,
+        turn.decision_option_key,
+    )
     context = _provider_context(
         get_campaign_state(session, campaign_id),
         get_world_state(session, campaign_id),
         turn.target_npc_id,
+        _choice_provider_context(choice),
     )
     attempt = _next_provider_attempt(session, turn.id, "narration")
     player_action = turn.player_action
@@ -1269,7 +1405,18 @@ def finalize_turn_execution(
         StateChangeValidator().validate(
             _character_snapshot(campaign, character), output.state_changes
         )
-        _validate_world_changes(session, campaign_id, output.state_changes)
+        touched_quests, touched_objectives, attitude_subjects = _validate_world_changes(
+            session, campaign_id, output.state_changes
+        )
+        choice = _validated_turn_choice(
+            session,
+            campaign_id,
+            turn.decision_id,
+            turn.decision_option_key,
+            occupied_quests=touched_quests,
+            occupied_objectives=touched_objectives,
+            occupied_attitude_subjects=attitude_subjects,
+        )
     except InvalidStateChange as exc:
         _record_narration_failure(
             session,
@@ -1308,6 +1455,14 @@ def finalize_turn_execution(
     turn.model = provider.model_name
     turn.structured_output = output.model_dump(mode="json")
     turn.narration_prompt_version = provider.narration_prompt_version
+    if choice is not None:
+        _apply_decision_choice(
+            session,
+            campaign,
+            turn,
+            choice,
+            actor_character_id=character.id,
+        )
     _add_event(
         session,
         campaign_id,
@@ -2372,6 +2527,7 @@ def _provider_context(
     state: CampaignState,
     world: WorldStateRead | None = None,
     target_npc_id: uuid.UUID | None = None,
+    selected_choice: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     campaign = state.campaign.model_dump(
         mode="json",
@@ -2474,9 +2630,7 @@ def _provider_context(
         "turn_count": state.turn_count,
     }
     if world is not None:
-        selected_target = next(
-            (npc for npc in world.present_npcs if npc.id == target_npc_id), None
-        )
+        selected_target = next((npc for npc in world.present_npcs if npc.id == target_npc_id), None)
         relevant_npc_ids = {npc.id for npc in world.present_npcs}
         relevant_facts = [
             fact
@@ -2486,15 +2640,28 @@ def _provider_context(
         omitted_fact_count = max(0, len(relevant_facts) - MAX_PROVIDER_WORLD_FACTS)
         if omitted_fact_count:
             relevant_facts = relevant_facts[-MAX_PROVIDER_WORLD_FACTS:]
+        relevant_quests = [quest for quest in world.quests if quest.status == "active"]
+        omitted_quest_count = max(0, len(relevant_quests) - MAX_PROVIDER_QUESTS)
+        if omitted_quest_count:
+            relevant_quests = relevant_quests[-MAX_PROVIDER_QUESTS:]
+        relevant_decisions = [decision for decision in world.decisions if decision.status == "open"]
+        omitted_decision_count = max(0, len(relevant_decisions) - MAX_PROVIDER_DECISIONS)
+        if omitted_decision_count:
+            relevant_decisions = relevant_decisions[-MAX_PROVIDER_DECISIONS:]
         context["world"] = {
             "world_revision": world.world_revision,
             "scene": world.scene.model_dump(mode="json"),
             "present_npcs": [npc.model_dump(mode="json") for npc in world.present_npcs],
             "facts": [fact.model_dump(mode="json") for fact in relevant_facts],
             "facts_truncated": omitted_fact_count,
+            "quests": [quest.model_dump(mode="json") for quest in relevant_quests],
+            "quests_truncated": omitted_quest_count,
+            "decisions": [decision.model_dump(mode="json") for decision in relevant_decisions],
+            "decisions_truncated": omitted_decision_count,
             "selected_target": (
                 selected_target.model_dump(mode="json") if selected_target is not None else None
             ),
+            "selected_choice": selected_choice,
         }
     return context
 
@@ -2535,9 +2702,141 @@ def _require_provider_fact_subject(
         raise InvalidStateChange("World fact NPC is not present in the active scene")
 
 
-def _validate_world_changes(session: Session, campaign_id: uuid.UUID, changes: list) -> None:
+def _quest_for_change(session: Session, campaign_id: uuid.UUID, quest_id: uuid.UUID) -> Quest:
+    quest = session.get(Quest, quest_id)
+    if quest is None or quest.campaign_id != campaign_id or quest.visibility != "player":
+        raise InvalidStateChange("Quest does not belong to the player-visible campaign state")
+    return quest
+
+
+def _objective_for_change(
+    session: Session, campaign_id: uuid.UUID, objective_id: uuid.UUID
+) -> QuestObjective:
+    objective = session.get(QuestObjective, objective_id)
+    if objective is None or objective.campaign_id != campaign_id:
+        raise InvalidStateChange("Quest objective does not belong to the campaign")
+    quest = _quest_for_change(session, campaign_id, objective.quest_id)
+    if quest.status != "active":
+        raise InvalidStateChange("Only an active quest objective can transition")
+    return objective
+
+
+def _validate_quest_transition(quest: Quest, expected_revision: int, status: str) -> None:
+    if quest.revision != expected_revision:
+        raise InvalidStateChange("Quest revision is stale")
+    if quest.status != "active":
+        raise InvalidStateChange("Only an active quest can transition")
+    if status not in {"completed", "failed", "abandoned"}:
+        raise InvalidStateChange("Unsupported quest transition")
+
+
+def _validate_objective_transition(
+    objective: QuestObjective, expected_revision: int, status: str
+) -> None:
+    if objective.revision != expected_revision:
+        raise InvalidStateChange("Quest objective revision is stale")
+    allowed = {
+        "pending": {"active", "skipped"},
+        "active": {"completed", "failed", "skipped"},
+    }
+    if status not in allowed.get(objective.status, set()):
+        raise InvalidStateChange(
+            f"Illegal quest objective transition from {objective.status} to {status}"
+        )
+
+
+def _parse_decision_consequences(raw: list[dict[str, Any]]) -> list[DecisionConsequence]:
+    try:
+        return DECISION_CONSEQUENCE_ADAPTER.validate_python(raw)
+    except ValidationError as exc:
+        raise InvalidStateChange("Stored decision consequences are invalid") from exc
+
+
+def _validate_decision_consequences(
+    session: Session,
+    campaign_id: uuid.UUID,
+    consequences: list[DecisionConsequence],
+    *,
+    occupied_quests: set[uuid.UUID] | None = None,
+    occupied_objectives: set[uuid.UUID] | None = None,
+    occupied_attitude_subjects: set[uuid.UUID] | None = None,
+) -> None:
+    touched_quests = set(occupied_quests or set())
+    touched_objectives = set(occupied_objectives or set())
+    attitude_subjects = set(occupied_attitude_subjects or set())
+    for consequence in consequences:
+        if isinstance(consequence, DecisionFactConsequence):
+            npc = _validate_fact_subject(
+                session,
+                campaign_id,
+                consequence.fact_type,
+                consequence.subject_npc_id,
+            )
+            if npc is not None and (npc.status != "active" or npc.visibility != "player"):
+                raise InvalidStateChange(
+                    "Decision consequence NPC must be active and player-visible"
+                )
+            value = _validate_fact_value(consequence.fact_type, consequence.value)
+            if consequence.fact_type == "npc_attitude":
+                assert consequence.subject_npc_id is not None
+                if consequence.subject_npc_id in attitude_subjects:
+                    raise InvalidStateChange(
+                        "A decision option can set an NPC attitude at most once"
+                    )
+                attitude_subjects.add(consequence.subject_npc_id)
+                existing = session.scalar(
+                    select(WorldFact).where(
+                        WorldFact.campaign_id == campaign_id,
+                        WorldFact.subject_npc_id == consequence.subject_npc_id,
+                        WorldFact.fact_type == "npc_attitude",
+                        WorldFact.status == "current",
+                    )
+                )
+                if existing is not None:
+                    if existing.visibility != "player":
+                        raise InvalidStateChange(
+                            "A hidden NPC attitude cannot be replaced by a player choice"
+                        )
+                    if existing.value == value:
+                        raise InvalidStateChange(
+                            "Decision consequence would not change NPC attitude"
+                        )
+        elif isinstance(consequence, DecisionQuestConsequence):
+            if consequence.quest_id in touched_quests:
+                raise InvalidStateChange("A quest can be changed at most once per turn")
+            for objective_id in touched_objectives:
+                objective = session.get(QuestObjective, objective_id)
+                assert objective is not None
+                if objective.quest_id == consequence.quest_id:
+                    raise InvalidStateChange(
+                        "A quest and one of its objectives cannot transition in the same turn"
+                    )
+            touched_quests.add(consequence.quest_id)
+            quest = _quest_for_change(session, campaign_id, consequence.quest_id)
+            _validate_quest_transition(quest, consequence.expected_revision, consequence.status)
+        elif isinstance(consequence, DecisionObjectiveConsequence):
+            if consequence.objective_id in touched_objectives:
+                raise InvalidStateChange("A quest objective can be changed at most once per turn")
+            touched_objectives.add(consequence.objective_id)
+            objective = _objective_for_change(session, campaign_id, consequence.objective_id)
+            if objective.quest_id in touched_quests:
+                raise InvalidStateChange(
+                    "A quest and one of its objectives cannot transition in the same turn"
+                )
+            _validate_objective_transition(
+                objective, consequence.expected_revision, consequence.status
+            )
+
+
+def _validate_world_changes(
+    session: Session, campaign_id: uuid.UUID, changes: list
+) -> tuple[set[uuid.UUID], set[uuid.UUID], set[uuid.UUID]]:
     touched_facts: set[uuid.UUID] = set()
     attitude_subjects: set[uuid.UUID] = set()
+    touched_quests: set[uuid.UUID] = set()
+    touched_objectives: set[uuid.UUID] = set()
+    new_quest_keys: set[str] = set()
+    new_decision_keys: set[str] = set()
     for change in changes:
         parts = _proposal_fact_parts(change)
         if parts is not None:
@@ -2590,6 +2889,65 @@ def _validate_world_changes(session: Session, campaign_id: uuid.UUID, changes: l
                     raise InvalidStateChange("Superseding value must change the world fact")
             elif fact.visibility != "dm_only":
                 raise InvalidStateChange("Only a hidden world fact can be revealed")
+        elif isinstance(change, QuestCreate):
+            if change.quest_key in new_quest_keys:
+                raise InvalidStateChange("A turn cannot create duplicate quest keys")
+            new_quest_keys.add(change.quest_key)
+            existing = session.scalar(
+                select(Quest.id).where(
+                    Quest.campaign_id == campaign_id, Quest.quest_key == change.quest_key
+                )
+            )
+            if existing is not None:
+                raise InvalidStateChange("Quest key already exists in campaign")
+        elif isinstance(change, QuestTransition):
+            if change.quest_id in touched_quests:
+                raise InvalidStateChange("A quest can be changed at most once per turn")
+            for objective_id in touched_objectives:
+                objective = session.get(QuestObjective, objective_id)
+                assert objective is not None
+                if objective.quest_id == change.quest_id:
+                    raise InvalidStateChange(
+                        "A quest and one of its objectives cannot transition in the same turn"
+                    )
+            touched_quests.add(change.quest_id)
+            quest = _quest_for_change(session, campaign_id, change.quest_id)
+            _validate_quest_transition(quest, change.expected_revision, change.status)
+        elif isinstance(change, QuestObjectiveTransition):
+            if change.objective_id in touched_objectives:
+                raise InvalidStateChange("A quest objective can be changed at most once per turn")
+            touched_objectives.add(change.objective_id)
+            objective = _objective_for_change(session, campaign_id, change.objective_id)
+            if objective.quest_id in touched_quests:
+                raise InvalidStateChange(
+                    "A quest and one of its objectives cannot transition in the same turn"
+                )
+            _validate_objective_transition(objective, change.expected_revision, change.status)
+        elif isinstance(change, DecisionOpen):
+            if change.decision_key in new_decision_keys:
+                raise InvalidStateChange("A turn cannot create duplicate decision keys")
+            new_decision_keys.add(change.decision_key)
+            existing = session.scalar(
+                select(DecisionPoint.id).where(
+                    DecisionPoint.campaign_id == campaign_id,
+                    DecisionPoint.decision_key == change.decision_key,
+                )
+            )
+            if existing is not None:
+                raise InvalidStateChange("Decision key already exists in campaign")
+    for change in changes:
+        if not isinstance(change, DecisionOpen):
+            continue
+        for option in change.options:
+            _validate_decision_consequences(
+                session,
+                campaign_id,
+                option.consequences,
+                occupied_quests=touched_quests,
+                occupied_objectives=touched_objectives,
+                occupied_attitude_subjects=attitude_subjects,
+            )
+    return touched_quests, touched_objectives, attitude_subjects
 
 
 def _record_fact_projection(
@@ -2742,6 +3100,312 @@ def _apply_world_fact_change(
     return False
 
 
+def _apply_quest_transition(
+    session: Session,
+    campaign: Campaign,
+    quest: Quest,
+    status: str,
+    *,
+    turn_id: uuid.UUID | None,
+    actor_character_id: uuid.UUID | None,
+) -> None:
+    next_revision = campaign.world_revision + 1
+    event = _add_event(
+        session,
+        campaign.id,
+        "quest_status_changed",
+        {
+            "quest_id": str(quest.id),
+            "quest_key": quest.quest_key,
+            "previous_status": quest.status,
+            "status": status,
+            "quest_revision": quest.revision + 1,
+            "world_revision": next_revision,
+        },
+        turn_id=turn_id,
+        actor_character_id=actor_character_id,
+    )
+    quest.status = status
+    quest.revision += 1
+    quest.transitioned_by_event_id = event.id
+    campaign.world_revision = next_revision
+
+
+def _apply_objective_transition(
+    session: Session,
+    campaign: Campaign,
+    objective: QuestObjective,
+    status: str,
+    *,
+    turn_id: uuid.UUID | None,
+    actor_character_id: uuid.UUID | None,
+) -> None:
+    next_revision = campaign.world_revision + 1
+    event = _add_event(
+        session,
+        campaign.id,
+        "quest_objective_status_changed",
+        {
+            "quest_id": str(objective.quest_id),
+            "objective_id": str(objective.id),
+            "objective_key": objective.objective_key,
+            "previous_status": objective.status,
+            "status": status,
+            "objective_revision": objective.revision + 1,
+            "world_revision": next_revision,
+        },
+        turn_id=turn_id,
+        actor_character_id=actor_character_id,
+    )
+    objective.status = status
+    objective.revision += 1
+    objective.transitioned_by_event_id = event.id
+    campaign.world_revision = next_revision
+
+
+def _apply_quest_decision_change(
+    session: Session,
+    campaign: Campaign,
+    change: Any,
+    *,
+    turn_id: uuid.UUID | None,
+    actor_character_id: uuid.UUID | None,
+) -> bool:
+    if isinstance(change, QuestCreate):
+        quest_id = uuid.uuid4()
+        objective_ids = [uuid.uuid4() for _ in change.objectives]
+        next_revision = campaign.world_revision + 1
+        event = _add_event(
+            session,
+            campaign.id,
+            "quest_created",
+            {
+                "quest_id": str(quest_id),
+                "quest_key": change.quest_key,
+                "title": change.title,
+                "objectives": [
+                    {
+                        "objective_id": str(objective_id),
+                        "objective_key": objective.objective_key,
+                        "title": objective.title,
+                        "status": objective.status,
+                    }
+                    for objective_id, objective in zip(
+                        objective_ids, change.objectives, strict=True
+                    )
+                ],
+                "world_revision": next_revision,
+            },
+            turn_id=turn_id,
+            actor_character_id=actor_character_id,
+        )
+        quest = Quest(
+            id=quest_id,
+            campaign_id=campaign.id,
+            quest_key=change.quest_key,
+            title=change.title,
+            summary=change.summary,
+            status="active",
+            visibility="player",
+            revision=0,
+            created_by_event_id=event.id,
+        )
+        session.add(quest)
+        for position, (objective_id, objective) in enumerate(
+            zip(objective_ids, change.objectives, strict=True), start=1
+        ):
+            session.add(
+                QuestObjective(
+                    id=objective_id,
+                    campaign_id=campaign.id,
+                    quest_id=quest_id,
+                    objective_key=objective.objective_key,
+                    title=objective.title,
+                    description=objective.description,
+                    status=objective.status,
+                    position=position,
+                    revision=0,
+                    created_by_event_id=event.id,
+                )
+            )
+        campaign.world_revision = next_revision
+        return True
+    if isinstance(change, QuestTransition):
+        quest = session.get(Quest, change.quest_id)
+        assert quest is not None
+        _apply_quest_transition(
+            session,
+            campaign,
+            quest,
+            change.status,
+            turn_id=turn_id,
+            actor_character_id=actor_character_id,
+        )
+        return True
+    if isinstance(change, QuestObjectiveTransition):
+        objective = session.get(QuestObjective, change.objective_id)
+        assert objective is not None
+        _apply_objective_transition(
+            session,
+            campaign,
+            objective,
+            change.status,
+            turn_id=turn_id,
+            actor_character_id=actor_character_id,
+        )
+        return True
+    if isinstance(change, DecisionOpen):
+        decision_id = uuid.uuid4()
+        option_ids = [uuid.uuid4() for _ in change.options]
+        next_revision = campaign.world_revision + 1
+        event = _add_event(
+            session,
+            campaign.id,
+            "decision_opened",
+            {
+                "decision_id": str(decision_id),
+                "decision_key": change.decision_key,
+                "prompt": change.prompt,
+                "options": [
+                    {
+                        "option_id": str(option_id),
+                        "option_key": option.option_key,
+                        "label": option.label,
+                        "description": option.description,
+                    }
+                    for option_id, option in zip(option_ids, change.options, strict=True)
+                ],
+                "world_revision": next_revision,
+            },
+            turn_id=turn_id,
+            actor_character_id=actor_character_id,
+        )
+        session.add(
+            DecisionPoint(
+                id=decision_id,
+                campaign_id=campaign.id,
+                decision_key=change.decision_key,
+                prompt=change.prompt,
+                status="open",
+                visibility="player",
+                revision=0,
+                created_by_event_id=event.id,
+            )
+        )
+        for position, (option_id, option) in enumerate(
+            zip(option_ids, change.options, strict=True), start=1
+        ):
+            session.add(
+                DecisionOption(
+                    id=option_id,
+                    campaign_id=campaign.id,
+                    decision_id=decision_id,
+                    option_key=option.option_key,
+                    label=option.label,
+                    description=option.description,
+                    position=position,
+                    consequences=[
+                        consequence.model_dump(mode="json") for consequence in option.consequences
+                    ],
+                )
+            )
+        campaign.world_revision = next_revision
+        return True
+    return False
+
+
+def _apply_decision_consequence(
+    session: Session,
+    campaign: Campaign,
+    consequence: DecisionConsequence,
+    *,
+    turn_id: uuid.UUID,
+    actor_character_id: uuid.UUID | None,
+) -> None:
+    if isinstance(consequence, DecisionFactConsequence):
+        _record_fact_projection(
+            session,
+            campaign,
+            fact_type=consequence.fact_type,
+            subject_npc_id=consequence.subject_npc_id,
+            value=consequence.value,
+            turn_id=turn_id,
+            actor_character_id=actor_character_id,
+        )
+    elif isinstance(consequence, DecisionQuestConsequence):
+        quest = session.get(Quest, consequence.quest_id)
+        assert quest is not None
+        _apply_quest_transition(
+            session,
+            campaign,
+            quest,
+            consequence.status,
+            turn_id=turn_id,
+            actor_character_id=actor_character_id,
+        )
+    elif isinstance(consequence, DecisionObjectiveConsequence):
+        objective = session.get(QuestObjective, consequence.objective_id)
+        assert objective is not None
+        _apply_objective_transition(
+            session,
+            campaign,
+            objective,
+            consequence.status,
+            turn_id=turn_id,
+            actor_character_id=actor_character_id,
+        )
+
+
+def _apply_decision_choice(
+    session: Session,
+    campaign: Campaign,
+    turn: Turn,
+    choice: tuple[DecisionPoint, DecisionOption, list[DecisionConsequence]],
+    *,
+    actor_character_id: uuid.UUID | None,
+) -> None:
+    decision, option, consequences = choice
+    next_revision = campaign.world_revision + 1
+    event = _add_event(
+        session,
+        campaign.id,
+        "decision_selected",
+        {
+            "decision_id": str(decision.id),
+            "decision_key": decision.decision_key,
+            "option_id": str(option.id),
+            "option_key": option.option_key,
+            "world_revision": next_revision,
+        },
+        turn_id=turn.id,
+        actor_character_id=actor_character_id,
+    )
+    decision.status = "selected"
+    decision.selected_option_key = option.option_key
+    decision.revision += 1
+    decision.selected_by_event_id = event.id
+    session.add(
+        DecisionSelection(
+            campaign_id=campaign.id,
+            decision_id=decision.id,
+            option_id=option.id,
+            turn_id=turn.id,
+            actor_character_id=actor_character_id,
+            world_revision=next_revision,
+            event_id=event.id,
+        )
+    )
+    campaign.world_revision = next_revision
+    for consequence in consequences:
+        _apply_decision_consequence(
+            session,
+            campaign,
+            consequence,
+            turn_id=turn.id,
+            actor_character_id=actor_character_id,
+        )
+
+
 def _apply_state_changes(
     session: Session,
     campaign_id: uuid.UUID,
@@ -2851,13 +3515,21 @@ def _apply_state_changes(
             new_scene.opened_by_event_id = opened_event.id
             campaign.world_revision = next_world_revision
         else:
-            _apply_world_fact_change(
+            handled = _apply_world_fact_change(
                 session,
                 campaign,
                 change,
                 turn_id=turn_id,
                 actor_character_id=actor_character_id,
             )
+            if not handled:
+                _apply_quest_decision_change(
+                    session,
+                    campaign,
+                    change,
+                    turn_id=turn_id,
+                    actor_character_id=actor_character_id,
+                )
     if character_changed and character is not None:
         character.state_revision += 1
 

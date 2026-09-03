@@ -1,26 +1,27 @@
 # M4 PostgreSQL and pgvector Readiness Audit
 
-- **Status:** Read-only audit complete; provisioning not yet authorized or performed
+- **Status:** Historical read-only audit complete; PostgreSQL 18 package provisioning later passed,
+  while per-database extension enablement remains pending
 - **Audit date:** 2026-09-04
 - **Host:** `postgresvm`
 - **Scope:** M4 compatibility, least privilege, capacity, and safe installation planning
 
 ## 1. Outcome
 
-`postgresvm` can support pgvector, but pgvector is not currently installed or available through the
-configured Debian repositories. No database, package, repository, role, service, or configuration
-was changed during this audit.
+At the time of this audit, `postgresvm` could support pgvector, but pgvector was not installed or
+available through the configured Debian repositories. No database, package, repository, role,
+service, or configuration was changed during the audit itself.
 
-The preferred next step is a narrowly pinned prebuilt pgvector package from the official PostgreSQL
-APT repository, but only if a fresh package simulation proves it will install the extension without
-replacing or upgrading PostgreSQL, libc, or unrelated services. If that condition is not met, stop
-and return for a separately reviewed maintenance plan. Do not silently fall back to a source build.
+The preferred next step at audit time was a narrowly pinned prebuilt pgvector package from the
+official PostgreSQL APT repository, conditional on a fresh simulation proving it would not replace
+or upgrade PostgreSQL, libc, or unrelated services. A failed condition would have stopped the work;
+the audit never permitted a silent source-build fallback.
 
-The owner subsequently accepted PostgreSQL 18 as Gandalf's long-term database target. PG18.0 is now
-complete and recommends migrating Gandalf first, then using the matching PostgreSQL 18 pgvector
-package. See [`POSTGRESQL_18_READINESS_AUDIT.md`](POSTGRESQL_18_READINESS_AUDIT.md). This audit
-remains the fallback PostgreSQL 15 plan if a changed pre-install simulation invalidates PG18.0; it
-does not authorize either package path.
+The owner subsequently accepted PostgreSQL 18 as Gandalf's long-term target and authorized its
+foundation. The signed exact transaction installed `postgresql-18-pgvector` 0.8.6 without changing
+the PostgreSQL 15 server/client; no database has enabled the `vector` extension. See
+[`POSTGRESQL_18_FOUNDATION_EXECUTION.md`](POSTGRESQL_18_FOUNDATION_EXECUTION.md). The source-build
+comparison remains historical rationale, not the current package plan.
 
 ## 2. Verified host and cluster state
 

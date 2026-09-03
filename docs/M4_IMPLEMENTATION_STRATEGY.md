@@ -1,13 +1,16 @@
 # M4 Long-Term Memory and Retrieval Implementation Strategy
 
-- **Status:** Ready; the PG18 controlled migration gate precedes M4.1
+- **Status:** Ready; PG18 foundation/test restore passed, and development restore/cutover precede
+  M4.1
 - **Prepared:** 2026-09-04
 - **Depends on:** M3 persistent world (Done, including live OpenClaw supplement)
 - **Infrastructure audit:** [`M4_POSTGRES_PGVECTOR_AUDIT.md`](M4_POSTGRES_PGVECTOR_AUDIT.md)
 - **Database longevity strategy:** [`POSTGRESQL_18_MIGRATION_STRATEGY.md`](POSTGRESQL_18_MIGRATION_STRATEGY.md)
 - **PG18.0 evidence:** [`POSTGRESQL_18_READINESS_AUDIT.md`](POSTGRESQL_18_READINESS_AUDIT.md)
-- **Owner input required now:** Approve or reject the exact recovery, shared-package, parallel
-  cluster, targeted HBA, and test-restore boundary recorded by PG18.0
+- **PG18 execution evidence:**
+  [`POSTGRESQL_18_FOUNDATION_EXECUTION.md`](POSTGRESQL_18_FOUNDATION_EXECUTION.md)
+- **Owner input required now:** Authorize or defer the separately bounded PostgreSQL 18 development
+  restore and Gandalf-only cutover rehearsal; package/cluster/HBA/test work is already accepted
 - **Owner checkpoint:** M4.5 retrieval/re-index acceptance, followed by any separately authorized
   live narrative-coherence supplement
 
@@ -270,7 +273,8 @@ Exit: strategy and audit committed; M4 is Ready; no VM mutation occurred.
 
 ### M4.1 — Extension and memory foundation
 
-- after explicit approval, provision pinned pgvector only in the two Gandalf databases;
+- after PG18 cutover approval, enable the already pinned PostgreSQL 18 pgvector package only in the
+  two Gandalf databases under a separate per-database mutation gate;
 - add the Python pgvector/SQLAlchemy adapter with a pinned compatible dependency;
 - migration `0012` (expected name, finalized during implementation) asserts the extension and adds
   profiles, documents, embeddings, jobs, campaign indexes, and retrieval audits;
@@ -376,9 +380,10 @@ or cross-campaign output is fail-closed and blocks the memory path until repaire
 
 Owner input is required at three bounded points:
 
-1. **Now:** approve or reject the PG18.0 recommendation to migrate before M4.1 under its exact
-   recovery/package/cluster/test boundary. A changed simulation or unrelated service impact stops
-   the work and returns for a new decision.
+1. **Now:** authorize or defer the next PG18 gate: fresh development recovery/write boundary,
+   development-only role/database restore and comparison, runtime acceptance, and reversible
+   Gandalf-only cutover rehearsal. A failed health or drift check stops the work; PG15 retirement,
+   deletion, and unrelated-service changes remain excluded.
 2. **M4.2 model selection:** review measured local model size, one-time download, CPU latency,
    retrieval quality, and license if candidates differ materially. Codex may choose autonomously if
    one candidate clearly meets every recorded bound with no new service or cost.
@@ -396,7 +401,6 @@ quality/latency results, defects, workarounds, and next actions. M4 moves to Rew
 shows hidden/cross-campaign retrieval, uncited memory, mixed profiles, canonical-state substitution,
 unbounded context, or a completed turn depending on index availability.
 
-M4 planning is complete. Implementation must stop at the PG18 controlled-migration gate and
-subsequent pgvector/database gates until the owner explicitly authorizes the exact shared-VM
-recovery, package, cluster, HBA, database, and per-database extension changes described in the
-readiness documents.
+M4 planning is complete. The PG18 package/cluster/HBA/test gate passed. Implementation must still
+stop before the development restore/cutover and subsequent per-database pgvector gate until the
+owner explicitly authorizes their exact database, connection, rollback, and extension boundaries.

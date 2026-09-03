@@ -1,23 +1,25 @@
 # PostgreSQL 18 Readiness Audit
 
-- **Status:** PG18.0 complete; conditionally ready for an explicitly authorized parallel migration
+- **Status:** PG18.0 complete; its authorized foundation and test-restore gate subsequently passed
 - **Audit date:** 2026-09-04
 - **Host:** `postgresvm`
 - **Scope:** Read-only package, cluster, access, recovery, and Gandalf compatibility assessment
 - **Strategy:** [`POSTGRESQL_18_MIGRATION_STRATEGY.md`](POSTGRESQL_18_MIGRATION_STRATEGY.md)
+- **Execution record:**
+  [`POSTGRESQL_18_FOUNDATION_EXECUTION.md`](POSTGRESQL_18_FOUNDATION_EXECUTION.md)
 
 ## 1. Outcome and sequencing decision
 
 A parallel PostgreSQL 18 Gandalf cluster is feasible on `postgresvm`. The recommended sequence is
-to migrate GandalfDnD to PostgreSQL 18 **before M4.1**, then install/enable pgvector for PostgreSQL
-18 only. This avoids building M4 on PostgreSQL 15 and repeating its extension work after migration.
+to migrate GandalfDnD to PostgreSQL 18 **before M4.1**, then enable pgvector for PostgreSQL 18 only.
+The server package is now installed, but database extension enablement remains gated. This avoids
+building M4 on PostgreSQL 15 and repeating its extension work after migration.
 
-The result is **conditional readiness**, not permission to install. PostgreSQL 18 can coexist with
-the current PostgreSQL 15 server and the exact narrowed transaction removes no package and does not
-upgrade the PostgreSQL 15 server/client. However, it must upgrade three shared packages used to
-manage or access PostgreSQL installations. The host also runs an unrelated active application
-against PostgreSQL 15, so a recovery point, maintenance boundary, package pin, and post-change
-service verification are mandatory.
+The audit result was **conditional readiness**, not permission to install. The owner later
+authorized its exact recovery/package/cluster/HBA/test boundary, and that bounded operation passed.
+PostgreSQL 18.6 now coexists with PostgreSQL 15; the narrowed transaction removed no package and did
+not upgrade the PostgreSQL 15 server/client. The required recovery evidence, package pinning, and
+post-change service checks are recorded in the execution record above.
 
 No configured repository, package, database, role, service, firewall, authentication file, or
 application setting changed during PG18.0. Temporary APT simulation directories were removed after
@@ -70,7 +72,7 @@ the exact versions above, and disabled recommended packages. Its complete transa
 | Install (4) | `liburing2`, `postgresql-client-18`, `postgresql-18`, `postgresql-18-pgvector` |
 | Remove | None |
 | PostgreSQL 15 server/client change | None |
-| Unrelated pending upgrades included | None; 259 remained untouched |
+| Unrelated pending upgrades included | None; the execution-time simulation left 260 untouched |
 
 `postgresql-common >=275` and `libpq5 >=18.6` are hard PostgreSQL 18 dependencies, so those three
 upgrades cannot be eliminated while using the supported PGDG binary package. `libpq` retains its
@@ -78,19 +80,21 @@ version-5 client ABI and the only running processes observed mapping it were two
 `psql` sessions, not the unrelated FastAPI service. Nevertheless, the shared package change is an
 operator-visible risk and must be verified, not assumed harmless.
 
-The temporary simulation source used HTTPS with `trusted=yes` because the PGDG signing key is not
-installed on the VM; APT correctly reported the missing key. Real provisioning must install the
-official key, use `Signed-By`, verify the signed index, and re-run the exact simulation. The audit's
-temporary trust override must never become the persisted source configuration.
+The audit's temporary simulation source used HTTPS with `trusted=yes` because the PGDG signing key
+was not yet installed; APT correctly reported the missing key. Provisioning did not preserve that
+temporary override. It installed the official key, verified fingerprint
+`B97B0AFCAA1A47F044F244A07FCC7D46ACCC4CF8`, configured `Signed-By`, and re-ran the exact signed
+simulation before applying the matching transaction.
 
 Recommended packages, including PostgreSQL 18 JIT, were intentionally excluded. M4's small exact
 search workload does not justify adding LLVM/JIT before measurements show a need.
 
 ## 4. Cluster-coexistence finding
 
-The installed `postgresql-common` configuration retains its default `create_main_cluster=true`.
-Installing a new server major would therefore automatically initialize a default `18/main` cluster,
-normally using the next free port. That is insufficiently controlled for this shared host.
+At audit time, `postgresql-common` retained its default `create_main_cluster=true`, which would have
+created an uncontrolled default `18/main` cluster. Execution installed and verified a
+`create_main_cluster=false` control fragment before the server package transaction. No `18/main`
+cluster was created.
 
 The approved execution plan should instead:
 
@@ -124,13 +128,11 @@ PL/pgSQL usage. It found no use of the migration-sensitive PostgreSQL 16–18 fe
 the reviewed release notes, including `NULLS NOT DISTINCT` primary keys, `old_snapshot_threshold`,
 custom-function expression indexes, or changed interval `ago` syntax.
 
-This is not a substitute for execution. PG18.3 must still prove:
-
-- the full migration chain into an empty database;
-- a populated PostgreSQL 15→18 logical dump/restore using PostgreSQL 18 `pg_dump`;
-- grants, triggers, indexes, sequences, constraints, JSONB/UUID behavior, and Alembic head;
-- the complete automated suite, deterministic Lantern replay, API health, restart, and isolation;
-- pgvector insert/query and later M4 migrations under the restricted roles.
+The test-database execution subsequently proved a populated PostgreSQL 15→18 logical restore made
+with PostgreSQL 18 client tools; exact row counts, 23 tables, 8 functions, 8 triggers, ownership,
+isolation, and Alembic head; plus the complete 126-test suite, including migrations, deterministic
+Lantern behavior, restart, JSONB/UUID, transaction, trigger, and constraint coverage. Development
+restore/runtime acceptance and pgvector insert/query plus later M4 migrations remain outstanding.
 
 PostgreSQL officially recommends concurrent old/new installations for cautious application testing
 and recommends using the newer `pg_dump` for a cross-major logical migration. See
@@ -151,17 +153,17 @@ PG18.0 found a pre-existing least-privilege gap:
 - metadata-only checks found no `CREATE`, `SELECT`, or write privileges for Gandalf roles on the
   unrelated application tables inspected, so no unrelated table-data access was observed.
 
-This is narrower than a data exposure but does not meet the project's desired database isolation.
-Do not revoke `PUBLIC CONNECT` from unrelated databases, because that could disrupt their owners.
-The preferred correction is ordered HBA rules that allow each Gandalf role to reach only its own
-database through the loopback SSH-tunnel path and reject that role for every other database. Apply
-and test this as an explicitly approved PG15 reload-only hardening step. Build the PostgreSQL 18 HBA
-correctly from the start. After accepted cutover, disable the old PG15 Gandalf logins while retaining
-a documented rollback method.
+This was narrower than a data exposure but did not meet the project's desired database isolation.
+The authorized execution corrected it without changing unrelated database ACLs: ordered PG15 HBA
+rules now allow each Gandalf role only to its matching database through the loopback tunnel path and
+reject it from every other database over IPv4 and IPv6. Syntax, reload, own-database access,
+cross-Gandalf denial, and unrelated-database denial all passed. PostgreSQL 18 uses matching
+database/role-specific loopback access plus a reject-all TCP fallback. Old PG15 Gandalf logins remain
+enabled for rollback and may be disabled only after a separately accepted cutover.
 
-## 7. Recovery and authorization gate
+## 7. Recovery and authorization gate (executed)
 
-Before any VM mutation, obtain explicit approval for one bounded operation that includes:
+The owner explicitly approved the following bounded operation, and it completed successfully:
 
 1. a hypervisor/VM recovery point or equivalent recovery evidence for the shared package change;
 2. fresh checksummed emergency dumps of only the two Gandalf databases using the installed PG15
@@ -176,18 +178,20 @@ Before any VM mutation, obtain explicit approval for one bounded operation that 
 9. test-database restore and acceptance before any development-database copy;
 10. no cutover, old-role disablement, package downgrade, database deletion, or PG15 retirement.
 
-Any changed package set, service restart requirement, signature problem, new removal, PG15 server
-upgrade, failed unrelated-service health check, or insufficient recovery point stops the operation.
-Package rollback should use the reviewed VM recovery point rather than an improvised downgrade of
-shared cluster-management packages.
+The package set and signed simulation matched. PostgreSQL 15, its server/client packages, and
+Bluebuild remained healthy. Verified emergency dumps, configuration/package records, checksums, and
+cached shared-package files provide the documented recovery evidence. No cutover, old-role
+disablement, database deletion, package downgrade, or PostgreSQL 15 retirement occurred.
 
 ## 8. PG18.0 conclusion
 
-**Go, with the authorization and recovery prerequisites above.** Migrate before M4.1. The database
-sizes, available resources, compatible driver, standard schema features, exact binary packages,
-free parallel port, and logical-restore strategy make this a favourable point in development to
-establish the long-lived platform. The migration must remain staged: package/cluster foundation,
-test restore, development restore, acceptance, and final cutover are separate gates.
+**Foundation and test gate passed.** The database sizes, available resources, compatible driver,
+standard schema features, exact binary packages, free parallel port, and logical-restore strategy
+were borne out in execution. PostgreSQL 18.6 `18/gandalf` is loopback-only on port 5433 with
+checksums and manual startup; its restored test database passed the full repository suite. The
+migration remains staged: development restore, application acceptance, cutover, stabilization, and
+retirement are separate decisions.
 
-PostgreSQL 15.14 remains active after this audit. Its update to 15.19 for unrelated remaining users
-is advisable but outside Gandalf's migration scope and must not be bundled into this operation.
+PostgreSQL 15.14 remains active and authoritative for Gandalf development after this gate. Its
+update to 15.19 for unrelated remaining users is advisable but outside Gandalf's migration scope
+and must not be bundled into the next operation.

@@ -18,6 +18,12 @@ from app.turn_interpretation import TurnIntent
 
 ShortText = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=160)]
 NPCName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=120)]
+NarrativeText = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=2000)
+]
+WorldFactType = Literal[
+    "npc_attitude", "relationship_note", "promise", "discovery", "clue"
+]
 
 
 class StartingNPCCreate(BaseModel):
@@ -142,12 +148,25 @@ class NPCRead(BaseModel):
     created_at: datetime
 
 
+class WorldFactRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    subject_npc_id: uuid.UUID | None
+    fact_type: WorldFactType
+    value: str
+    status: str
+    revision: int
+    created_at: datetime
+
+
 class WorldStateRead(BaseModel):
     campaign_id: uuid.UUID
     world_revision: int
     location: LocationRead
     scene: SceneRead
     present_npcs: list[NPCRead]
+    facts: list[WorldFactRead]
 
 
 class HPDelta(BaseModel):
@@ -169,8 +188,74 @@ class InventoryChange(BaseModel):
     reason: ShortText
 
 
+class NPCAttitudeSet(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    type: Literal["npc_attitude_set"]
+    npc_id: uuid.UUID
+    attitude: Literal["friendly", "neutral", "wary", "hostile"]
+
+
+class RelationshipNoteAdd(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    type: Literal["relationship_note_add"]
+    npc_id: uuid.UUID
+    note: NarrativeText
+
+
+class PromiseRecord(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    type: Literal["promise_record"]
+    npc_id: uuid.UUID
+    promise: NarrativeText
+
+
+class DiscoveryRecord(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    type: Literal["discovery_record"]
+    subject_npc_id: uuid.UUID | None = None
+    discovery: NarrativeText
+
+
+class ClueRecord(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    type: Literal["clue_record"]
+    subject_npc_id: uuid.UUID | None = None
+    clue: NarrativeText
+
+
+class WorldFactSupersede(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    type: Literal["world_fact_supersede"]
+    fact_id: uuid.UUID
+    expected_revision: int = Field(ge=0)
+    value: NarrativeText
+
+
+class WorldFactReveal(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    type: Literal["world_fact_reveal"]
+    fact_id: uuid.UUID
+    expected_revision: int = Field(ge=0)
+
+
 StateChange = Annotated[
-    HPDelta | MoveLocation | InventoryChange,
+    HPDelta
+    | MoveLocation
+    | InventoryChange
+    | NPCAttitudeSet
+    | RelationshipNoteAdd
+    | PromiseRecord
+    | DiscoveryRecord
+    | ClueRecord
+    | WorldFactSupersede
+    | WorldFactReveal,
     Field(discriminator="type"),
 ]
 

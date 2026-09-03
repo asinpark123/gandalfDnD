@@ -218,6 +218,7 @@ class NPC(TimestampMixin, Base):
 
     campaign: Mapped[Campaign] = relationship(back_populates="npcs")
     presences: Mapped[list["SceneNPCPresence"]] = relationship(back_populates="npc")
+    facts: Mapped[list["WorldFact"]] = relationship(back_populates="subject_npc")
 
     __table_args__ = (
         CheckConstraint("status IN ('active', 'inactive')", name="npc_status"),
@@ -278,6 +279,91 @@ class SceneNPCPresence(TimestampMixin, Base):
             "npc_id",
             unique=True,
             postgresql_where=text("status = 'present'"),
+        ),
+    )
+
+
+class WorldFact(TimestampMixin, Base):
+    __tablename__ = "world_facts"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    campaign_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("campaigns.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    subject_npc_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("npcs.id", ondelete="CASCADE"), index=True
+    )
+    fact_type: Mapped[str] = mapped_column(String(30), nullable=False)
+    value: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="current")
+    visibility: Mapped[str] = mapped_column(String(20), nullable=False, default="player")
+    revision: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    supersedes_fact_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("world_facts.id", ondelete="RESTRICT"), unique=True
+    )
+    created_by_event_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey(
+            "campaign_events.id",
+            name="world_facts_created_by_event_id_fkey",
+            ondelete="RESTRICT",
+            use_alter=True,
+        ),
+        nullable=False,
+    )
+    superseded_by_event_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey(
+            "campaign_events.id",
+            name="world_facts_superseded_by_event_id_fkey",
+            ondelete="SET NULL",
+            use_alter=True,
+        )
+    )
+    revealed_by_event_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey(
+            "campaign_events.id",
+            name="world_facts_revealed_by_event_id_fkey",
+            ondelete="SET NULL",
+            use_alter=True,
+        )
+    )
+
+    subject_npc: Mapped[NPC | None] = relationship(back_populates="facts")
+
+    __table_args__ = (
+        CheckConstraint(
+            "fact_type IN ('npc_attitude', 'relationship_note', 'promise', 'discovery', 'clue')",
+            name="world_fact_type",
+        ),
+        CheckConstraint("status IN ('current', 'superseded')", name="world_fact_status"),
+        CheckConstraint(
+            "visibility IN ('player', 'dm_only')", name="world_fact_visibility"
+        ),
+        CheckConstraint("revision >= 0", name="world_fact_revision_nonnegative"),
+        CheckConstraint(
+            "char_length(value) BETWEEN 1 AND 2000", name="world_fact_value_length"
+        ),
+        CheckConstraint(
+            "fact_type NOT IN ('npc_attitude', 'relationship_note', 'promise') "
+            "OR subject_npc_id IS NOT NULL",
+            name="world_fact_npc_subject_required",
+        ),
+        CheckConstraint(
+            "fact_type <> 'npc_attitude' "
+            "OR value IN ('friendly', 'neutral', 'wary', 'hostile')",
+            name="world_fact_attitude_value",
+        ),
+        Index(
+            "ix_world_facts_current_campaign",
+            "campaign_id",
+            "status",
+            "visibility",
+        ),
+        Index(
+            "uq_world_facts_current_npc_attitude",
+            "campaign_id",
+            "subject_npc_id",
+            unique=True,
+            postgresql_where=text("status = 'current' AND fact_type = 'npc_attitude'"),
         ),
     )
 

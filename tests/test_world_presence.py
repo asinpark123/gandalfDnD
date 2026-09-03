@@ -360,5 +360,5 @@ def test_migration_backfills_default_scene_and_blocks_world_data_loss(
         command.downgrade(config, "0007_turn_stage_recovery")
     with get_engine().connect() as connection:
         assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == (
-            "0008_world_presence"
+            "0009_world_facts"
         )

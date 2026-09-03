@@ -1,6 +1,6 @@
 # M3 Persistent World Implementation Strategy
 
-- **Status:** In progress — M3.1 Done; M3.2 Ready
+- **Status:** In progress — M3.1–M3.2 Done; M3.3 Ready
 - **Prepared:** 2026-09-03
 - **Depends on:** M2 two-stage AI turn and model-authored feasibility (Done)
 - **Owner input required now:** No; M3 begins with a neutral, mechanically inert world fixture
@@ -310,6 +310,8 @@ Implemented evidence:
 
 ### M3.2 — Typed facts, relationships, and reveal
 
+**Status:** Done (2026-09-03)
+
 Player outcome: an NPC can remember a promise or attitude across turns and restart, while a hidden
 clue remains absent until an explicit reveal.
 
@@ -323,6 +325,26 @@ Deliver:
 
 Exit evidence: fact persistence/supersession, no numeric reputation mechanics, hidden API/provider
 exclusion, reveal history, rollback, restart, campaign isolation, and context-budget fixtures pass.
+
+Implemented evidence:
+
+- migration `0009_world_facts` adds typed current/history rows, causal event links, single-step
+  supersession, guarded downgrade, fixed attitude labels, and database checks that require NPC
+  subjects for relationships and promises;
+- narration proposals support fixed NPC attitudes, relationship notes, promises, discoveries,
+  clues, explicit fact supersession, and reveal; extra fields and unknown/mechanical shapes fail the
+  strict provider contract;
+- all proposals are prevalidated before mutation, campaign/NPC/revision ownership is enforced, and
+  each accepted fact mutation advances `world_revision` and emits a named causal event;
+- hidden facts can be recorded only through the trusted internal boundary, remain absent from the
+  player world API, player events, interpretation context, and narration context, and become public
+  only after an explicit reveal event;
+- public current facts survive restart, superseded rows remain queryable history, and only facts for
+  the current scene's NPCs plus campaign-wide facts enter provider context;
+- provider context retains the newest 50 relevant facts and reports the omitted count, keeping the
+  101-fact synthetic fixture below its serialized budget;
+- seven focused M3.2 tests and all 109 normal tests pass with lint, compilation, and zero Alembic
+  drift; the live OpenClaw scenario remains intentionally scheduled for M3.5.
 
 ### M3.3 — Quests, objectives, and branching decisions
 
@@ -438,6 +460,6 @@ domain validation failure before provider work creates no provider audit.
 
 Each slice is committed only when it crosses migration, ORM, schema, API, service, events, tests,
 and documentation. A later slice that invalidates an earlier visibility, identity, causality, or
-restart guarantee moves that slice back to Rework. M3 planning is complete with this document. M3.1
-is verified and complete; implementation proceeds to M3.2's typed narrative-only facts,
-relationships, supersession, and controlled reveal.
+restart guarantee moves that slice back to Rework. M3 planning is complete with this document.
+M3.1–M3.2 are verified and complete; implementation proceeds to M3.3's quests, objectives, and
+explicit branching decisions.

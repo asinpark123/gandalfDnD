@@ -51,6 +51,7 @@ from app.models import (
     Scene,
     SceneNPCPresence,
     Turn,
+    WorldFact,
 )
 from app.resolution import (
     AppliedAdjustmentSource,
@@ -72,10 +73,15 @@ from app.schemas import (
     CampaignState,
     CharacterCreate,
     CharacterRead,
+    ClueRecord,
+    DiscoveryRecord,
     HPDelta,
     InventoryChange,
     LoadoutUpdate,
     MoveLocation,
+    NPCAttitudeSet,
+    PromiseRecord,
+    RelationshipNoteAdd,
     RuleResolutionRead,
     RuleResolutionReplayRead,
     TurnExecutionCreate,
@@ -84,6 +90,8 @@ from app.schemas import (
     TurnInterpretationRead,
     TurnNarrationOutput,
     TurnRead,
+    WorldFactReveal,
+    WorldFactSupersede,
     WorldStateRead,
 )
 from app.turn_errors import TurnProviderError
@@ -102,6 +110,9 @@ class NotFoundError(LookupError):
 
 class ConflictError(ValueError):
     pass
+
+
+MAX_PROVIDER_WORLD_FACTS = 50
 
 
 class TurnNarrationError(TurnProviderError):
@@ -275,13 +286,142 @@ def get_world_state(session: Session, campaign_id: uuid.UUID) -> WorldStateRead:
             .order_by(NPC.created_at, NPC.id)
         )
     )
+    facts = list(
+        session.scalars(
+            select(WorldFact)
+            .where(
+                WorldFact.campaign_id == campaign_id,
+                WorldFact.status == "current",
+                WorldFact.visibility == "player",
+            )
+            .order_by(WorldFact.created_at, WorldFact.id)
+        )
+    )
     return WorldStateRead(
         campaign_id=campaign.id,
         world_revision=campaign.world_revision,
         location=location,
         scene=scene,
         present_npcs=npcs,
+        facts=facts,
     )
+
+
+def list_world_facts(
+    session: Session,
+    campaign_id: uuid.UUID,
+    *,
+    visibility: str = "player",
+    include_history: bool = False,
+) -> list[WorldFact]:
+    if session.get(Campaign, campaign_id) is None:
+        raise NotFoundError("Campaign not found")
+    if visibility not in {"player", "dm_only"}:
+        raise ValueError("Invalid world fact visibility")
+    statement = select(WorldFact).where(
+        WorldFact.campaign_id == campaign_id,
+        WorldFact.visibility == visibility,
+    )
+    if not include_history:
+        statement = statement.where(WorldFact.status == "current")
+    return list(session.scalars(statement.order_by(WorldFact.created_at, WorldFact.id)))
+
+
+def _validate_fact_subject(
+    session: Session,
+    campaign_id: uuid.UUID,
+    fact_type: str,
+    subject_npc_id: uuid.UUID | None,
+) -> NPC | None:
+    if fact_type not in {
+        "npc_attitude",
+        "relationship_note",
+        "promise",
+        "discovery",
+        "clue",
+    }:
+        raise InvalidStateChange("Unsupported world fact type")
+    if fact_type in {"npc_attitude", "relationship_note", "promise"} and subject_npc_id is None:
+        raise InvalidStateChange(f"{fact_type} requires an NPC subject")
+    if subject_npc_id is None:
+        return None
+    npc = session.get(NPC, subject_npc_id)
+    if npc is None or npc.campaign_id != campaign_id:
+        raise InvalidStateChange("World fact NPC does not belong to the campaign")
+    return npc
+
+
+def _validate_fact_value(fact_type: str, value: str) -> str:
+    normalized = value.strip()
+    if not normalized or len(normalized) > 2000:
+        raise InvalidStateChange("World fact value must contain 1 to 2000 characters")
+    if fact_type == "npc_attitude" and normalized not in {
+        "friendly",
+        "neutral",
+        "wary",
+        "hostile",
+    }:
+        raise InvalidStateChange("Unsupported NPC attitude")
+    return normalized
+
+
+def record_world_fact(
+    session: Session,
+    campaign_id: uuid.UUID,
+    *,
+    fact_type: str,
+    value: str,
+    subject_npc_id: uuid.UUID | None = None,
+    visibility: str = "player",
+) -> WorldFact:
+    """Record trusted setup/GM state; player APIs expose only player-visible facts."""
+    campaign = _campaign_for_update(session, campaign_id)
+    if visibility not in {"player", "dm_only"}:
+        raise InvalidStateChange("Unsupported world fact visibility")
+    _validate_fact_subject(session, campaign_id, fact_type, subject_npc_id)
+    normalized = _validate_fact_value(fact_type, value)
+    if fact_type == "npc_attitude":
+        existing = session.scalar(
+            select(WorldFact.id).where(
+                WorldFact.campaign_id == campaign_id,
+                WorldFact.subject_npc_id == subject_npc_id,
+                WorldFact.fact_type == "npc_attitude",
+                WorldFact.status == "current",
+            )
+        )
+        if existing is not None:
+            raise ConflictError("NPC already has a current attitude fact")
+    fact_id = uuid.uuid4()
+    next_revision = campaign.world_revision + 1
+    event = _add_event(
+        session,
+        campaign_id,
+        "world_fact_recorded",
+        {
+            "fact_id": str(fact_id),
+            "fact_type": fact_type,
+            "subject_npc_id": str(subject_npc_id) if subject_npc_id else None,
+            "value": normalized,
+            "world_revision": next_revision,
+        },
+        visibility=visibility,
+    )
+    fact = WorldFact(
+        id=fact_id,
+        campaign_id=campaign_id,
+        subject_npc_id=subject_npc_id,
+        fact_type=fact_type,
+        value=normalized,
+        status="current",
+        visibility=visibility,
+        revision=0,
+        created_by_event_id=event.id,
+    )
+    session.add(fact)
+    campaign.world_revision = next_revision
+    session.commit()
+    session.refresh(fact)
+    return fact
 
 
 def _validate_turn_target(
@@ -1129,6 +1269,7 @@ def finalize_turn_execution(
         StateChangeValidator().validate(
             _character_snapshot(campaign, character), output.state_changes
         )
+        _validate_world_changes(session, campaign_id, output.state_changes)
     except InvalidStateChange as exc:
         _record_narration_failure(
             session,
@@ -2336,15 +2477,269 @@ def _provider_context(
         selected_target = next(
             (npc for npc in world.present_npcs if npc.id == target_npc_id), None
         )
+        relevant_npc_ids = {npc.id for npc in world.present_npcs}
+        relevant_facts = [
+            fact
+            for fact in world.facts
+            if fact.subject_npc_id is None or fact.subject_npc_id in relevant_npc_ids
+        ]
+        omitted_fact_count = max(0, len(relevant_facts) - MAX_PROVIDER_WORLD_FACTS)
+        if omitted_fact_count:
+            relevant_facts = relevant_facts[-MAX_PROVIDER_WORLD_FACTS:]
         context["world"] = {
             "world_revision": world.world_revision,
             "scene": world.scene.model_dump(mode="json"),
             "present_npcs": [npc.model_dump(mode="json") for npc in world.present_npcs],
+            "facts": [fact.model_dump(mode="json") for fact in relevant_facts],
+            "facts_truncated": omitted_fact_count,
             "selected_target": (
                 selected_target.model_dump(mode="json") if selected_target is not None else None
             ),
         }
     return context
+
+
+def _proposal_fact_parts(change: Any) -> tuple[str, uuid.UUID | None, str] | None:
+    if isinstance(change, NPCAttitudeSet):
+        return "npc_attitude", change.npc_id, change.attitude
+    if isinstance(change, RelationshipNoteAdd):
+        return "relationship_note", change.npc_id, change.note
+    if isinstance(change, PromiseRecord):
+        return "promise", change.npc_id, change.promise
+    if isinstance(change, DiscoveryRecord):
+        return "discovery", change.subject_npc_id, change.discovery
+    if isinstance(change, ClueRecord):
+        return "clue", change.subject_npc_id, change.clue
+    return None
+
+
+def _require_provider_fact_subject(
+    session: Session, campaign_id: uuid.UUID, fact_type: str, subject_npc_id: uuid.UUID | None
+) -> None:
+    npc = _validate_fact_subject(session, campaign_id, fact_type, subject_npc_id)
+    if npc is None:
+        return
+    if npc.status != "active" or npc.visibility != "player":
+        raise InvalidStateChange("World fact NPC is not an active player-visible subject")
+    presence = session.scalar(
+        select(SceneNPCPresence.id)
+        .join(Scene, Scene.id == SceneNPCPresence.scene_id)
+        .where(
+            Scene.campaign_id == campaign_id,
+            Scene.status == "active",
+            SceneNPCPresence.npc_id == npc.id,
+            SceneNPCPresence.status == "present",
+        )
+    )
+    if presence is None:
+        raise InvalidStateChange("World fact NPC is not present in the active scene")
+
+
+def _validate_world_changes(session: Session, campaign_id: uuid.UUID, changes: list) -> None:
+    touched_facts: set[uuid.UUID] = set()
+    attitude_subjects: set[uuid.UUID] = set()
+    for change in changes:
+        parts = _proposal_fact_parts(change)
+        if parts is not None:
+            fact_type, subject_npc_id, value = parts
+            _require_provider_fact_subject(session, campaign_id, fact_type, subject_npc_id)
+            _validate_fact_value(fact_type, value)
+            if fact_type == "npc_attitude":
+                assert subject_npc_id is not None
+                if subject_npc_id in attitude_subjects:
+                    raise InvalidStateChange("A turn can set an NPC attitude at most once")
+                attitude_subjects.add(subject_npc_id)
+                existing = session.scalar(
+                    select(WorldFact).where(
+                        WorldFact.campaign_id == campaign_id,
+                        WorldFact.subject_npc_id == subject_npc_id,
+                        WorldFact.fact_type == "npc_attitude",
+                        WorldFact.status == "current",
+                    )
+                )
+                if existing is not None:
+                    if existing.id in touched_facts:
+                        raise InvalidStateChange(
+                            "A world fact can be changed at most once per turn"
+                        )
+                    touched_facts.add(existing.id)
+                    if existing.visibility != "player":
+                        raise InvalidStateChange("A hidden NPC attitude cannot be replaced here")
+                    if existing.value == value:
+                        raise InvalidStateChange("NPC already has the proposed attitude")
+            continue
+        if isinstance(change, (WorldFactSupersede, WorldFactReveal)):
+            if change.fact_id in touched_facts:
+                raise InvalidStateChange("A world fact can be changed at most once per turn")
+            touched_facts.add(change.fact_id)
+            fact = session.get(WorldFact, change.fact_id)
+            if fact is None or fact.campaign_id != campaign_id:
+                raise InvalidStateChange("World fact does not belong to the campaign")
+            if fact.status != "current":
+                raise InvalidStateChange("Only a current world fact can be changed")
+            if fact.revision != change.expected_revision:
+                raise InvalidStateChange("World fact revision is stale")
+            if isinstance(change, WorldFactSupersede):
+                if fact.visibility != "player":
+                    raise InvalidStateChange("A hidden world fact cannot be superseded here")
+                _require_provider_fact_subject(
+                    session, campaign_id, fact.fact_type, fact.subject_npc_id
+                )
+                _validate_fact_value(fact.fact_type, change.value)
+                if fact.value == change.value.strip():
+                    raise InvalidStateChange("Superseding value must change the world fact")
+            elif fact.visibility != "dm_only":
+                raise InvalidStateChange("Only a hidden world fact can be revealed")
+
+
+def _record_fact_projection(
+    session: Session,
+    campaign: Campaign,
+    *,
+    fact_type: str,
+    subject_npc_id: uuid.UUID | None,
+    value: str,
+    turn_id: uuid.UUID | None,
+    actor_character_id: uuid.UUID | None,
+) -> WorldFact:
+    current_attitude = None
+    if fact_type == "npc_attitude":
+        current_attitude = session.scalar(
+            select(WorldFact).where(
+                WorldFact.campaign_id == campaign.id,
+                WorldFact.subject_npc_id == subject_npc_id,
+                WorldFact.fact_type == "npc_attitude",
+                WorldFact.status == "current",
+            )
+        )
+    fact_id = uuid.uuid4()
+    next_revision = campaign.world_revision + 1
+    if current_attitude is None:
+        event_type = "world_fact_recorded"
+        revision = 0
+        supersedes_fact_id = None
+    else:
+        event_type = "world_fact_superseded"
+        revision = current_attitude.revision + 1
+        supersedes_fact_id = current_attitude.id
+    event = _add_event(
+        session,
+        campaign.id,
+        event_type,
+        {
+            "fact_id": str(fact_id),
+            "supersedes_fact_id": str(supersedes_fact_id) if supersedes_fact_id else None,
+            "fact_type": fact_type,
+            "subject_npc_id": str(subject_npc_id) if subject_npc_id else None,
+            "value": value.strip(),
+            "world_revision": next_revision,
+        },
+        turn_id=turn_id,
+        actor_character_id=actor_character_id,
+    )
+    if current_attitude is not None:
+        current_attitude.status = "superseded"
+        current_attitude.superseded_by_event_id = event.id
+    fact = WorldFact(
+        id=fact_id,
+        campaign_id=campaign.id,
+        subject_npc_id=subject_npc_id,
+        fact_type=fact_type,
+        value=value.strip(),
+        status="current",
+        visibility="player",
+        revision=revision,
+        supersedes_fact_id=supersedes_fact_id,
+        created_by_event_id=event.id,
+    )
+    session.add(fact)
+    campaign.world_revision = next_revision
+    return fact
+
+
+def _apply_world_fact_change(
+    session: Session,
+    campaign: Campaign,
+    change: Any,
+    *,
+    turn_id: uuid.UUID | None,
+    actor_character_id: uuid.UUID | None,
+) -> bool:
+    parts = _proposal_fact_parts(change)
+    if parts is not None:
+        fact_type, subject_npc_id, value = parts
+        _record_fact_projection(
+            session,
+            campaign,
+            fact_type=fact_type,
+            subject_npc_id=subject_npc_id,
+            value=value,
+            turn_id=turn_id,
+            actor_character_id=actor_character_id,
+        )
+        return True
+    if isinstance(change, WorldFactSupersede):
+        fact = session.get(WorldFact, change.fact_id)
+        assert fact is not None
+        next_revision = campaign.world_revision + 1
+        new_fact_id = uuid.uuid4()
+        event = _add_event(
+            session,
+            campaign.id,
+            "world_fact_superseded",
+            {
+                "fact_id": str(new_fact_id),
+                "supersedes_fact_id": str(fact.id),
+                "fact_type": fact.fact_type,
+                "subject_npc_id": str(fact.subject_npc_id) if fact.subject_npc_id else None,
+                "value": change.value.strip(),
+                "world_revision": next_revision,
+            },
+            turn_id=turn_id,
+            actor_character_id=actor_character_id,
+        )
+        fact.status = "superseded"
+        fact.superseded_by_event_id = event.id
+        session.add(
+            WorldFact(
+                id=new_fact_id,
+                campaign_id=campaign.id,
+                subject_npc_id=fact.subject_npc_id,
+                fact_type=fact.fact_type,
+                value=change.value.strip(),
+                status="current",
+                visibility="player",
+                revision=fact.revision + 1,
+                supersedes_fact_id=fact.id,
+                created_by_event_id=event.id,
+            )
+        )
+        campaign.world_revision = next_revision
+        return True
+    if isinstance(change, WorldFactReveal):
+        fact = session.get(WorldFact, change.fact_id)
+        assert fact is not None
+        next_revision = campaign.world_revision + 1
+        event = _add_event(
+            session,
+            campaign.id,
+            "world_fact_revealed",
+            {
+                "fact_id": str(fact.id),
+                "fact_type": fact.fact_type,
+                "subject_npc_id": str(fact.subject_npc_id) if fact.subject_npc_id else None,
+                "value": fact.value,
+                "world_revision": next_revision,
+            },
+            turn_id=turn_id,
+            actor_character_id=actor_character_id,
+        )
+        fact.visibility = "player"
+        fact.revision += 1
+        fact.revealed_by_event_id = event.id
+        campaign.world_revision = next_revision
+        return True
+    return False
 
 
 def _apply_state_changes(
@@ -2455,6 +2850,14 @@ def _apply_state_changes(
             )
             new_scene.opened_by_event_id = opened_event.id
             campaign.world_revision = next_world_revision
+        else:
+            _apply_world_fact_change(
+                session,
+                campaign,
+                change,
+                turn_id=turn_id,
+                actor_character_id=actor_character_id,
+            )
     if character_changed and character is not None:
         character.state_revision += 1
 
@@ -2524,6 +2927,7 @@ def process_turn(
             equipped_names,
         )
     StateChangeValidator().validate(snapshot, output.state_changes)
+    _validate_world_changes(session, campaign_id, output.state_changes)
 
     turn_sequence = (
         session.scalar(select(func.max(Turn.sequence)).where(Turn.campaign_id == campaign_id)) or 0

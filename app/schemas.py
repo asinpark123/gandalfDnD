@@ -266,6 +266,28 @@ class MoveLocation(BaseModel):
     description: str | None = Field(default=None, max_length=2000)
 
 
+class NPCIntroduce(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    type: Literal["npc_introduce"]
+    name: NPCName
+    public_description: str | None = Field(default=None, max_length=2000)
+
+
+class NPCArrive(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    type: Literal["npc_arrive"]
+    npc_id: uuid.UUID
+
+
+class NPCDepart(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    type: Literal["npc_depart"]
+    npc_id: uuid.UUID
+
+
 class InventoryChange(BaseModel):
     type: Literal["inventory_change"]
     item_name: ShortText
@@ -472,6 +494,9 @@ class NarrativeTimeAdvance(BaseModel):
 StateChange = Annotated[
     HPDelta
     | MoveLocation
+    | NPCIntroduce
+    | NPCArrive
+    | NPCDepart
     | InventoryChange
     | NPCAttitudeSet
     | RelationshipNoteAdd

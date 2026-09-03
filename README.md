@@ -48,7 +48,8 @@ paid API integration remains deferred and paid model calls remain disabled. M3.1
 exact scene/NPC presence, explicit target IDs, world-revision safety, typed narrative facts,
 relationships, supersession, controlled reveal, durable quests/objectives, and explicit exact-once
 branch decisions, typed factions, bounded narrative time, and audience-safe world projections. M3.5
-deterministic/owner verification is Ready; its capped live OpenClaw run remains separately gated.
+deterministic branching, NPC lifecycle, restart, and causal-event replay now pass; the owner API
+review is Ready, while its capped live OpenClaw supplement remains separately gated.
 
 ## Versioned rulesets
 

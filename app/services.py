@@ -99,7 +99,10 @@ from app.schemas import (
     LoadoutUpdate,
     MoveLocation,
     NarrativeTimeAdvance,
+    NPCArrive,
     NPCAttitudeSet,
+    NPCDepart,
+    NPCIntroduce,
     PromiseRecord,
     QuestCreate,
     QuestObjectiveRead,
@@ -3071,6 +3074,36 @@ def _faction_for_change(session: Session, campaign_id: uuid.UUID, faction_id: uu
     return faction
 
 
+def _active_scene_for_change(session: Session, campaign_id: uuid.UUID) -> Scene:
+    scene = session.scalar(
+        select(Scene).where(Scene.campaign_id == campaign_id, Scene.status == "active")
+    )
+    if scene is None:
+        raise InvalidStateChange("Campaign has no active scene")
+    return scene
+
+
+def _npc_for_presence_change(session: Session, campaign_id: uuid.UUID, npc_id: uuid.UUID) -> NPC:
+    npc = session.get(NPC, npc_id)
+    if npc is None or npc.campaign_id != campaign_id:
+        raise InvalidStateChange("NPC does not belong to the campaign")
+    if npc.status != "active" or npc.visibility != "player":
+        raise InvalidStateChange("NPC must be active and player-visible")
+    return npc
+
+
+def _current_npc_presence(
+    session: Session, campaign_id: uuid.UUID, npc_id: uuid.UUID
+) -> SceneNPCPresence | None:
+    return session.scalar(
+        select(SceneNPCPresence).where(
+            SceneNPCPresence.campaign_id == campaign_id,
+            SceneNPCPresence.npc_id == npc_id,
+            SceneNPCPresence.status == "present",
+        )
+    )
+
+
 def _faction_relationship_for_change(
     session: Session,
     campaign_id: uuid.UUID,
@@ -3131,7 +3164,15 @@ def _validate_world_changes(
     touched_faction_relationships: set[
         tuple[uuid.UUID, str, uuid.UUID | None, uuid.UUID | None]
     ] = set()
+    touched_npc_presences: set[uuid.UUID] = set()
     time_advance_count = 0
+    has_location_move = any(isinstance(change, MoveLocation) for change in changes)
+    if has_location_move and any(
+        isinstance(change, (NPCIntroduce, NPCArrive, NPCDepart)) for change in changes
+    ):
+        raise InvalidStateChange(
+            "NPC presence changes and location movement must use separate turns"
+        )
     for change in changes:
         parts = _proposal_fact_parts(change)
         if parts is not None:
@@ -3230,6 +3271,20 @@ def _validate_world_changes(
             )
             if existing is not None:
                 raise InvalidStateChange("Decision key already exists in campaign")
+        elif isinstance(change, NPCIntroduce):
+            _active_scene_for_change(session, campaign_id)
+        elif isinstance(change, (NPCArrive, NPCDepart)):
+            if change.npc_id in touched_npc_presences:
+                raise InvalidStateChange("An NPC's presence can be changed at most once per turn")
+            touched_npc_presences.add(change.npc_id)
+            _npc_for_presence_change(session, campaign_id, change.npc_id)
+            active_scene = _active_scene_for_change(session, campaign_id)
+            presence = _current_npc_presence(session, campaign_id, change.npc_id)
+            if isinstance(change, NPCArrive):
+                if presence is not None:
+                    raise InvalidStateChange("NPC is already present in a scene")
+            elif presence is None or presence.scene_id != active_scene.id:
+                raise InvalidStateChange("NPC is not present in the active scene")
         elif isinstance(change, FactionCreate):
             if change.faction_key in new_faction_keys:
                 raise InvalidStateChange("A turn cannot create duplicate faction keys")
@@ -3758,6 +3813,91 @@ def _apply_faction_time_change(
     return False
 
 
+def _apply_npc_presence_change(
+    session: Session,
+    campaign: Campaign,
+    change: Any,
+    *,
+    turn_id: uuid.UUID | None,
+    actor_character_id: uuid.UUID | None,
+) -> bool:
+    if not isinstance(change, (NPCIntroduce, NPCArrive, NPCDepart)):
+        return False
+    scene = _active_scene_for_change(session, campaign.id)
+    next_world_revision = campaign.world_revision + 1
+    if isinstance(change, NPCIntroduce):
+        npc = NPC(
+            campaign_id=campaign.id,
+            name=change.name,
+            public_description=change.public_description,
+            status="active",
+            visibility="player",
+            revision=0,
+        )
+        session.add(npc)
+        session.flush()
+        introduced = _add_event(
+            session,
+            campaign.id,
+            "npc_introduced",
+            {
+                "npc_id": str(npc.id),
+                "name": npc.name,
+                "public_description": npc.public_description,
+                "world_revision": next_world_revision,
+            },
+            turn_id=turn_id,
+            actor_character_id=actor_character_id,
+        )
+        npc.introduced_by_event_id = introduced.id
+        npc_id = npc.id
+    else:
+        npc_id = change.npc_id
+    if isinstance(change, NPCDepart):
+        presence = _current_npc_presence(session, campaign.id, npc_id)
+        assert presence is not None
+        departed = _add_event(
+            session,
+            campaign.id,
+            "npc_departed",
+            {
+                "npc_id": str(npc_id),
+                "scene_id": str(scene.id),
+                "world_revision": next_world_revision,
+            },
+            turn_id=turn_id,
+            actor_character_id=actor_character_id,
+        )
+        presence.status = "departed"
+        presence.revision += 1
+        presence.departed_by_event_id = departed.id
+    else:
+        arrived = _add_event(
+            session,
+            campaign.id,
+            "npc_arrived",
+            {
+                "npc_id": str(npc_id),
+                "scene_id": str(scene.id),
+                "world_revision": next_world_revision,
+            },
+            turn_id=turn_id,
+            actor_character_id=actor_character_id,
+        )
+        session.add(
+            SceneNPCPresence(
+                campaign_id=campaign.id,
+                scene_id=scene.id,
+                npc_id=npc_id,
+                status="present",
+                revision=0,
+                arrived_by_event_id=arrived.id,
+            )
+        )
+    campaign.world_revision = next_world_revision
+    return True
+
+
 def _apply_decision_consequence(
     session: Session,
     campaign: Campaign,
@@ -3887,6 +4027,30 @@ def _apply_state_changes(
             if active_scene is None:
                 raise ConflictError("Campaign has no active scene")
             next_world_revision = campaign.world_revision + 1
+            active_presences = list(
+                session.scalars(
+                    select(SceneNPCPresence).where(
+                        SceneNPCPresence.scene_id == active_scene.id,
+                        SceneNPCPresence.status == "present",
+                    )
+                )
+            )
+            for presence in active_presences:
+                departed = _add_event(
+                    session,
+                    campaign_id,
+                    "npc_departed",
+                    {
+                        "npc_id": str(presence.npc_id),
+                        "scene_id": str(active_scene.id),
+                        "world_revision": next_world_revision,
+                    },
+                    turn_id=turn_id,
+                    actor_character_id=actor_character_id,
+                )
+                presence.status = "departed"
+                presence.revision += 1
+                presence.departed_by_event_id = departed.id
             closed_event = _add_event(
                 session,
                 campaign_id,
@@ -3959,13 +4123,21 @@ def _apply_state_changes(
             new_scene.opened_by_event_id = opened_event.id
             campaign.world_revision = next_world_revision
         else:
-            handled = _apply_world_fact_change(
+            handled = _apply_npc_presence_change(
                 session,
                 campaign,
                 change,
                 turn_id=turn_id,
                 actor_character_id=actor_character_id,
             )
+            if not handled:
+                handled = _apply_world_fact_change(
+                    session,
+                    campaign,
+                    change,
+                    turn_id=turn_id,
+                    actor_character_id=actor_character_id,
+                )
             if not handled:
                 handled = _apply_quest_decision_change(
                     session,

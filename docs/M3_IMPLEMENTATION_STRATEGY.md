@@ -1,6 +1,6 @@
 # M3 Persistent World Implementation Strategy
 
-- **Status:** In progress — M3.1–M3.4 Done; M3.5 Ready
+- **Status:** Verification — M3.1–M3.4 Done; M3.5 automated gate passed, owner gate Ready
 - **Prepared:** 2026-09-03
 - **Depends on:** M2 two-stage AI turn and model-authored feasibility (Done)
 - **Owner input required now:** At the M3.5 API acceptance gate, after its deterministic scenario
@@ -434,6 +434,8 @@ Implemented evidence:
 
 ### M3.5 — Branching Lantern verification and owner gate
 
+**Status:** Verification — automated gate passed (2026-09-03); owner API review Ready
+
 Run a deterministic two-character world scenario that covers:
 
 1. interaction with a present NPC;
@@ -457,6 +459,29 @@ safety. Request separate permission before a capped OpenClaw version of the scen
 M3 reaches Done when the deterministic scenario and owner API gate pass. A live OpenClaw run is
 optional additional evidence unless separately authorized; any model failure is classified and
 corrected and never weakens the canonical state or visibility boundary.
+
+Automated evidence:
+
+- the completed two-character Lantern fixture creates two isolated campaigns from the same setup,
+  accepts the same quest, then explicitly selects `signal_bridge` in one and `flooded_tunnel` in the
+  other; both reach revision 20 and 90 elapsed minutes while producing different objective states
+  and typed discoveries;
+- present-NPC interaction, absent-target pre-provider rejection, movement, NPC introduction,
+  automatic scene departure, explicit departure/arrival, promises, attitudes, quest acceptance,
+  hidden-clue exclusion/reveal, faction relationships, and bounded time all cross real two-stage
+  turn/finalization boundaries;
+- movement now marks every old-scene presence departed with a causal event, and strict typed
+  `npc_introduce`, `npc_arrive`, and `npc_depart` proposals validate campaign, lifecycle,
+  visibility, current presence, duplicate mutation, and move-overlap rules before writes;
+- engine disposal preserves byte-equivalent player world projections; an independent event fold
+  reconstructs the exact scene, present cast, current facts, quests/objectives, decisions, faction
+  relationships, clock, and every world revision from 0 through 20;
+- every scene, presence, fact, quest, decision, faction, and faction relationship retains its
+  required causal event link, and rejected mixed presence/movement proposals write no world state;
+- two focused M3.5 tests and all 125 normal tests pass with one opt-in live test skipped, plus
+  formatting, lint, compilation, ruleset/schema integrity, and zero Alembic drift on both databases;
+- `player/M3_5_ACCEPTANCE_CHECKLIST.md` and the guarded development fixture runner are ready for the
+  owner coherence/restart review. No Clawvis change or external model call was made.
 
 ## 8. Verification matrix
 
@@ -514,5 +539,6 @@ domain validation failure before provider work creates no provider audit.
 Each slice is committed only when it crosses migration, ORM, schema, API, service, events, tests,
 and documentation. A later slice that invalidates an earlier visibility, identity, causality, or
 restart guarantee moves that slice back to Rework. M3 planning is complete with this document.
-M3.1–M3.4 are verified and complete; implementation proceeds to M3.5's deterministic branching
-Lantern scenario, owner API acceptance gate, and separately authorized capped live OpenClaw run.
+M3.1–M3.4 are verified and complete. M3.5's deterministic branching Lantern scenario, lifecycle,
+restart, and event replay pass; implementation pauses at the owner API acceptance gate before M3
+closure and any separately authorized capped live OpenClaw supplement.

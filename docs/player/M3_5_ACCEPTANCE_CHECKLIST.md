@@ -1,11 +1,15 @@
 # M3.5 Persistent World Targeted Owner Retest
 
-- **Milestone state:** Verification — corrected candidate ready for targeted owner retest
+- **Milestone state:** Done — targeted owner retest passed 2026-09-04
 - **Automated gate:** Corrected two-branch scenario and full regression gate pass locally
 - **External model use:** None; this uses only the deterministic in-process provider
 - **Purpose:** Confirm through staged interaction that the same NPC keeps her promise, the owner
   makes both types of decisions, the branches diverge coherently, and an unavailable action gives
   frontend-ready recovery information.
+
+The completed evidence is preserved in
+[`../testM3_5_TARGETED_RETEST_RESULTS.md`](../testM3_5_TARGETED_RETEST_RESULTS.md). All six actions
+and all four subjective questions passed; this checklist is retained as the reproducible procedure.
 
 The original owner run is preserved unchanged in
 [`../testM3_5_ACCEPTANCE_CHECKLIST_RESULTS.md`](../testM3_5_ACCEPTANCE_CHECKLIST_RESULTS.md). It
@@ -74,9 +78,8 @@ Record concise answers after the six actions:
 4. Is the absent-target error structured well enough for a future frontend to explain the problem
    and offer a corrective action? Visual clarity itself remains an M7 frontend question.
 
-## Results to record
+## Recorded result
 
-Copy this checklist to `docs/testM3_5_TARGETED_RETEST_RESULTS.md`, append the observed evidence and
-four answers, and notify Codex. M3 remains in Verification until the result is analyzed. The
-optional capped live OpenClaw run is a separate supplemental gate and still requires explicit
-authorization.
+The complete result and four positive subjective answers are stored in
+`docs/testM3_5_TARGETED_RETEST_RESULTS.md`. M3 is Done. The optional capped live OpenClaw run is a
+separate supplemental evaluation and still requires explicit authorization.

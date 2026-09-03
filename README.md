@@ -46,12 +46,11 @@ Done. M2 is also Done: the resumable two-stage workflow, deterministic Lantern s
 OpenClaw activation, and three passing ten-scenario live model-authored runs are verified. Direct
 paid API integration remains deferred and paid model calls remain disabled. M3.1–M3.4 are Done with
 exact scene/NPC presence, explicit target IDs, world-revision safety, typed narrative facts,
-relationships, supersession, controlled reveal, durable quests/objectives, and explicit exact-once
-branch decisions, typed factions, bounded narrative time, and audience-safe world projections. M3.5
-deterministic branching, NPC lifecycle, restart, and causal-event replay now pass. The initial owner
-review confirmed backend integrity but exposed a same-name NPC fixture defect and passive review
-flow; both are corrected and the targeted guided retest is Ready. Its capped live OpenClaw
-supplement remains separately gated.
+relationships, supersession, controlled reveal, durable quests/objectives, explicit exact-once
+branch decisions, typed factions, bounded narrative time, and audience-safe world projections. M3
+is Done after its corrected deterministic and owner-guided branching, NPC continuity, restart,
+causal replay, and recoverable-error gates passed. A capped live OpenClaw M3 scenario remains an
+optional, separately authorized supplement rather than a closure requirement.
 
 ## Versioned rulesets
 

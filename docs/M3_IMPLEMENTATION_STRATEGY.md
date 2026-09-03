@@ -1,10 +1,11 @@
 # M3 Persistent World Implementation Strategy
 
-- **Status:** Verification — M3.1–M3.4 Done; M3.5 automated gate passed, owner gate Ready
+- **Status:** Done (2026-09-04)
 - **Prepared:** 2026-09-03
 - **Depends on:** M2 two-stage AI turn and model-authored feasibility (Done)
-- **Owner input required now:** At the M3.5 API acceptance gate, after its deterministic scenario
-- **Owner checkpoint:** M3.5, after a complete branching world loop is stable through the API
+- **Owner input required now:** None for M3 closure; separate authorization is required only for the
+  optional capped live OpenClaw supplement
+- **Owner checkpoint:** M3.5 passed on 2026-09-04
 
 ## 1. Objective
 
@@ -347,7 +348,7 @@ Implemented evidence:
 - provider context retains the newest 50 relevant facts and reports the omitted count, keeping the
   101-fact synthetic fixture below its serialized budget;
 - seven focused M3.2 tests and all 109 normal tests pass with lint, compilation, and zero Alembic
-  drift; the live OpenClaw scenario remains intentionally scheduled for M3.5.
+  drift; the live OpenClaw scenario remains an optional post-closure supplement.
 
 ### M3.3 — Quests, objectives, and branching decisions
 
@@ -434,7 +435,7 @@ Implemented evidence:
 
 ### M3.5 — Branching Lantern verification and owner gate
 
-**Status:** Verification — corrected guided targeted owner retest Ready (2026-09-03)
+**Status:** Done (2026-09-04)
 
 Run a deterministic two-character world scenario that covers:
 
@@ -456,9 +457,9 @@ focuses on whether decisions, NPC continuity, and quest consequences feel cohere
 remain responsible for exact IDs, visibility, revisions, state transitions, rollback, and migration
 safety. Request separate permission before a capped OpenClaw version of the scenario.
 
-M3 reaches Done when the deterministic scenario and owner API gate pass. A live OpenClaw run is
-optional additional evidence unless separately authorized; any model failure is classified and
-corrected and never weakens the canonical state or visibility boundary.
+M3 reached Done after the deterministic scenario and owner API gate passed. A live OpenClaw run is
+optional additional evidence and requires separate authorization; any model failure is classified
+and corrected and never weakens the canonical state or visibility boundary.
 
 Automated evidence:
 
@@ -480,7 +481,7 @@ Automated evidence:
   required causal event link, and rejected mixed presence/movement proposals write no world state;
 - two focused M3.5 tests and all 125 normal tests pass with one opt-in live test skipped, plus
   formatting, lint, compilation, ruleset/schema integrity, and zero Alembic drift on both databases;
-- `player/M3_5_ACCEPTANCE_CHECKLIST.md` and the guarded development fixture runner are ready for the
+- `player/M3_5_ACCEPTANCE_CHECKLIST.md` and the guarded development fixture runner supported the
   owner coherence/restart review. No Clawvis change or external model call was made.
 
 The initial owner review confirmed the exact backend state, restart, causality, visibility, and
@@ -491,7 +492,16 @@ the guide by stable role, asserts her ID across facts/travel/return, and pauses 
 quest acceptance and both routes while seeing staged world summaries. It also exposes a documented
 HTTP 409 body with `world_target_not_present` and safe recovery guidance. The focused scenario, all
 125 normal tests, static/integrity checks, both database drift checks, and a scripted end-to-end run
-pass; the narrowed owner retest remains the only required M3 gate.
+passed; at that checkpoint the narrowed owner retest remained the only required M3 gate.
+
+Owner closure evidence (2026-09-04): both guided campaigns retained the promise-bearing watchful
+innkeeper's exact UUID through travel and fresh API reads. The owner personally accepted both quests
+and selected `flooded_tunnel` then `signal_bridge`; the first branch failed the objective and stored
+only the collapse discovery, while the second completed it and stored only the rescue discovery.
+Both final worlds remained at Old Tower, revision 20, after 90 minutes. The real absent-target call
+returned documented HTTP 409 with `world_target_not_present` and recovery guidance, and all four
+subjective questions passed. The raw result is preserved as
+`testM3_5_TARGETED_RETEST_RESULTS.md`; no further M3 retest is required.
 
 ## 8. Verification matrix
 
@@ -553,7 +563,7 @@ existing safe 404 shape pending broader API error normalization in M7.
 Each slice is committed only when it crosses migration, ORM, schema, API, service, events, tests,
 and documentation. A later slice that invalidates an earlier visibility, identity, causality, or
 restart guarantee moves that slice back to Rework. M3 planning is complete with this document.
-M3.1–M3.4 are verified and complete. M3.5's corrected deterministic branching Lantern scenario,
-lifecycle, restart, event replay, guided choice flow, and recoverable absent-target contract pass;
-implementation pauses at the narrowed targeted owner retest before M3 closure and any separately
-authorized capped live OpenClaw supplement.
+M3.1–M3.4 and M3.5 are verified and complete. The corrected deterministic branching Lantern
+scenario, lifecycle, restart, event replay, guided choice flow, recoverable absent-target contract,
+and owner checkpoint pass. M3 is Done; a capped live OpenClaw run remains optional supplemental
+evidence and requires separate authorization.

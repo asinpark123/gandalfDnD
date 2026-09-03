@@ -1,11 +1,12 @@
 # M4 Long-Term Memory and Retrieval Implementation Strategy
 
-- **Status:** Ready; infrastructure authorization gate is next
+- **Status:** Ready; PG18.0 read-only sequencing assessment is next
 - **Prepared:** 2026-09-04
 - **Depends on:** M3 persistent world (Done, including live OpenClaw supplement)
 - **Infrastructure audit:** [`M4_POSTGRES_PGVECTOR_AUDIT.md`](M4_POSTGRES_PGVECTOR_AUDIT.md)
-- **Owner input required now:** Approve or reject the narrow pgvector provisioning gate after
-  reviewing its no-unrelated-upgrade condition
+- **Database longevity strategy:** [`POSTGRESQL_18_MIGRATION_STRATEGY.md`](POSTGRESQL_18_MIGRATION_STRATEGY.md)
+- **Owner input required now:** None for PG18.0 read-only assessment; approve the exact selected
+  PostgreSQL/pgvector mutation only after its simulation and rollback plan are reported
 - **Owner checkpoint:** M4.5 retrieval/re-index acceptance, followed by any separately authorized
   live narrative-coherence supplement
 
@@ -374,8 +375,10 @@ or cross-campaign output is fail-closed and blocks the memory path until repaire
 
 Owner input is required at three bounded points:
 
-1. **Now:** authorize or reject the pgvector provisioning plan. Any simulated unrelated package
-   upgrade returns for a new decision.
+1. **Now:** complete the read-only PostgreSQL 18 assessment and decide whether Gandalf migrates
+   before M4.1 or temporarily provisions pgvector on supported PostgreSQL 15. The exact selected
+   package/database mutation then returns for explicit authorization; any unrelated package change
+   stops the work.
 2. **M4.2 model selection:** review measured local model size, one-time download, CPU latency,
    retrieval quality, and license if candidates differ materially. Codex may choose autonomously if
    one candidate clearly meets every recorded bound with no new service or cost.
@@ -393,6 +396,6 @@ quality/latency results, defects, workarounds, and next actions. M4 moves to Rew
 shows hidden/cross-campaign retrieval, uncited memory, mixed profiles, canonical-state substitution,
 unbounded context, or a completed turn depending on index availability.
 
-M4 planning is complete. Implementation must stop at the pgvector operator gate until the owner
-explicitly authorizes the shared-VM package and per-database extension changes described in the
-readiness audit.
+M4 planning is complete. Implementation must stop at the PG18.0 sequencing decision and subsequent
+pgvector operator gate until the owner explicitly authorizes the exact shared-VM package,
+cluster/database, and per-database extension changes described in the readiness documents.

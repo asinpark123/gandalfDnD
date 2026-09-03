@@ -6,7 +6,8 @@
   integrity and schema verification)
 - **Current delivery stage:** M4 Ready — the long-term-memory architecture, 500-event retrieval
   gate, local-embedding policy, and read-only PostgreSQL/pgvector audit are documented. M3 remains
-  Done. M4.1 awaits explicit authorization for narrowly scoped shared-VM pgvector provisioning
+  Done. PostgreSQL 18 is the accepted long-term target; PG18.0 read-only readiness is next and will
+  decide whether the parallel Gandalf-only migration precedes M4.1. No VM mutation is authorized
 - **Canonical repository:** `~/Git/gandalfDnD`
 
 ## 1. Purpose of this document
@@ -104,6 +105,7 @@ Current documentation index:
 | M3 supplemental live OpenClaw branching evaluation | [`M3_OPENCLAW_EVALUATION.md`](M3_OPENCLAW_EVALUATION.md) |
 | M4 long-term-memory architecture, slices, and acceptance strategy | [`M4_IMPLEMENTATION_STRATEGY.md`](M4_IMPLEMENTATION_STRATEGY.md) |
 | M4 PostgreSQL/pgvector read-only readiness and provisioning gate | [`M4_POSTGRES_PGVECTOR_AUDIT.md`](M4_POSTGRES_PGVECTOR_AUDIT.md) |
+| PostgreSQL 18 Gandalf-only parallel migration and rollback strategy | [`POSTGRESQL_18_MIGRATION_STRATEGY.md`](POSTGRESQL_18_MIGRATION_STRATEGY.md) |
 
 ## 2. Product objective
 
@@ -209,6 +211,7 @@ presented separately from the immutable SRD baseline.
 | Clawvis VM | Existing services plus the restricted private OpenClaw provider route | No Gandalf application/database deployment; loopback-only gateway integration |
 | Gandalf application VM | Future persistent runtime | Deferred |
 | pgvector | M4 semantic-memory index | Not installed; read-only M4 audit complete and owner provisioning approval required |
+| PostgreSQL 18 | Long-term Gandalf database target | Direction approved; read-only readiness assessment pending; no installation or migration authorized |
 
 Database roles are separate, non-superuser, non-`CREATEDB`, non-`CREATEROLE`, non-replication
 accounts. Public database connectivity is revoked, and cross-database isolation has been tested.
@@ -328,6 +331,7 @@ Use these values consistently:
 | M2 | Two-stage AI turn and model-authored feasibility | Done | Real DM-authored output uses recorded dice results safely through a private provider boundary |
 | M3 | Persistent world model | Done | NPCs, quests, scenes, clues, time, decisions, and visibility |
 | M4 | Long-term memory and retrieval | Ready | Coherent recall without full history in context |
+| PG18 | PostgreSQL 18 migration | Proposed | Longer-supported parallel database foundation with tested cutover and rollback |
 | M5 | Basic deterministic combat | Proposed | Reproducible initiative, actions, attacks, and damage |
 | M6 | Spoiler-safe Guide | Proposed | Beginner help with enforceable knowledge boundaries |
 | M7 | Play interface and campaign administration | Proposed | Usable play, recap, correction, and export workflows |
@@ -1073,6 +1077,7 @@ while DM-only facts remain absent from player-visible APIs.
 - **Depends on:** M3
 - **Detailed strategy:** [`M4_IMPLEMENTATION_STRATEGY.md`](M4_IMPLEMENTATION_STRATEGY.md)
 - **Infrastructure audit:** [`M4_POSTGRES_PGVECTOR_AUDIT.md`](M4_POSTGRES_PGVECTOR_AUDIT.md)
+- **Database longevity strategy:** [`POSTGRESQL_18_MIGRATION_STRATEGY.md`](POSTGRESQL_18_MIGRATION_STRATEGY.md)
 
 Add player-visible, source-cited narrative memory for completed turns/events, a local embedding
 provider, versioned profiles, durable idempotent indexing, exact-vector plus lexical hybrid search,
@@ -1104,6 +1109,14 @@ fresh exact simulation adds pgvector without unrelated upgrades/replacements. Th
 `v0.8.6` tag resolved to commit `8ee86c96f0fd72390f890aa8a336fda6d3ab4c6c`; package/version state
 will be rechecked at execution. No host, service, database, package, repository, role, or
 configuration changed during the audit.
+
+PostgreSQL longevity decision (2026-09-04): PostgreSQL 18 is the accepted target, but the migration
+is an independently gated infrastructure track rather than part of an incidental pgvector install.
+PG18.0 will first inventory and simulate read-only. If a parallel Gandalf-only PostgreSQL 18 cluster
+is readily achievable without disturbing PostgreSQL 15 or unrelated services, migration and tested
+cutover should precede M4.1 so pgvector is installed only for the target major version. If shared
+host coordination makes that unsafe or materially longer, M4 may proceed temporarily on supported
+PostgreSQL 15 and migrate later. Neither sequence permits an unreviewed in-place major upgrade.
 
 Exit gate: in a synthetic campaign of at least 500 events, a relevant early clue is retrieved late
 without placing full history in the prompt, while irrelevant/hidden/cross-campaign records remain
@@ -1184,6 +1197,7 @@ agent direct database or unvalidated state-mutation access.
 | WARN-001 | Dependency | Monitoring | Current TestClient emits an `httpx` deprecation warning | No functional failure today | Reassess FastAPI/Starlette test client during dependency maintenance |
 | OPS-001 | Source control | Resolved | Initial push was blocked because HTTPS lacked credentials and Git did not automatically select the nonstandard SSH key filename | GitHub was temporarily behind local `main` | Registered the existing Ed25519 key, verified GitHub's host fingerprint, configured this repository's SSH command, and synchronized `main`; 2026-08-30 |
 | OPS-002 | Infrastructure | Approval required | Read-only M4 audit confirms pgvector is absent and unavailable from configured Debian repositories; installing server headers would upgrade 14 system/server packages and add 26 | M4 tables cannot use vectors yet, and an incidental source-build setup could disturb shared VM services | Prefer a pinned prebuilt PostgreSQL-15 pgvector package only if a fresh exact simulation shows no unrelated upgrades; then enable it only in both Gandalf databases; `M4_POSTGRES_PGVECTOR_AUDIT.md` |
+| OPS-003 | Infrastructure | Proposed/read-only next | PostgreSQL 15.14 remains supported but has a shorter lifetime than PostgreSQL 18; the shared host may contain unrelated consumers | Gandalf needs a longer-supported database without turning a major upgrade into an uncontrolled shared-service migration | Complete PG18.0 inventory/simulation, choose migrate-before-M4 or supported-PG15 interim sequencing, then require explicit approval for every mutation; `POSTGRESQL_18_MIGRATION_STRATEGY.md` |
 | DOC-001 | Documentation | Open | RES-001's verbatim export contains temporary Deep Research citation tokens | Tokens are not durable implementation citations | Preserve the source unchanged; use official URLs and SRD pages in specifications and rule definitions; M1.1 onward |
 | GAP-003 | Rules | Resolved | Authoritative ability checks and saving throws now derive from actor-bound canonical state and preserve exact dice, rules/catalog provenance, typed outcomes, and replay evidence | Character choices now produce reproducible check/save outcomes through the dedicated resolution API | Migration `0005`, 45-test suite, fixed-dice/restart replay, modifier rejection, schema/catalog integrity, development runtime checks, and all nine owner acceptance actions passed |
 | GAP-004 | Product | Open | Solo balance has a research framework but no measured product results | Encounter/class support cannot yet claim solo balance | Establish strict-SRD baselines in M5; build balance harness after supported combat |
@@ -1238,6 +1252,7 @@ because a workaround exists; record both the workaround and the permanent resolu
 | RISK-028 | Embedding model, dimensions, license, or preprocessing drift silently changes retrieval | High | High | Immutable profiles with artifact checksum/license and adapter/query-format versions; side-by-side re-index plus golden gate before atomic activation |
 | RISK-029 | Failed or lagging indexing makes provider memory incomplete | Medium | Medium | Durable idempotent leased jobs, indexed-through checkpoint, safe retry, freshness metadata, and fail-soft use of exact relational state |
 | RISK-030 | Retrieved prose leaks hidden/cross-campaign data or acts as prompt instructions | Medium | High | Campaign/audience/status/profile SQL filters before ranking, player-only initial index, adversarial injection fixtures, untrusted-data prompt labels, cited bounded context |
+| RISK-031 | A PostgreSQL major upgrade disrupts Gandalf, unrelated databases, or shared services, or creates unrollbackable write divergence | Medium | High | Read-only inventory first; parallel PostgreSQL 18 cluster; Gandalf-only logical restore; no unrelated content migration; complete acceptance before cutover; bounded write pause; preserved PostgreSQL 15 rollback source; separate retirement approval |
 
 ## 13. Architectural decision log
 
@@ -1277,6 +1292,7 @@ because a workaround exists; record both the workaround and the permanent resolu
 | ADR-032 | 2026-09-04 | Use exact pgvector cosine search plus PostgreSQL lexical search and versioned rank fusion for M4; defer approximate indexes | The 500-event target is small enough for exact scans, while hybrid ranking handles paraphrases and exact names without premature HNSW operations | When measured corpus size or p95 exceeds the recorded gate and an approximate-index plan passes recall/rebuild tests |
 | ADR-033 | 2026-09-04 | Persist idempotent leased memory-index jobs but use bounded in-process/CLI draining rather than Redis, Celery, or an in-memory-only queue | Index work must survive restart and remain outside canonical turn transactions without adding unneeded distributed infrastructure | When deployment throughput and measured backlog cannot meet freshness targets on one application worker |
 | ADR-034 | 2026-09-04 | Treat summaries as mechanically inert, player-visible derived documents that retain immutable source citations and prompt/model versions | Summaries reduce context but can omit or invent details; cited canonical sources must remain reconstructable | When M6 or a future planner defines a separately tested audience and summary policy |
+| ADR-035 | 2026-09-04 | Target PostgreSQL 18 through a parallel Gandalf-only migration rather than an in-place shared-cluster upgrade | PostgreSQL 18 extends the support horizon to 2030, while parallel restore/testing preserves PostgreSQL 15 as rollback and avoids coupling Gandalf to unrelated service migrations | Revisit the exact M4 sequence after PG18.0 evidence; never broaden shared-host scope without affected-owner approval |
 
 ## 14. Milestone review template
 
@@ -1365,13 +1381,14 @@ Destination milestone:
 
 ## 17. Immediate next actions
 
-1. Obtain explicit owner authorization for the exact pgvector provisioning boundary in
-   `M4_POSTGRES_PGVECTOR_AUDIT.md`; authorization is conditional on a fresh simulation showing no
-   PostgreSQL, libc, or unrelated package changes.
-2. If authorized and the simulation is clean, back up only the Gandalf databases, install the pinned
-   prebuilt extension, enable it only in development/test, and verify cluster/application health.
-3. Implement M4.1's guarded memory foundation without provider-context integration, then run
-   extension, migration, role-isolation, rollback, regression, and dual-database drift gates.
+1. Complete the PG18.0 read-only readiness assessment in
+   `POSTGRESQL_18_MIGRATION_STRATEGY.md`: inventory shared-host boundaries without reading unrelated
+   database content, inspect PostgreSQL 18/package coexistence, and simulate the exact transaction.
+2. From that evidence, choose and document whether the parallel Gandalf-only PostgreSQL 18
+   migration precedes M4.1 or M4 proceeds temporarily on supported PostgreSQL 15.
+3. Request explicit approval for the chosen exact package/database mutation and rollback boundary.
+4. After the approved infrastructure gate passes, implement M4.1's guarded memory foundation and
+   run extension, migration, role-isolation, rollback, regression, and dual-database drift gates.
 
 ## 18. Documentation change log
 
@@ -1412,3 +1429,4 @@ Destination milestone:
 | 2026-09-04 | DOC-033 | Preserved and analyzed the successful targeted owner evidence, resolved ISSUE-010, passed the M3 exit gate, and closed M3 | Both owner-selected branches retained the same promise-bearing guide through restart, produced the exact opposing objective/discovery outcomes, returned the documented recoverable 409, and received four positive subjective answers; no further M3 retest is required | Ask for separate authorization for the optional capped live OpenClaw supplement, then prepare the M4 strategy |
 | 2026-09-04 | DOC-034 | Completed the authorized capped live M3 OpenClaw supplement, resolved ISSUE-011, and preserved its credential-free evaluation record | 25/50 real attempts included one harmless harness diagnostic plus two 12-call runs; the first exposed duplicate decision facts, while prompt `1.2.0`, deterministic overlap validation, regression coverage, and the corrected 12/12-call branching/restart run passed | Prepare M4's strategy and infrastructure audit before installing pgvector |
 | 2026-09-04 | DOC-035 | Prepared M4, completed the read-only PostgreSQL/pgvector audit, defined five implementation slices and the 500-event quality/security/re-index gate, and advanced M4 to Ready | PostgreSQL 15.14 is compatible but vector is absent; the direct header/source path would upgrade 14 and add 26 packages. The plan therefore requires a pinned prebuilt package simulation with no unrelated changes, player-only source-cited memory, local versioned embeddings, exact hybrid retrieval, durable jobs, and atomic profile activation | Obtain owner authorization for the conditional pgvector provisioning gate, then implement M4.1 only if the exact simulation remains safe |
+| 2026-09-04 | DOC-036 | Adopted PostgreSQL 18 as the long-term Gandalf target and added a separately gated parallel-cluster migration strategy | PostgreSQL 15 support ends in 2027 while PostgreSQL 18 extends the horizon to 2030; a Gandalf-only logical migration can be tested without an in-place shared-cluster replacement | Complete PG18.0 read-only inventory/simulation, select its sequence relative to M4.1, and request explicit mutation approval |

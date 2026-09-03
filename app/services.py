@@ -140,6 +140,13 @@ class ConflictError(ValueError):
     pass
 
 
+class WorldTargetConflict(ConflictError):
+    def __init__(self, detail: str, *, code: str, recovery: str) -> None:
+        super().__init__(detail)
+        self.code = code
+        self.recovery = recovery
+
+
 MAX_PROVIDER_WORLD_FACTS = 50
 MAX_PROVIDER_QUESTS = 20
 MAX_PROVIDER_DECISIONS = 20
@@ -703,9 +710,17 @@ def _validate_turn_target(
     if npc is None or npc.campaign_id != campaign_id:
         raise NotFoundError("Target NPC not found in campaign")
     if npc.visibility != "player":
-        raise ConflictError("Target NPC is not player-visible")
+        raise WorldTargetConflict(
+            "Target NPC is not player-visible",
+            code="world_target_not_visible",
+            recovery="Choose a player-visible NPC or act without a target.",
+        )
     if npc.status != "active":
-        raise ConflictError("Target NPC is not active")
+        raise WorldTargetConflict(
+            "Target NPC is not active",
+            code="world_target_inactive",
+            recovery="Choose an active NPC or act without a target.",
+        )
     present = session.scalar(
         select(SceneNPCPresence.id)
         .join(Scene, Scene.id == SceneNPCPresence.scene_id)
@@ -717,7 +732,11 @@ def _validate_turn_target(
         )
     )
     if present is None:
-        raise ConflictError("Target NPC is not present in the current scene")
+        raise WorldTargetConflict(
+            "Target NPC is not present in the current scene",
+            code="world_target_not_present",
+            recovery="Choose an NPC present in the current scene or act without a target.",
+        )
     return npc
 
 

@@ -2,6 +2,7 @@ import uuid
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi.responses import JSONResponse
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -19,6 +20,7 @@ from app.llm.factory import get_dm_provider, get_turn_interpreter, get_turn_narr
 from app.resolution import ResolutionCreate, ResolutionError
 from app.rulesets import UnknownRulesetDataCatalogError, UnknownRulesetError, get_ruleset_registry
 from app.schemas import (
+    APIErrorRead,
     CampaignCreate,
     CampaignRead,
     CampaignState,
@@ -43,6 +45,7 @@ from app.services import (
     ConflictError,
     NotFoundError,
     TurnNarrationError,
+    WorldTargetConflict,
     add_character,
     cancel_turn_execution,
     create_campaign,
@@ -291,17 +294,33 @@ def create_app() -> FastAPI:
         "/campaigns/{campaign_id}/turn-executions",
         response_model=TurnExecutionRead,
         status_code=status.HTTP_201_CREATED,
+        responses={
+            409: {
+                "model": APIErrorRead,
+                "description": "Turn input conflicts with the current campaign state.",
+            }
+        },
     )
     def turn_executions_create(
         campaign_id: uuid.UUID,
         data: TurnExecutionCreate,
         session: SessionDep,
-    ) -> TurnExecutionRead:
+    ) -> TurnExecutionRead | JSONResponse:
         try:
             return create_turn_execution(session, campaign_id, data)
         except NotFoundError as exc:
             session.rollback()
             raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except WorldTargetConflict as exc:
+            session.rollback()
+            return JSONResponse(
+                status_code=409,
+                content=APIErrorRead(
+                    detail=str(exc),
+                    code=exc.code,
+                    recovery=exc.recovery,
+                ).model_dump(),
+            )
         except InvalidStateChange as exc:
             session.rollback()
             raise HTTPException(status_code=409, detail=str(exc)) from exc

@@ -1,90 +1,82 @@
-# M3.5 Persistent World Owner Acceptance Checklist
+# M3.5 Persistent World Targeted Owner Retest
 
-- **Milestone state:** Verification — deterministic gate passed; owner review required
-- **Automated gate:** Two-branch scenario passed locally
-- **External model use:** None; the fixture uses only the deterministic in-process provider
-- **Purpose:** Confirm that NPC continuity, quest acceptance, explicit choices, faction state,
-  revealed knowledge, and time form an understandable persistent campaign history.
+- **Milestone state:** Verification — corrected candidate ready for targeted owner retest
+- **Automated gate:** Corrected two-branch scenario and full regression gate pass locally
+- **External model use:** None; this uses only the deterministic in-process provider
+- **Purpose:** Confirm through staged interaction that the same NPC keeps her promise, the owner
+  makes both types of decisions, the branches diverge coherently, and an unavailable action gives
+  frontend-ready recovery information.
 
-This is a backend coherence checkpoint. Exact identity, revisions, visibility, rollback, event
-causality, context limits, and restart equality are enforced by automated tests. Frontend
-presentation and ordinary-player guidance remain M7 work.
+The original owner run is preserved unchanged in
+[`../testM3_5_ACCEPTANCE_CHECKLIST_RESULTS.md`](../testM3_5_ACCEPTANCE_CHECKLIST_RESULTS.md). It
+confirmed persistence, event causality, restart behavior, visibility, and mechanically inert world
+state, but it could not establish the subjective continuity/choice gate: the runner had already
+made every choice, and an unstable test-fixture lookup returned a different same-name Mira instead
+of the promise-bearing guide. This targeted retest replaces only the inconclusive portion.
 
 ## Setup
 
-Keep the PostgreSQL tunnel open. Stop the development API if it is already running, then prepare two
-isolated review campaigns from `~/Git/gandalfDnD`:
+Keep the PostgreSQL tunnel open. Stop the development API if it is already running, then run from
+`~/Git/gandalfDnD`:
 
 ```bash
 source .venv/bin/activate
 alembic upgrade head
-python -m scripts.run_m3_5_owner_fixture | tee /tmp/gandalf-m3-5-owner-fixture.json
-uvicorn app.api:app --reload
+python -m scripts.run_m3_5_owner_fixture --guided | tee /tmp/gandalf-m3-5-targeted-retest.txt
 ```
 
 The runner refuses any database whose name does not begin with `gandalfdnd_dev`. It creates new
-campaign rows without altering prior campaigns, uses no Clawvis/OpenClaw route, makes no paid call,
-and prints both campaign, character, and starting-NPC IDs plus their final world projections. Keep
-the JSON file open and open `http://127.0.0.1:8000/docs`.
+campaign rows without changing earlier campaigns, makes no OpenClaw or paid-provider call, and
+pauses for your choices. It prints concise checkpoints as the story progresses and a complete final
+record for both campaigns.
 
 ## Actions and expected results
 
-1. In the fixture JSON, confirm `fixture` is `m3.5-branching-lantern-v1`,
-   `external_provider_calls` is `0`, and the two campaign IDs differ. Both worlds should report
-   `world_revision: 20`, `narrative_time_minutes: 90`, and `Old Tower` as the current location.
-2. Call `GET /campaigns/{campaign_id}/world` for both campaign IDs. Confirm each response exactly
-   matches its saved fixture projection after allowing for JSON object-key ordering. Restart the
-   API, repeat both calls, and confirm neither world changed.
-3. In each world, confirm only the caravan-guard Mira is currently present. Seren and the
-   innkeeper Mira should not be present after their recorded departures. The two same-name Miras
-   retain distinct IDs, and the present Mira's ID matches the second `starting_npc_ids` value.
-4. Confirm both worlds contain the current friendly attitude and Mira's promise to guide the party,
-   plus the revealed clue about the Lantern Watch bell. No numeric reputation, automatic modifier,
-   rest, healing, resource recovery, condition, reward, XP, or level change should appear.
-5. Confirm `The Missing Lantern Patrol` is active and its `find_patrol` objective differs by branch:
-   `completed` for `signal_bridge` and `failed` for `flooded_tunnel`. In both campaigns the
-   `accept_lantern_patrol` decision should be `selected` with `accept` recorded.
-6. Confirm the second decision records exactly the player's branch: `signal_bridge` in one campaign
-   and `flooded_tunnel` in the other. The matching discovery should say either that the patrol was
-   rescued across the bridge or that the tunnel collapsed before the patrol was found. The other
-   branch's discovery must be absent.
-7. Confirm the Lantern Watch faction persists in both worlds with a `friendly` party attitude and
-   an `associate` membership for Arin's character ID. Both relationship rows should remain
-   narrative labels and should not change either character's HP, resources, inventory, or derived
-   rules state.
-8. Call `GET /campaigns/{campaign_id}/events` for each campaign. Confirm sequences are strictly
-   increasing and the history visibly explains NPC arrivals/departures, scene closure/opening, quest
-   creation and acceptance, clue reveal, faction changes, time advancement, decision selection,
-   objective outcome, and branch discovery. The hidden clue-creation event itself must not appear;
-   only its later player-visible reveal may contain the clue value.
-9. For either final campaign, use its first `starting_npc_ids` value as `target_npc_id` in
-   `POST /campaigns/{campaign_id}/turn-executions` with a new UUID, an action such as
-   `Ask the absent innkeeper Mira for help`, and either finalized character ID. Expect HTTP 409 with
-   `Target NPC is not present in the current scene`. No provider call or canonical event is created.
+1. For both campaigns, enter `accept` when asked whether the party will search for the patrol. The
+   next checkpoint should show the quest objective changing from `pending` to `active`.
+2. At `promise made`, note the guide's ID and the promise/attitude `subject_npc_id`. At
+   `promise keeper returns`, confirm the present watchful innkeeper has that same ID and both facts
+   still refer to it. The weary caravan guard must be absent.
+3. At the route prompt, choose `signal_bridge` for one campaign and `flooded_tunnel` for the other,
+   in either order. The runner will require the second choice to differ from the first.
+4. At each `final world after restart` checkpoint, confirm the selected route remains recorded.
+   The bridge route should complete `Find the missing patrol` and record a rescue; the tunnel route
+   should fail it and record a collapse. Both should finish at the Old Tower, revision 20, after 90
+   narrative minutes.
+5. Confirm the printed `absent_target_error` is HTTP-equivalent error data with all three fields:
+
+   ```json
+   {
+     "detail": "Target NPC is not present in the current scene",
+     "code": "world_target_not_present",
+     "recovery": "Choose an NPC present in the current scene or act without a target."
+   }
+   ```
+
+6. Start the API with `uvicorn app.api:app --reload`, open `http://127.0.0.1:8000/docs`, and call
+   `GET /campaigns/{campaign_id}/world` for both final campaign IDs. Confirm the final state matches
+   the saved output. Also confirm the documented 409 response for
+   `POST /campaigns/{campaign_id}/turn-executions` uses the structured error schema rather than
+   appearing as an undocumented response.
+
+Exact identity, revisions, no rejected-turn provider/event writes, hidden-data exclusion, complete
+event replay, atomic rollback, and engine-disposal equality remain automated assertions and do not
+need manual repetition.
 
 ## Subjective review
 
-Record concise answers after the nine actions:
+Record concise answers after the six actions:
 
-1. Does Mira's promise and attitude feel continuous after travel and restart?
-2. Is it clear that accepting the quest and choosing the route are separate player decisions?
-3. Do the two outcomes feel meaningfully different and consistent with their selected route?
-4. Does the event history contain enough structured information to explain how the final world was
-   reached, even though a future frontend will present it more clearly?
-5. Is the absent-target error sufficient for a future frontend to tell a player why the action is
-   unavailable and what they should do next? If not, describe the missing guidance.
+1. With the checkpoints shown in order, does the guide's promise and attitude now feel continuous
+   through travel and restart?
+2. Did personally accepting the quest and later choosing a route feel like two distinct decisions?
+3. Did the two selected routes produce meaningfully different, internally consistent outcomes?
+4. Is the absent-target error structured well enough for a future frontend to explain the problem
+   and offer a corrective action? Visual clarity itself remains an M7 frontend question.
 
 ## Results to record
 
-For every action, record the HTTP status where applicable, the relevant returned values, and one of:
-
-- pass;
-- defect, with the request and credential-free response;
-- coherence or product-design concern;
-- documentation clarification; or
-- accepted limitation.
-
-Copy this checklist to `docs/testM3_5_ACCEPTANCE_CHECKLIST_RESULTS.md`, append the observed evidence
-and subjective answers, and notify Codex. M3 remains in Verification until the result is analyzed
-and any defect is fixed. The optional capped live OpenClaw run is a separate supplemental gate and
-still requires explicit authorization.
+Copy this checklist to `docs/testM3_5_TARGETED_RETEST_RESULTS.md`, append the observed evidence and
+four answers, and notify Codex. M3 remains in Verification until the result is analyzed. The
+optional capped live OpenClaw run is a separate supplemental gate and still requires explicit
+authorization.

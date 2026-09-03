@@ -1,4 +1,5 @@
 import uuid
+from collections.abc import Callable
 from typing import Any
 
 from fastapi.testclient import TestClient
@@ -36,6 +37,9 @@ from app.schemas import (
 from app.services import record_world_fact
 from app.turn_interpretation import NarrativeIntent
 from tests.test_world_presence import _ready_world
+
+DecisionSelector = Callable[[dict[str, Any]], str]
+ScenarioObserver = Callable[[str, dict[str, Any]], None]
 
 
 class ScenarioInterpreter:
@@ -301,13 +305,30 @@ def _assert_all_projection_links_are_causal(campaign_id: uuid.UUID) -> None:
 
 
 def _run_branching_lantern(
-    client: TestClient, option_key: str
+    client: TestClient,
+    option_key: str | None,
+    *,
+    select_decision: DecisionSelector | None = None,
+    observe: ScenarioObserver | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     campaign_id, characters, starting_npcs = _ready_world(client)
     campaign_uuid = uuid.UUID(campaign_id)
     interpreter = ScenarioInterpreter()
     app.dependency_overrides[get_turn_interpreter] = lambda: interpreter
     state_before = client.get(f"/campaigns/{campaign_id}/state").json()
+    starting_world = client.get(f"/campaigns/{campaign_id}/world").json()
+    guide = next(
+        npc
+        for npc in starting_world["present_npcs"]
+        if npc["public_description"] == "A watchful innkeeper."
+    )
+    caravan_guard = next(
+        npc
+        for npc in starting_world["present_npcs"]
+        if npc["public_description"] == "A weary caravan guard."
+    )
+    guide_id = guide["id"]
+    caravan_guard_id = caravan_guard["id"]
     secret = "The Lantern Watch bell bears a concealed tunnel map."
     with get_session_factory()() as session:
         hidden_clue = record_world_fact(
@@ -326,18 +347,27 @@ def _run_branching_lantern(
         campaign_id,
         characters[0],
         [
-            NPCAttitudeSet(type="npc_attitude_set", npc_id=starting_npcs[0], attitude="friendly"),
+            NPCAttitudeSet(type="npc_attitude_set", npc_id=guide_id, attitude="friendly"),
             PromiseRecord(
                 type="promise_record",
-                npc_id=starting_npcs[0],
+                npc_id=guide_id,
                 promise="Mira will guide the party to the Old Tower.",
             ),
         ],
         action="Arin asks Mira about the missing lantern patrol.",
-        target_npc_id=starting_npcs[0],
+        target_npc_id=guide_id,
         captured=captured_interaction,
     )
-    assert captured_interaction["world"]["selected_target"]["id"] == starting_npcs[0]
+    assert captured_interaction["world"]["selected_target"]["id"] == guide_id
+    if observe is not None:
+        observe(
+            "promise_made",
+            {
+                "campaign_id": campaign_id,
+                "guide_npc_id": guide_id,
+                "world": client.get(f"/campaigns/{campaign_id}/world").json(),
+            },
+        )
 
     _complete_turn(
         client,
@@ -365,7 +395,7 @@ def _run_branching_lantern(
             ),
         ],
         action="Bryn listens to the Watch's request.",
-        target_npc_id=starting_npcs[1],
+        target_npc_id=caravan_guard_id,
     )
     world = client.get(f"/campaigns/{campaign_id}/world").json()
     quest = world["quests"][0]
@@ -412,6 +442,14 @@ def _run_branching_lantern(
         action="The party considers the Watch's request.",
     )
     offer = client.get(f"/campaigns/{campaign_id}/world").json()["decisions"][0]
+    if observe is not None:
+        observe(
+            "quest_offer",
+            {"campaign_id": campaign_id, "decision": offer},
+        )
+    acceptance_option = select_decision(offer) if select_decision is not None else "accept"
+    if acceptance_option != "accept":
+        raise ValueError("The complete M3.5 review requires accepting the quest")
     _complete_turn(
         client,
         campaign_id,
@@ -419,8 +457,16 @@ def _run_branching_lantern(
         [],
         action="The party accepts the Lantern Watch mission.",
         decision_id=offer["id"],
-        option_key="accept",
+        option_key=acceptance_option,
     )
+    if observe is not None:
+        observe(
+            "quest_accepted",
+            {
+                "campaign_id": campaign_id,
+                "world": client.get(f"/campaigns/{campaign_id}/world").json(),
+            },
+        )
 
     _complete_turn(
         client,
@@ -445,11 +491,15 @@ def _run_branching_lantern(
             "command_id": str(uuid.uuid4()),
             "action": "Ask Mira what she sees.",
             "actor_character_id": characters[0],
-            "target_npc_id": starting_npcs[0],
+            "target_npc_id": caravan_guard_id,
         },
     )
     assert absent.status_code == 409
-    assert absent.json()["detail"] == "Target NPC is not present in the current scene"
+    assert absent.json() == {
+        "detail": "Target NPC is not present in the current scene",
+        "code": "world_target_not_present",
+        "recovery": "Choose an NPC present in the current scene or act without a target.",
+    }
     assert interpreter.calls == calls_before_absent_target
     assert len(client.get(f"/campaigns/{campaign_id}/events").json()) == events_before_absent_target
 
@@ -479,12 +529,26 @@ def _run_branching_lantern(
         client,
         campaign_id,
         characters[0],
-        [NPCArrive(type="npc_arrive", npc_id=starting_npcs[1])],
-        action="The caravan guard Mira catches up at the Old Tower.",
+        [NPCArrive(type="npc_arrive", npc_id=guide_id)],
+        action="Mira the innkeeper arrives to honour her promise at the Old Tower.",
     )
-    assert [
-        row["id"] for row in client.get(f"/campaigns/{campaign_id}/world").json()["present_npcs"]
-    ] == [starting_npcs[1]]
+    returned_world = client.get(f"/campaigns/{campaign_id}/world").json()
+    assert [row["id"] for row in returned_world["present_npcs"]] == [guide_id]
+    assert {
+        fact["subject_npc_id"]
+        for fact in returned_world["facts"]
+        if fact["fact_type"] in {"promise", "npc_attitude"}
+    } == {guide_id}
+    if observe is not None:
+        observe(
+            "promise_keeper_returns",
+            {
+                "campaign_id": campaign_id,
+                "guide_npc_id": guide_id,
+                "world": returned_world,
+                "absent_target_error": absent.json(),
+            },
+        )
 
     _complete_turn(
         client,
@@ -492,7 +556,7 @@ def _run_branching_lantern(
         characters[0],
         [WorldFactReveal(type="world_fact_reveal", fact_id=hidden_clue.id, expected_revision=0)],
         action="Arin deciphers the concealed map on the bell.",
-        target_npc_id=starting_npcs[1],
+        target_npc_id=guide_id,
     )
     assert secret in client.get(f"/campaigns/{campaign_id}/world").text
     assert secret in client.get(f"/campaigns/{campaign_id}/events").text
@@ -519,7 +583,7 @@ def _run_branching_lantern(
             ),
         ],
         action="The Watch recognizes the party's help as the search continues.",
-        target_npc_id=starting_npcs[1],
+        target_npc_id=guide_id,
     )
 
     _complete_turn(
@@ -574,18 +638,26 @@ def _run_branching_lantern(
         action="The party reaches two possible routes beneath the tower.",
     )
     branch = client.get(f"/campaigns/{campaign_id}/world").json()["decisions"][1]
+    if observe is not None:
+        observe(
+            "route_choice",
+            {"campaign_id": campaign_id, "decision": branch},
+        )
+    selected_route = select_decision(branch) if select_decision is not None else option_key
+    if selected_route not in {"signal_bridge", "flooded_tunnel"}:
+        raise ValueError("The M3.5 route must be signal_bridge or flooded_tunnel")
     captured_choice: dict[str, Any] = {}
     finalized = _complete_turn(
         client,
         campaign_id,
         characters[0],
         [],
-        action=f"The party chooses {option_key}.",
+        action=f"The party chooses {selected_route}.",
         decision_id=branch["id"],
-        option_key=option_key,
+        option_key=selected_route,
         captured=captured_choice,
     )
-    assert captured_choice["world"]["selected_choice"]["option_key"] == option_key
+    assert captured_choice["world"]["selected_choice"]["option_key"] == selected_route
     assert finalized["turn"]["world_revision_after"] == 20
 
     world_before_restart = client.get(f"/campaigns/{campaign_id}/world").json()
@@ -604,19 +676,55 @@ def _run_branching_lantern(
     assert world_after_restart == world_before_restart
     _assert_replay_matches_world(campaign_uuid, world_after_restart)
     _assert_all_projection_links_are_causal(campaign_uuid)
+    if observe is not None:
+        observe(
+            "final_world_after_restart",
+            {
+                "campaign_id": campaign_id,
+                "guide_npc_id": guide_id,
+                "selected_route": selected_route,
+                "world": world_after_restart,
+            },
+        )
     return world_after_restart, {
         "campaign_id": campaign_id,
         "character_ids": characters,
         "starting_npc_ids": starting_npcs,
+        "guide_npc_id": guide_id,
+        "absent_npc_id": caravan_guard_id,
     }
 
 
 def test_complete_lantern_world_scenario_branches_restarts_and_replays(
     client: TestClient,
 ) -> None:
-    bridge_world, bridge_ids = _run_branching_lantern(client, "signal_bridge")
+    selected_decisions: list[str] = []
+    observed_stages: list[str] = []
+
+    def select_bridge_path(decision: dict[str, Any]) -> str:
+        selected_decisions.append(decision["decision_key"])
+        return {
+            "accept_lantern_patrol": "accept",
+            "tower_route": "signal_bridge",
+        }[decision["decision_key"]]
+
+    bridge_world, bridge_ids = _run_branching_lantern(
+        client,
+        None,
+        select_decision=select_bridge_path,
+        observe=lambda stage, _payload: observed_stages.append(stage),
+    )
     tunnel_world, tunnel_ids = _run_branching_lantern(client, "flooded_tunnel")
 
+    assert selected_decisions == ["accept_lantern_patrol", "tower_route"]
+    assert observed_stages == [
+        "promise_made",
+        "quest_offer",
+        "quest_accepted",
+        "promise_keeper_returns",
+        "route_choice",
+        "final_world_after_restart",
+    ]
     assert bridge_ids["campaign_id"] != tunnel_ids["campaign_id"]
     assert bridge_world["world_revision"] == tunnel_world["world_revision"] == 20
     assert bridge_world["narrative_time_minutes"] == tunnel_world["narrative_time_minutes"] == 90
@@ -625,6 +733,15 @@ def test_complete_lantern_world_scenario_branches_restarts_and_replays(
     assert tunnel_world["quests"][0]["objectives"][0]["status"] == "failed"
     assert bridge_world["decisions"][1]["selected_option_key"] == "signal_bridge"
     assert tunnel_world["decisions"][1]["selected_option_key"] == "flooded_tunnel"
+    assert bridge_world["present_npcs"][0]["id"] == bridge_ids["guide_npc_id"]
+    assert tunnel_world["present_npcs"][0]["id"] == tunnel_ids["guide_npc_id"]
+    assert bridge_world["present_npcs"][0]["public_description"] == "A watchful innkeeper."
+    assert tunnel_world["present_npcs"][0]["public_description"] == "A watchful innkeeper."
+    for world, ids in ((bridge_world, bridge_ids), (tunnel_world, tunnel_ids)):
+        continuity_facts = [
+            fact for fact in world["facts"] if fact["fact_type"] in {"promise", "npc_attitude"}
+        ]
+        assert {fact["subject_npc_id"] for fact in continuity_facts} == {ids["guide_npc_id"]}
     bridge_discovery = next(
         fact["value"] for fact in bridge_world["facts"] if fact["fact_type"] == "discovery"
     )
@@ -633,6 +750,12 @@ def test_complete_lantern_world_scenario_branches_restarts_and_replays(
     )
     assert bridge_discovery == "The party rescued the patrol across the signal bridge."
     assert tunnel_discovery == "The flooded tunnel collapsed before the patrol was found."
+    documented_conflict = client.get("/openapi.json").json()["paths"][
+        "/campaigns/{campaign_id}/turn-executions"
+    ]["post"]["responses"]["409"]
+    assert documented_conflict["content"]["application/json"]["schema"]["$ref"].endswith(
+        "/APIErrorRead"
+    )
 
 
 def test_presence_mutations_are_atomic_and_cannot_overlap_movement(client: TestClient) -> None:

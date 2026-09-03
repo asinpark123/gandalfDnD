@@ -33,6 +33,12 @@ StableKey = Annotated[
 WorldFactType = Literal["npc_attitude", "relationship_note", "promise", "discovery", "clue"]
 
 
+class APIErrorRead(BaseModel):
+    detail: str
+    code: str | None = None
+    recovery: str | None = None
+
+
 class StartingNPCCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

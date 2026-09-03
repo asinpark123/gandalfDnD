@@ -434,7 +434,7 @@ Implemented evidence:
 
 ### M3.5 — Branching Lantern verification and owner gate
 
-**Status:** Verification — automated gate passed (2026-09-03); owner API review Ready
+**Status:** Verification — corrected guided targeted owner retest Ready (2026-09-03)
 
 Run a deterministic two-character world scenario that covers:
 
@@ -483,6 +483,16 @@ Automated evidence:
 - `player/M3_5_ACCEPTANCE_CHECKLIST.md` and the guarded development fixture runner are ready for the
   owner coherence/restart review. No Clawvis change or external model call was made.
 
+The initial owner review confirmed the exact backend state, restart, causality, visibility, and
+mechanical-isolation items, but its subjective result was inconclusive. The runner had already
+selected both decisions, and duplicate-name NPCs created in one transaction could be ordered by
+UUID, causing the returned Mira to differ from the promise subject. The corrected fixture identifies
+the guide by stable role, asserts her ID across facts/travel/return, and pauses so the owner selects
+quest acceptance and both routes while seeing staged world summaries. It also exposes a documented
+HTTP 409 body with `world_target_not_present` and safe recovery guidance. The focused scenario, all
+125 normal tests, static/integrity checks, both database drift checks, and a scripted end-to-end run
+pass; the narrowed owner retest remains the only required M3 gate.
+
 ## 8. Verification matrix
 
 | Area | Required evidence |
@@ -521,6 +531,10 @@ Errors should include safe IDs and corrective context but never hidden names, fa
 content. As with M2, provider failure remains resumable only from a safe persisted checkpoint;
 domain validation failure before provider work creates no provider audit.
 
+The corrected M3.5 candidate implements documented `detail`, `code`, and `recovery` responses for
+not-visible, inactive, and absent target conflicts. A missing/cross-campaign target retains the
+existing safe 404 shape pending broader API error normalization in M7.
+
 ## 10. Risks and mitigations
 
 | Risk | Mitigation |
@@ -539,6 +553,7 @@ domain validation failure before provider work creates no provider audit.
 Each slice is committed only when it crosses migration, ORM, schema, API, service, events, tests,
 and documentation. A later slice that invalidates an earlier visibility, identity, causality, or
 restart guarantee moves that slice back to Rework. M3 planning is complete with this document.
-M3.1–M3.4 are verified and complete. M3.5's deterministic branching Lantern scenario, lifecycle,
-restart, and event replay pass; implementation pauses at the owner API acceptance gate before M3
-closure and any separately authorized capped live OpenClaw supplement.
+M3.1–M3.4 are verified and complete. M3.5's corrected deterministic branching Lantern scenario,
+lifecycle, restart, event replay, guided choice flow, and recoverable absent-target contract pass;
+implementation pauses at the narrowed targeted owner retest before M3 closure and any separately
+authorized capped live OpenClaw supplement.

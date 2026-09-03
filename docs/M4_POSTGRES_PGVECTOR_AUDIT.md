@@ -16,11 +16,11 @@ APT repository, but only if a fresh package simulation proves it will install th
 replacing or upgrading PostgreSQL, libc, or unrelated services. If that condition is not met, stop
 and return for a separately reviewed maintenance plan. Do not silently fall back to a source build.
 
-The owner subsequently accepted PostgreSQL 18 as Gandalf's long-term database target. Complete the
-read-only PG18.0 assessment in [`POSTGRESQL_18_MIGRATION_STRATEGY.md`](POSTGRESQL_18_MIGRATION_STRATEGY.md)
-before mutating this VM. That assessment decides whether Gandalf migrates first and uses the matching
-PostgreSQL 18 pgvector package, or M4 temporarily follows this PostgreSQL 15 plan. This audit does
-not authorize either package path.
+The owner subsequently accepted PostgreSQL 18 as Gandalf's long-term database target. PG18.0 is now
+complete and recommends migrating Gandalf first, then using the matching PostgreSQL 18 pgvector
+package. See [`POSTGRESQL_18_READINESS_AUDIT.md`](POSTGRESQL_18_READINESS_AUDIT.md). This audit
+remains the fallback PostgreSQL 15 plan if a changed pre-install simulation invalidates PG18.0; it
+does not authorize either package path.
 
 ## 2. Verified host and cluster state
 

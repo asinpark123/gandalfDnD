@@ -1,10 +1,11 @@
 # PostgreSQL 18 Migration Strategy
 
-- **Status:** Proposed; read-only readiness assessment is next
+- **Status:** Ready; PG18.0 passed conditionally and the controlled mutation gate is next
 - **Decision date:** 2026-09-04
 - **Current Gandalf database platform:** PostgreSQL 15.14 on Debian 12
 - **Target:** PostgreSQL 18, subject to compatibility evidence and an explicit mutation gate
 - **Scope:** `gandalfdnd_dev` and `gandalfdnd_test`; unrelated databases and services are excluded
+- **Readiness evidence:** [`POSTGRESQL_18_READINESS_AUDIT.md`](POSTGRESQL_18_READINESS_AUDIT.md)
 
 ## 1. Decision and purpose
 
@@ -37,19 +38,19 @@ application connection, or removing PostgreSQL 15.
 
 ## 3. Relationship to M4 and pgvector
 
-The PostgreSQL 18 readiness assessment occurs before M4.1 changes the VM. Its outcome selects one
-of two documented sequences:
+PG18.0 selected the first of two documented sequences:
 
-- **Preferred when readily achievable:** migrate the Gandalf databases to PostgreSQL 18, install
+- **Selected path:** migrate the Gandalf databases to PostgreSQL 18, install
   the matching pinned `postgresql-18-pgvector` package under the same clean-simulation gate, enable
   `vector` only in the two PostgreSQL 18 Gandalf databases, then implement M4.1.
-- **Supported interim path:** if PostgreSQL 18 needs broader shared-host coordination, keep Gandalf
+- **Fallback only if the signed execution preflight invalidates PG18.0:** keep Gandalf
   on supported PostgreSQL 15, safely install the pinned PostgreSQL 15 pgvector package, implement
   M4, and perform a later tested PostgreSQL 18 migration. This avoids blocking product development
   without weakening the 2027 retirement deadline.
 
-The decision will be based on evidence rather than elapsed time alone. M4 must not provision both
-packages or clusters speculatively.
+M4 must not provision both packages or clusters speculatively. Any changed package transaction,
+insufficient recovery evidence, or failed unrelated-service health gate returns to the fallback
+decision rather than silently widening the authorized change.
 
 ## 4. Delivery stages and gates
 
@@ -164,6 +165,7 @@ The migration is complete only when:
 
 ## 7. Immediate next decision
 
-Complete PG18.0 read-only assessment first. Then choose and record whether PostgreSQL 18 migration
-precedes M4.1 or whether M4 temporarily proceeds on supported PostgreSQL 15. No VM mutation should
-occur until the resulting exact transaction and rollback plan receive explicit owner approval.
+PG18.0 is complete and recommends migrating before M4.1. The next decision is explicit approval for
+the bounded recovery, exact package, parallel-cluster, targeted HBA, and test-restore operation in
+the readiness audit. That operation does not authorize application cutover, old-role disablement,
+database deletion, package rollback/downgrade, or PostgreSQL 15 retirement.

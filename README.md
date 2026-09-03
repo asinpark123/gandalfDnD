@@ -46,6 +46,8 @@ maintained in the [living development plan](docs/PROJECT_PLAN.md).
   least privilege, package-impact boundary, and conditional provisioning plan
 - [PostgreSQL 18 migration strategy](docs/POSTGRESQL_18_MIGRATION_STRATEGY.md) — parallel-cluster,
   Gandalf-only migration, acceptance, rollback, and longevity gates
+- [PostgreSQL 18 readiness audit](docs/POSTGRESQL_18_READINESS_AUDIT.md) — verified package impact,
+  shared-host boundaries, compatibility, isolation finding, and migration recommendation
 
 Documentation distinguishes planned behavior from verified implementation. M1.3 Party Commander
 and complete level-one character state are Done. M1.4 authoritative ability-check and saving-throw
@@ -60,10 +62,10 @@ is Done after its corrected deterministic and owner-guided branching, NPC contin
 causal replay, and recoverable-error gates passed. Its separately authorized capped live OpenClaw
 supplement also passed both persistent branches after exposing and resolving an exact duplicate
 decision-fact edge case. M4 is Ready at its infrastructure gate: pgvector remains uninstalled, and
-shared-VM provisioning requires explicit approval plus a clean package simulation before M4.1. The
-owner has approved PostgreSQL 18 as the long-term target; a read-only readiness assessment will
-determine whether the parallel Gandalf-only migration should precede M4.1. No upgrade is authorized
-or underway.
+shared-VM provisioning requires explicit approval plus a clean package simulation before M4.1.
+PG18.0 found a parallel Gandalf-only PostgreSQL 18 migration feasible and recommends completing it
+before M4.1; the exact shared-package, recovery, cluster, and isolation-hardening boundary still
+requires owner approval. No upgrade is authorized or underway.
 
 ## Versioned rulesets
 

@@ -1,6 +1,6 @@
 # M4 Long-Term Memory and Retrieval Implementation Strategy
 
-- **Status:** Ready; PG18 foundation and both restores passed, and active cutover precedes M4.1
+- **Status:** Ready; PostgreSQL 18 cutover passed and the per-database M4.1 extension gate is next
 - **Prepared:** 2026-09-04
 - **Depends on:** M3 persistent world (Done, including live OpenClaw supplement)
 - **Infrastructure audit:** [`M4_POSTGRES_PGVECTOR_AUDIT.md`](M4_POSTGRES_PGVECTOR_AUDIT.md)
@@ -10,8 +10,9 @@
   [`POSTGRESQL_18_FOUNDATION_EXECUTION.md`](POSTGRESQL_18_FOUNDATION_EXECUTION.md)
 - **PG18 development evidence:**
   [`POSTGRESQL_18_DEVELOPMENT_REHEARSAL.md`](POSTGRESQL_18_DEVELOPMENT_REHEARSAL.md)
-- **Owner input required now:** Authorize or defer the separately bounded active PostgreSQL 18
-  cutover; package/cluster/HBA/test/development restore work is already accepted
+- **PG18 cutover evidence:** [`POSTGRESQL_18_CUTOVER_EXECUTION.md`](POSTGRESQL_18_CUTOVER_EXECUTION.md)
+- **Owner input required now:** Authorize or defer M4.1's per-database `vector` enablement, pinned
+  Python adapter, and guarded memory-foundation migration
 - **Owner checkpoint:** M4.5 retrieval/re-index acceptance, followed by any separately authorized
   live narrative-coherence supplement
 
@@ -381,10 +382,10 @@ or cross-campaign output is fail-closed and blocks the memory path until repaire
 
 Owner input is required at three bounded points:
 
-1. **Now:** authorize or defer active PG18 cutover: repeat the final development recovery boundary,
-   require unchanged source/restore fingerprints, enable automatic PG18 cluster startup, switch
-   only the local Gandalf tunnel target, restart the API, and roll back immediately on failed
-   acceptance. PG15 retirement, deletion, pgvector enablement, and unrelated services are excluded.
+1. **Now:** authorize or defer M4.1's bounded database gate: enable the already installed `vector`
+   extension only in both PostgreSQL 18 Gandalf databases, add the pinned Python adapter, apply the
+   guarded memory-foundation migration, and run dual-database rollback/isolation/regression checks.
+   PostgreSQL 15 rollback copies, retirement, deletion, and unrelated services remain excluded.
 2. **M4.2 model selection:** review measured local model size, one-time download, CPU latency,
    retrieval quality, and license if candidates differ materially. Codex may choose autonomously if
    one candidate clearly meets every recorded bound with no new service or cost.
@@ -402,6 +403,6 @@ quality/latency results, defects, workarounds, and next actions. M4 moves to Rew
 shows hidden/cross-campaign retrieval, uncited memory, mixed profiles, canonical-state substitution,
 unbounded context, or a completed turn depending on index availability.
 
-M4 planning is complete. The PG18 package/cluster/HBA/test/development-restore gates passed.
-Implementation must still stop before active cutover and the subsequent per-database pgvector gate
-until the owner explicitly authorizes their exact connection, rollback, and extension boundaries.
+M4 planning is complete and PostgreSQL 18 cutover passed. Implementation must stop before the
+per-database pgvector/memory-foundation gate until the owner explicitly authorizes its extension,
+migration, rollback, dependency, and dual-database boundaries.

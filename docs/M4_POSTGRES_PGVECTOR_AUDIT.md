@@ -21,7 +21,9 @@ The owner subsequently accepted PostgreSQL 18 as Gandalf's long-term target and 
 foundation. The signed exact transaction installed `postgresql-18-pgvector` 0.8.6 without changing
 the PostgreSQL 15 server/client; no database has enabled the `vector` extension. See
 [`POSTGRESQL_18_FOUNDATION_EXECUTION.md`](POSTGRESQL_18_FOUNDATION_EXECUTION.md). The source-build
-comparison remains historical rationale, not the current package plan.
+comparison remains historical rationale, not the current package plan. Active Gandalf development
+subsequently cut over successfully to PostgreSQL 18; see
+[`POSTGRESQL_18_CUTOVER_EXECUTION.md`](POSTGRESQL_18_CUTOVER_EXECUTION.md).
 
 ## 2. Verified host and cluster state
 

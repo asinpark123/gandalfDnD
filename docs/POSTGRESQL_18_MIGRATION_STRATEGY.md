@@ -1,17 +1,18 @@
 # PostgreSQL 18 Migration Strategy
 
-- **Status:** Verification; parallel foundation plus test/development restore acceptance passed,
-  while active cutover remains separately gated
+- **Status:** Cutover complete; stabilization monitoring active and PostgreSQL 15 rollback retained
 - **Decision date:** 2026-09-04
-- **Current Gandalf database platform:** Active development remains PostgreSQL 15.14; validated
-  PostgreSQL 18.6 development and test copies run in parallel on Debian 12
-- **Target:** PostgreSQL 18.6; active cutover requires explicit authorization
+- **Current Gandalf database platform:** Active development and tests use PostgreSQL 18.6; preserved
+  PostgreSQL 15.14 Gandalf copies remain available for rollback on Debian 12
+- **Target:** PostgreSQL 18.6; achieved for active Gandalf development
 - **Scope:** `gandalfdnd_dev` and `gandalfdnd_test`; unrelated databases and services are excluded
 - **Readiness evidence:** [`POSTGRESQL_18_READINESS_AUDIT.md`](POSTGRESQL_18_READINESS_AUDIT.md)
 - **Foundation execution evidence:**
   [`POSTGRESQL_18_FOUNDATION_EXECUTION.md`](POSTGRESQL_18_FOUNDATION_EXECUTION.md)
 - **Development rehearsal evidence:**
   [`POSTGRESQL_18_DEVELOPMENT_REHEARSAL.md`](POSTGRESQL_18_DEVELOPMENT_REHEARSAL.md)
+- **Active cutover evidence:**
+  [`POSTGRESQL_18_CUTOVER_EXECUTION.md`](POSTGRESQL_18_CUTOVER_EXECUTION.md)
 
 ## 1. Decision and purpose
 
@@ -23,9 +24,9 @@ the current minor release of a supported major version. See the official
 
 This is a separately gated infrastructure track, not an incidental part of installing pgvector.
 The owner subsequently authorized and the project completed the recovery, signed-package,
-parallel-cluster, PG15 HBA hardening, test restore, and development restore/rehearsal boundaries.
-Those completed authorizations did **not** include active application cutover, old-role disablement,
-database deletion, PostgreSQL 15 retirement, or per-database pgvector enablement.
+parallel-cluster, PG15 HBA hardening, test restore, development restore/rehearsal, and active
+application-cutover boundaries. Those completed authorizations did **not** include old-role
+disablement, database deletion, PostgreSQL 15 retirement, or per-database pgvector enablement.
 
 ## 2. Migration principles
 
@@ -128,7 +129,7 @@ active PostgreSQL 15 Gandalf connection.
 
 ### PG18.4 — Controlled cutover and rollback window
 
-**Status: Pending explicit authorization.**
+**Status: Done; active Gandalf development uses PostgreSQL 18 with automatic-start policy.**
 
 - stop new Gandalf writes for a bounded maintenance window;
 - take and verify final Gandalf-only backups, restore the final delta/database copies, and repeat
@@ -142,7 +143,7 @@ Exit: Gandalf runs on PostgreSQL 18 with documented recovery points and a tested
 
 ### PG18.5 — Stabilization and retirement decision
 
-**Status: Pending; no PostgreSQL 15 retirement is implied by the current work.**
+**Status: Monitoring; PostgreSQL 15 rollback copies/roles remain intact.**
 
 - monitor errors, connections, storage, backups, migrations, and performance through the agreed
   stabilization period;
@@ -184,9 +185,9 @@ The migration is complete only when:
 
 ## 7. Immediate next decision
 
-The foundation, test restore, and development restore/rehearsal passed and are recorded in the two
-execution documents. The next decision is explicit approval for active Gandalf cutover: final
-preflight and development snapshot, PostgreSQL 18 automatic-start policy, local tunnel target
-switch, API restart, acceptance, and immediate PG15 rollback on failure. This next gate still does
-not authorize old-role disablement, database deletion, package downgrade, PostgreSQL 15 retirement,
-pgvector database enablement, or changes to unrelated services.
+Foundation, both restores, and the rollback-protected active cutover passed. During stabilization,
+retain PostgreSQL 15 databases/roles and all recovery evidence while monitoring PG18 health,
+connections, migrations, disk, and application behavior. The next development decision is the
+separate M4.1 gate to enable pgvector only in the two PostgreSQL 18 Gandalf databases and add the
+guarded memory schema. Old-role disablement, database deletion, package downgrade, PostgreSQL 15
+retirement, and unrelated-service changes remain unauthorized.

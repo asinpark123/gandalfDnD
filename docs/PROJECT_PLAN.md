@@ -4,10 +4,10 @@
 - **Last updated:** 2026-09-04
 - **Rules baseline:** SRD 5.2.1 (pinned; character-state and check/save-resolution catalogs pass
   integrity and schema verification)
-- **Current delivery stage:** PostgreSQL 18 migration verification before M4.1. The signed/pinned
-  package foundation, loopback-only `18/gandalf` cluster, targeted PG15 HBA hardening, and exact
-  test/development restores plus dual-runtime acceptance passed. M3 remains Done and M4 remains
-  Ready, but active Gandalf cutover requires a separate owner authorization
+- **Current delivery stage:** M4 Ready. The rollback-protected PostgreSQL 18 cutover passed after
+  signed/pinned infrastructure, PG15 HBA hardening, exact test/development restores, dual-runtime
+  comparison, and full post-cutover regression. M3 remains Done; PG18 is under stabilization
+  monitoring with PG15 rollback retained. M4.1's per-database extension/migration gate is next
 - **Canonical repository:** `~/Git/gandalfDnD`
 
 ## 1. Purpose of this document
@@ -109,6 +109,7 @@ Current documentation index:
 | PostgreSQL 18 verified readiness, package impact, compatibility, and authorization gate | [`POSTGRESQL_18_READINESS_AUDIT.md`](POSTGRESQL_18_READINESS_AUDIT.md) |
 | PostgreSQL 18 package/cluster/HBA/test-restore execution evidence | [`POSTGRESQL_18_FOUNDATION_EXECUTION.md`](POSTGRESQL_18_FOUNDATION_EXECUTION.md) |
 | PostgreSQL 18 development restore/runtime/cutover rehearsal evidence | [`POSTGRESQL_18_DEVELOPMENT_REHEARSAL.md`](POSTGRESQL_18_DEVELOPMENT_REHEARSAL.md) |
+| PostgreSQL 18 active cutover, rollback, acceptance, and stabilization evidence | [`POSTGRESQL_18_CUTOVER_EXECUTION.md`](POSTGRESQL_18_CUTOVER_EXECUTION.md) |
 
 ## 2. Product objective
 
@@ -209,18 +210,18 @@ presented separately from the immutable SRD baseline.
 | --- | --- | --- |
 | MacBook | Development, FastAPI, tests, Alembic, Git | Active |
 | `postgresvm` | Isolated development and test databases | Active |
-| `gandalfdnd_dev` | Manual development and play-test state | Provisioned and migrated |
-| `gandalfdnd_test` | Automated integration-test state | Provisioned and migrated |
+| `gandalfdnd_dev` | Manual development and play-test state | Active on PostgreSQL 18.6; PostgreSQL 15 rollback copy retained |
+| `gandalfdnd_test` | Automated integration-test state | Active on PostgreSQL 18.6; PostgreSQL 15 rollback copy retained |
 | Clawvis VM | Existing services plus the restricted private OpenClaw provider route | No Gandalf application/database deployment; loopback-only gateway integration |
 | Gandalf application VM | Future persistent runtime | Deferred |
 | pgvector | M4 semantic-memory index | PostgreSQL 18 package 0.8.6 installed; extension not enabled in any database and M4.1 approval remains required |
-| PostgreSQL 18 | Long-term Gandalf database target | 18.6 parallel cluster and exact test/development restores accepted; active cutover remains gated |
+| PostgreSQL 18 | Long-term Gandalf database target | Active on 18.6 with automatic startup; stabilization monitoring in progress |
 
 Database roles are separate, non-superuser, non-`CREATEDB`, non-`CREATEROLE`, non-replication
-accounts. `PUBLIC CONNECT` is revoked on both active PG15 Gandalf databases and the restored PG18
-test database. Targeted PG15 HBA rules now permit each Gandalf role only to its matching database
-through the loopback tunnel path and reject other database targets; positive and negative tests
-pass. PostgreSQL 18 applies the same least-privilege pattern and rejects all other TCP access.
+accounts. `PUBLIC CONNECT` is revoked on both active PG18 Gandalf databases and the preserved PG15
+rollback copies. The active loopback tunnel now targets PostgreSQL 18 remote port 5433. Both PG15
+and PG18 HBA policies permit each Gandalf role only to its matching database and reject other
+targets; positive and negative tests pass. PostgreSQL 18 rejects all other TCP access.
 
 ## 7. Development workflow
 
@@ -337,7 +338,7 @@ Use these values consistently:
 | M2 | Two-stage AI turn and model-authored feasibility | Done | Real DM-authored output uses recorded dice results safely through a private provider boundary |
 | M3 | Persistent world model | Done | NPCs, quests, scenes, clues, time, decisions, and visibility |
 | M4 | Long-term memory and retrieval | Ready | Coherent recall without full history in context |
-| PG18 | PostgreSQL 18 migration | Verification | Both restores/runtime comparison passed; active cutover remains gated |
+| PG18 | PostgreSQL 18 migration | Done/Monitoring | Active cutover passed; PG15 rollback retained during stabilization |
 | M5 | Basic deterministic combat | Proposed | Reproducible initiative, actions, attacks, and damage |
 | M6 | Spoiler-safe Guide | Proposed | Beginner help with enforceable knowledge boundaries |
 | M7 | Play interface and campaign administration | Proposed | Usable play, recap, correction, and export workflows |
@@ -1087,6 +1088,7 @@ while DM-only facts remain absent from player-visible APIs.
 - **PG18.0 readiness evidence:** [`POSTGRESQL_18_READINESS_AUDIT.md`](POSTGRESQL_18_READINESS_AUDIT.md)
 - **PG18 foundation/test evidence:** [`POSTGRESQL_18_FOUNDATION_EXECUTION.md`](POSTGRESQL_18_FOUNDATION_EXECUTION.md)
 - **PG18 development rehearsal:** [`POSTGRESQL_18_DEVELOPMENT_REHEARSAL.md`](POSTGRESQL_18_DEVELOPMENT_REHEARSAL.md)
+- **PG18 active cutover:** [`POSTGRESQL_18_CUTOVER_EXECUTION.md`](POSTGRESQL_18_CUTOVER_EXECUTION.md)
 
 Add player-visible, source-cited narrative memory for completed turns/events, a local embedding
 provider, versioned profiles, durable idempotent indexing, exact-vector plus lexical hybrid search,
@@ -1122,7 +1124,8 @@ PostgreSQL longevity execution (2026-09-04): the authorized exact transaction up
 server/client, and PostgreSQL 18 pgvector 0.8.6; removed nothing; and left PostgreSQL 15
 server/client unchanged. Verified recovery evidence preceded it. Automatic default-cluster creation
 was disabled, and the manually created checksum-enabled `18/gandalf` cluster listens only on
-`127.0.0.1:5433` with manual startup. The exact PG15→18 test restore matched migration/schema/row
+`127.0.0.1:5433`; it remained manual-start until the later accepted cutover. The exact PG15→18
+test restore matched migration/schema/row
 fingerprints and passed 126 tests. PG15 and Bluebuild remained healthy. At that foundation gate no
 PG18 development identity/database, cutover, old-role disablement, extension enablement, or
 deletion occurred.
@@ -1134,8 +1137,17 @@ matched for all 23 tables and every row count, 8 functions, 8 triggers, 107 vali
 version-stable constraints; PostgreSQL 18's additional catalogued `NOT NULL` constraints are an
 expected major-version representation difference. Two complete post-restart comparisons produced
 identical OpenAPI and 66 read-only responses across 11 campaigns. Alembic head/check and the full
-126-test PG18 suite passed. The temporary API/tunnel were removed, and the active API/tunnel still
-use PostgreSQL 15 pending the explicit cutover gate.
+126-test PG18 suite passed. At the end of that rehearsal, the temporary API/tunnel were removed and
+the active API/tunnel still used PostgreSQL 15 pending the explicit cutover gate.
+
+PostgreSQL active cutover (2026-09-04): a final owner-only checksummed dump was captured with the
+PG15 API paused and idle sessions drained. Source and target fingerprints remained exact, then one
+rollback-protected operation enabled automatic PG18 startup, replaced only the local SSH forwarding
+target, and restarted the API. Direct PostgreSQL 18 identity and transactional write/rollback
+checks passed; all 68 pre/post-cutover API fingerprints matched; Alembic reported head with zero
+drift; and an explicitly isolated post-cutover run passed all 126 tests. PG15 has zero Gandalf
+development sessions but remains online with both rollback copies/roles. Bluebuild remained active
+and healthy. The rollback was armed but not invoked; pgvector remains disabled in both databases.
 
 Exit gate: in a synthetic campaign of at least 500 events, a relevant early clue is retrieved late
 without placing full history in the prompt, while irrelevant/hidden/cross-campaign records remain
@@ -1216,7 +1228,7 @@ agent direct database or unvalidated state-mutation access.
 | WARN-001 | Dependency | Monitoring | Current TestClient emits an `httpx` deprecation warning | No functional failure today | Reassess FastAPI/Starlette test client during dependency maintenance |
 | OPS-001 | Source control | Resolved | Initial push was blocked because HTTPS lacked credentials and Git did not automatically select the nonstandard SSH key filename | GitHub was temporarily behind local `main` | Registered the existing Ed25519 key, verified GitHub's host fingerprint, configured this repository's SSH command, and synchronized `main`; 2026-08-30 |
 | OPS-002 | Infrastructure | Partially resolved/approval required | The pinned PostgreSQL 18 pgvector 0.8.6 package installed under a signed exact transaction without the rejected 14-upgrade/26-install source-build path | Package availability is resolved, but no database has the extension and M4 tables cannot use vectors yet | After PG18 cutover approval, enable and test `vector` only in the intended Gandalf databases at the M4.1 gate; `M4_POSTGRES_PGVECTOR_AUDIT.md` |
-| OPS-003 | Infrastructure | Verification/approval required | Recovery evidence, signed packages, the checksum-enabled PostgreSQL 18.6 cluster, both exact restores, 126-test regression, and twice-repeated 66-response dual-runtime comparison passed while PG15 and Bluebuild stayed healthy | The long-lived parallel foundation is accepted, but active development still uses PostgreSQL 15 | Obtain separate authorization for final unchanged-data check and active Gandalf-only tunnel/API cutover; retain PG15 rollback copies and exclude unrelated services; `POSTGRESQL_18_DEVELOPMENT_REHEARSAL.md` |
+| OPS-003 | Infrastructure | Resolved/monitoring | Final recovery and unchanged-data gates passed; the rollback-protected tunnel/API cutover, automatic startup, 68-response comparison, transactional probe, and isolated 126-test suite passed while PG15 and Bluebuild remained healthy | Active Gandalf development/tests now use PostgreSQL 18.6; PG15 copies remain available during stabilization | Monitor PG18 and retain recovery/PG15 rollback assets; require separate approval before old-role disablement, deletion, or retirement; `POSTGRESQL_18_CUTOVER_EXECUTION.md` |
 | OPS-004 | Access control | Resolved/monitoring | Ordered PG15 role/database loopback allows plus all-database rejects were applied; own-database access and cross/unrelated denial passed. PG18 is loopback-only with matching allows and reject-all TCP fallback | The observed Gandalf-role path to unrelated databases is closed without changing unrelated database ACLs | Retest after connection or HBA changes; disable old PG15 Gandalf logins only after separately accepted cutover; `POSTGRESQL_18_FOUNDATION_EXECUTION.md` |
 | DOC-001 | Documentation | Open | RES-001's verbatim export contains temporary Deep Research citation tokens | Tokens are not durable implementation citations | Preserve the source unchanged; use official URLs and SRD pages in specifications and rule definitions; M1.1 onward |
 | GAP-003 | Rules | Resolved | Authoritative ability checks and saving throws now derive from actor-bound canonical state and preserve exact dice, rules/catalog provenance, typed outcomes, and replay evidence | Character choices now produce reproducible check/save outcomes through the dedicated resolution API | Migration `0005`, 45-test suite, fixed-dice/restart replay, modifier rejection, schema/catalog integrity, development runtime checks, and all nine owner acceptance actions passed |
@@ -1272,7 +1284,7 @@ because a workaround exists; record both the workaround and the permanent resolu
 | RISK-028 | Embedding model, dimensions, license, or preprocessing drift silently changes retrieval | High | High | Immutable profiles with artifact checksum/license and adapter/query-format versions; side-by-side re-index plus golden gate before atomic activation |
 | RISK-029 | Failed or lagging indexing makes provider memory incomplete | Medium | Medium | Durable idempotent leased jobs, indexed-through checkpoint, safe retry, freshness metadata, and fail-soft use of exact relational state |
 | RISK-030 | Retrieved prose leaks hidden/cross-campaign data or acts as prompt instructions | Medium | High | Campaign/audience/status/profile SQL filters before ranking, player-only initial index, adversarial injection fixtures, untrusted-data prompt labels, cited bounded context |
-| RISK-031 | A PostgreSQL major upgrade disrupts Gandalf, unrelated databases, or shared services, or creates unrollbackable write divergence | Medium | High | Read-only inventory first; parallel PostgreSQL 18 cluster; Gandalf-only logical restore; no unrelated content migration; complete acceptance before cutover; bounded write pause; preserved PostgreSQL 15 rollback source; separate retirement approval |
+| RISK-031 | A PostgreSQL major upgrade disrupts Gandalf, unrelated databases, or shared services, or creates unrollbackable write divergence | Low/Monitoring | High | Parallel migration and rollback-protected cutover passed with exact fingerprints and shared-service health; retain all PG15 copies/roles and recovery bundles during stabilization; separate approval remains mandatory for disablement/deletion/retirement |
 | RISK-032 | Broad shared PG15 HBA plus default `PUBLIC CONNECT` lets Gandalf credentials authenticate to unrelated databases | Medium | Medium | Targeted ordered HBA allow/reject rules for Gandalf roles, SCRAM, loopback-only PG18, denial tests, and old PG15 login disablement after accepted cutover; never change unrelated database ACLs without their owners |
 
 ## 13. Architectural decision log
@@ -1315,6 +1327,7 @@ because a workaround exists; record both the workaround and the permanent resolu
 | ADR-034 | 2026-09-04 | Treat summaries as mechanically inert, player-visible derived documents that retain immutable source citations and prompt/model versions | Summaries reduce context but can omit or invent details; cited canonical sources must remain reconstructable | When M6 or a future planner defines a separately tested audience and summary policy |
 | ADR-035 | 2026-09-04 | Target PostgreSQL 18 through a parallel Gandalf-only migration rather than an in-place shared-cluster upgrade | PostgreSQL 18 extends the support horizon to 2030, while parallel restore/testing preserves PostgreSQL 15 as rollback and avoids coupling Gandalf to unrelated service migrations | Revisit only if PG18.0 prerequisites fail; never broaden shared-host scope without affected-owner approval |
 | ADR-036 | 2026-09-04 | Complete the conditionally safe PostgreSQL 18 migration before M4.1 and install pgvector only for PostgreSQL 18 | PG18.0 found sufficient resources, small databases, compatible driver/schema, and a pinned no-removal transaction; migrating now avoids duplicate extension work, while staged test restore and preserved PG15 contain the shared-package risk | Revisit only if the signed pre-install simulation changes, recovery evidence is insufficient, or an unrelated-service health gate fails |
+| ADR-037 | 2026-09-04 | Cut active Gandalf development to PostgreSQL 18 only after exact final source/target and API fingerprints, under an automatic PG15 rollback trap, while retaining the old copies and roles | A tunnel-only target change preserves the application URL, and a single rollback-protected boundary prevents an ambiguous half-cutover or silent write divergence | Revisit after stabilization only to decide old-role disablement or copy retention; never infer PostgreSQL 15 retirement |
 
 ## 14. Milestone review template
 
@@ -1403,17 +1416,17 @@ Destination milestone:
 
 ## 17. Immediate next actions
 
-1. Obtain explicit owner authorization for active PG18 cutover: final preflight and bounded
-   development write pause, verified final dump, unchanged source/restore fingerprint requirement,
-   PG18 automatic-start policy, local tunnel-target switch, API restart, and immediate PG15 rollback
-   on any failed acceptance check.
-2. During that gate, change only the Gandalf development connection path. Retain both PostgreSQL 15
-   Gandalf databases/roles and do not alter unrelated databases/services, Clawvis, or pgvector.
-3. After successful cutover, monitor through the documented stabilization window and request a
-   later explicit decision before disabling old logins or deleting/retiring any PG15 data.
-4. After accepted PostgreSQL 18 cutover, implement M4.1's guarded memory foundation and enable/test
-   pgvector only in the intended Gandalf databases under its own extension, migration,
-   role-isolation, rollback, regression, and dual-database drift gates.
+1. Monitor the active PG18 connection, application/database errors, startup behavior, connections,
+   disk, and migration behavior while retaining all three recovery bundles and both PG15 Gandalf
+   copies/roles unchanged.
+2. Obtain explicit owner authorization for M4.1's bounded database change: enable the already
+   installed `vector` extension only in both PG18 Gandalf databases, add the pinned Python adapter,
+   and apply the guarded memory-foundation migration.
+3. If authorized, implement M4.1 with extension/version, migration upgrade/downgrade,
+   role-isolation, transactional vector, full-regression, and dual-database drift gates; do not add
+   provider memory context yet.
+4. Request a later explicit destructive-action decision before disabling old PG15 logins, deleting
+   rollback copies, changing unrelated services, or considering PostgreSQL 15 retirement.
 
 ## 18. Documentation change log
 
@@ -1458,3 +1471,4 @@ Destination milestone:
 | 2026-09-04 | DOC-037 | Completed PG18.0, selected migration-before-M4 sequencing, and recorded exact package, coexistence, compatibility, recovery, and access-isolation evidence | Narrow pinning reduced the proposal to three shared upgrades and four installs with no removals or PG15 server/client change; the app already uses bundled libpq 18, databases are small, port/storage are available, but Bluebuild is active and Gandalf roles can authenticate to unrelated databases through broad defaults | Obtain explicit authorization for the bounded recovery/package/manual-cluster/HBA/test-restore operation; stop again before development restore or cutover |
 | 2026-09-04 | DOC-038 | Completed the authorized PG18 foundation and test-restore gate, preserved an operator execution record, resolved OPS-004, and advanced PG18 to In progress | Checksummed dual-version backups, signed exact pins, three shared upgrades/four installs, loopback-only checksum-enabled PostgreSQL 18.6, PG15 HBA isolation, exact test fingerprints, 126 passing tests, and repeated PG15/Bluebuild health checks passed; pgvector is packaged but not enabled, and no PG18 development identity exists | Obtain separate authorization for fresh development restore and reversible Gandalf-only cutover; retain PG15 rollback and exclude unrelated services |
 | 2026-09-04 | DOC-039 | Completed the authorized PG18 development restore and cutover rehearsal, preserved fresh recovery evidence, and advanced PG18 to Verification | All source/restore row counts and version-stable schema properties matched; PG18 development migration/drift checks, two complete 66-response comparisons across 11 campaigns separated by restart, 126 tests, isolation, and shared-service health passed. The active API/tunnel remains on PG15 | Obtain explicit authorization for the bounded active tunnel/API cutover and immediate rollback gate; retain both PG15 copies/roles and defer pgvector enablement |
+| 2026-09-04 | DOC-040 | Completed the rollback-protected active PostgreSQL 18 cutover, preserved final recovery evidence, advanced PG18 to Done/Monitoring, and returned M4 to its implementation gate | Final fingerprints matched; PG18 automatic startup, tunnel/API switch, transactional write/rollback, all 68 API hashes, active migration/drift checks, explicit test-role 126-test suite, isolation, and PG15/Bluebuild health passed. Rollback was armed but not invoked; PG15 retains zero active Gandalf sessions and both copies/roles | Monitor stabilization and obtain explicit M4.1 authorization for per-database vector enablement, Python adapter, and guarded `0012`; retain PG15 rollback assets |

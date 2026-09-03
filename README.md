@@ -52,6 +52,8 @@ maintained in the [living development plan](docs/PROJECT_PLAN.md).
   signed package, parallel-cluster, HBA-isolation, restore, and test evidence
 - [PostgreSQL 18 development rehearsal](docs/POSTGRESQL_18_DEVELOPMENT_REHEARSAL.md) — fresh
   development restore, exact source comparison, dual-runtime acceptance, and cutover gate
+- [PostgreSQL 18 active cutover](docs/POSTGRESQL_18_CUTOVER_EXECUTION.md) — final recovery,
+  rollback-protected tunnel/API switch, post-cutover acceptance, and stabilization boundary
 
 Documentation distinguishes planned behavior from verified implementation. M1.3 Party Commander
 and complete level-one character state are Done. M1.4 authoritative ability-check and saving-throw
@@ -70,8 +72,10 @@ foundation and restore rehearsals passed: signed pinned packages installed Postg
 pgvector 0.8.6 without changing PostgreSQL 15 server/client; `18/gandalf` is checksum-enabled and
 loopback-only; PG15 role isolation is hardened; and exact test/development copies passed the full
 suite plus two complete dual-runtime comparisons while PostgreSQL 15 and Bluebuild remained
-healthy. The extension is not enabled and active Gandalf development has not been cut over. The
-active tunnel/application switch requires the next explicit authorization before M4.1.
+healthy. The rollback-protected active cutover then passed: Gandalf development and tests now use
+PostgreSQL 18, its startup policy is automatic, and the post-cutover isolated suite passed again.
+PostgreSQL 15 rollback copies/roles remain intact. The `vector` extension is not enabled; M4.1's
+per-database extension and memory-foundation migration require the next explicit authorization.
 
 ## Versioned rulesets
 

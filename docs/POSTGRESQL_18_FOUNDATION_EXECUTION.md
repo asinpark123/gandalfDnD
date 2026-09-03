@@ -1,6 +1,6 @@
 # PostgreSQL 18 Foundation and Test-Restore Record
 
-- **Status:** Complete; development restore rehearsal subsequently passed and active cutover remains gated
+- **Status:** Complete; development rehearsal and active cutover subsequently passed
 - **Execution date:** 2026-09-04
 - **Host:** `postgresvm`
 - **Authorized boundary:** Recovery evidence, signed/pinned packages, targeted PostgreSQL 15 HBA
@@ -9,14 +9,16 @@
 - **Migration strategy:** [`POSTGRESQL_18_MIGRATION_STRATEGY.md`](POSTGRESQL_18_MIGRATION_STRATEGY.md)
 - **Development rehearsal:**
   [`POSTGRESQL_18_DEVELOPMENT_REHEARSAL.md`](POSTGRESQL_18_DEVELOPMENT_REHEARSAL.md)
+- **Active cutover:** [`POSTGRESQL_18_CUTOVER_EXECUTION.md`](POSTGRESQL_18_CUTOVER_EXECUTION.md)
 
 ## 1. Outcome
 
-The authorized foundation passed. PostgreSQL 18.6 now runs as the separate `18/gandalf` cluster on
-remote port 5433. It listens only on `127.0.0.1`, uses SCRAM-SHA-256, has data checksums enabled,
-uses conservative settings, and has a manual startup policy. PostgreSQL 15 `15/main` remains online
-on port 5432. Bluebuild remained active and returned HTTP 200 for `/`, `/docs`, and
-`/openapi.json` before and after the shared-package transaction and after test acceptance.
+The authorized foundation passed. PostgreSQL 18.6 was established as the separate `18/gandalf`
+cluster on remote port 5433. It listens only on `127.0.0.1`, uses SCRAM-SHA-256, has data checksums
+enabled, and uses conservative settings. Its manual foundation-stage startup policy changed to
+automatic only at the later accepted cutover. PostgreSQL 15 `15/main` remains online on port 5432.
+Bluebuild remained active and returned HTTP 200 for `/`, `/docs`, and `/openapi.json` before and
+after the shared-package transaction and after test acceptance.
 
 Only `gandalfdnd_test_user` and `gandalfdnd_test` exist in the PostgreSQL 18 cluster. The test role
 is login-only and is not a superuser and has no database-creation, role-creation, or replication
@@ -129,6 +131,6 @@ here so later operators do not repeat the same diagnostics.
 
 The separately authorized development restore and cutover rehearsal subsequently passed; see
 `POSTGRESQL_18_DEVELOPMENT_REHEARSAL.md`. Both PostgreSQL 18 Gandalf databases now exist and have
-accepted relational/runtime evidence. The active application remains on PostgreSQL 15 pending a
-new explicit cutover authorization. PostgreSQL 15 copies and roles remain intact, and pgvector is
-still not enabled in either database.
+accepted relational/runtime evidence. The active application subsequently cut over successfully to
+PostgreSQL 18. PostgreSQL 15 copies and roles remain intact for stabilization/rollback, and pgvector
+is still not enabled in either database.

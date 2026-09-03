@@ -1,6 +1,6 @@
 # PostgreSQL 18 Readiness Audit
 
-- **Status:** PG18.0 complete; foundation plus test/development restore acceptance subsequently passed
+- **Status:** PG18.0 complete; all later restore and active-cutover gates passed
 - **Audit date:** 2026-09-04
 - **Host:** `postgresvm`
 - **Scope:** Read-only package, cluster, access, recovery, and Gandalf compatibility assessment
@@ -9,6 +9,7 @@
   [`POSTGRESQL_18_FOUNDATION_EXECUTION.md`](POSTGRESQL_18_FOUNDATION_EXECUTION.md)
 - **Development rehearsal:**
   [`POSTGRESQL_18_DEVELOPMENT_REHEARSAL.md`](POSTGRESQL_18_DEVELOPMENT_REHEARSAL.md)
+- **Active cutover:** [`POSTGRESQL_18_CUTOVER_EXECUTION.md`](POSTGRESQL_18_CUTOVER_EXECUTION.md)
 
 ## 1. Outcome and sequencing decision
 
@@ -192,10 +193,12 @@ disablement, database deletion, package downgrade, or PostgreSQL 15 retirement o
 **Foundation and test gate passed.** The database sizes, available resources, compatible driver,
 standard schema features, exact binary packages, free parallel port, and logical-restore strategy
 were borne out in execution. PostgreSQL 18.6 `18/gandalf` is loopback-only on port 5433 with
-checksums and manual startup; its restored test database passed the full repository suite. The
-development restore/runtime rehearsal subsequently passed as well. The migration remains staged:
-active cutover, stabilization, extension enablement, and retirement are separate decisions.
+checksums; it used manual startup through restore acceptance, and the later cutover changed it to
+automatic. The restored test database passed the full repository suite, and the development
+restore/runtime rehearsal subsequently passed as well. Active cutover is complete; stabilization,
+extension enablement, and retirement remain separate decisions.
 
-PostgreSQL 15.14 remains active and authoritative for Gandalf development after this gate. Its
-update to 15.19 for unrelated remaining users is advisable but outside Gandalf's migration scope
-and must not be bundled into the next operation.
+PostgreSQL 15.14 remained authoritative after the audit/foundation gate. The later rollback-protected
+cutover passed, and active Gandalf development now uses PostgreSQL 18.6. PostgreSQL 15 remains online
+with preserved Gandalf rollback copies. Any PostgreSQL 15 update or retirement for unrelated
+remaining users is outside Gandalf's migration scope.

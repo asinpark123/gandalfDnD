@@ -1,6 +1,6 @@
 # PostgreSQL 18 Development Restore and Cutover Rehearsal
 
-- **Status:** Complete; active cutover requires explicit owner authorization
+- **Status:** Complete; active cutover subsequently passed and is under stabilization monitoring
 - **Execution date:** 2026-09-04
 - **Host:** `postgresvm`
 - **Authorized boundary:** Fresh development snapshot, PostgreSQL 18 development identity/database,
@@ -8,6 +8,7 @@
 - **Foundation evidence:**
   [`POSTGRESQL_18_FOUNDATION_EXECUTION.md`](POSTGRESQL_18_FOUNDATION_EXECUTION.md)
 - **Migration strategy:** [`POSTGRESQL_18_MIGRATION_STRATEGY.md`](POSTGRESQL_18_MIGRATION_STRATEGY.md)
+- **Cutover evidence:** [`POSTGRESQL_18_CUTOVER_EXECUTION.md`](POSTGRESQL_18_CUTOVER_EXECUTION.md)
 
 ## 1. Outcome
 
@@ -114,9 +115,10 @@ Four diagnostics failed closed and are retained so later operators do not repeat
 None of these events affected PostgreSQL 15 data, the accepted PostgreSQL 18 restore, Bluebuild,
 Clawvis, or unrelated databases.
 
-## 6. Active-cutover authorization gate
+## 6. Active-cutover gate and follow-up
 
-Stop here for owner review. A separately authorized active cutover should:
+The owner separately authorized this gate, and it subsequently passed as recorded in
+`POSTGRESQL_18_CUTOVER_EXECUTION.md`. The executed plan was:
 
 1. recheck both clusters, disk, HBA, Bluebuild, the local API/tunnel identity, and source/restore
    fingerprints;

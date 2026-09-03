@@ -44,11 +44,11 @@ and complete level-one character state are Done. M1.4 authoritative ability-chec
 resolution is also Done after automated and owner runtime verification. The complete M1 gate is
 Done. M2 is also Done: the resumable two-stage workflow, deterministic Lantern suite, private
 OpenClaw activation, and three passing ten-scenario live model-authored runs are verified. Direct
-paid API integration remains deferred and paid model calls remain disabled. M3.1–M3.3 are Done with
+paid API integration remains deferred and paid model calls remain disabled. M3.1–M3.4 are Done with
 exact scene/NPC presence, explicit target IDs, world-revision safety, typed narrative facts,
 relationships, supersession, controlled reveal, durable quests/objectives, and explicit exact-once
-branch decisions. M3.4 factions, narrative time, and full visibility projection is Ready; the next
-live OpenClaw gate remains M3.5.
+branch decisions, typed factions, bounded narrative time, and audience-safe world projections. M3.5
+deterministic/owner verification is Ready; its capped live OpenClaw run remains separately gated.
 
 ## Versioned rulesets
 
@@ -95,6 +95,11 @@ checksum, size, license, attribution, normalized-data catalogs, and schema versi
 - durable quests and ordered objectives with revision-checked legal transitions, plus visible
   two-to-four-option decisions selected explicitly and applied exactly once as typed narrative
   facts or quest/objective consequences; choices never imply rewards or mechanical effects
+- stable factions with revisioned fixed-label party attitudes and character/NPC memberships, plus
+  monotonic elapsed narrative minutes; neither can imply reputation modifiers, rest, recovery,
+  durations, travel resolution, or other mechanics
+- explicit player/DM world audiences with player-only public/provider use and bounded context caps
+  for facts, active quests, open decisions, active factions, and faction relationships
 - auditable application dice rolls, including internally logged hidden rolls
 - provider-neutral DM interface
 - deterministic offline provider for development and repeatable tests

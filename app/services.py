@@ -1,7 +1,8 @@
+import re
 import uuid
 from datetime import UTC, datetime, timedelta
 from time import perf_counter
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import TypeAdapter, ValidationError
 from sqlalchemy import func, select
@@ -46,6 +47,8 @@ from app.models import (
     DecisionPoint,
     DecisionSelection,
     DiceRoll,
+    Faction,
+    FactionRelationship,
     Location,
     ProviderCall,
     Quest,
@@ -86,10 +89,16 @@ from app.schemas import (
     DecisionQuestConsequence,
     DecisionRead,
     DiscoveryRecord,
+    FactionAttitudeSet,
+    FactionCreate,
+    FactionMembershipSet,
+    FactionRead,
+    FactionRelationshipRead,
     HPDelta,
     InventoryChange,
     LoadoutUpdate,
     MoveLocation,
+    NarrativeTimeAdvance,
     NPCAttitudeSet,
     PromiseRecord,
     QuestCreate,
@@ -131,6 +140,9 @@ class ConflictError(ValueError):
 MAX_PROVIDER_WORLD_FACTS = 50
 MAX_PROVIDER_QUESTS = 20
 MAX_PROVIDER_DECISIONS = 20
+MAX_PROVIDER_FACTIONS = 20
+MAX_PROVIDER_FACTION_RELATIONSHIPS = 50
+MAX_NARRATIVE_TIME_MINUTES = 2_147_483_647
 DECISION_CONSEQUENCE_ADAPTER = TypeAdapter(list[DecisionConsequence])
 
 
@@ -280,7 +292,14 @@ def _validate_turn_actor(
     return character
 
 
-def get_world_state(session: Session, campaign_id: uuid.UUID) -> WorldStateRead:
+def get_world_state(
+    session: Session,
+    campaign_id: uuid.UUID,
+    *,
+    audience: Literal["player", "dm"] = "player",
+) -> WorldStateRead:
+    if audience not in {"player", "dm"}:
+        raise ValueError("Unsupported world-state audience")
     campaign = session.get(Campaign, campaign_id)
     if campaign is None:
         raise NotFoundError("Campaign not found")
@@ -292,26 +311,26 @@ def get_world_state(session: Session, campaign_id: uuid.UUID) -> WorldStateRead:
     location = session.get(Location, scene.location_id)
     if location is None:
         raise ConflictError("Active scene has no location")
-    npcs = list(
-        session.scalars(
-            select(NPC)
-            .join(SceneNPCPresence, SceneNPCPresence.npc_id == NPC.id)
-            .where(
-                SceneNPCPresence.scene_id == scene.id,
-                SceneNPCPresence.status == "present",
-                NPC.status == "active",
-                NPC.visibility == "player",
-            )
-            .order_by(NPC.created_at, NPC.id)
+    npc_query = (
+        select(NPC)
+        .join(SceneNPCPresence, SceneNPCPresence.npc_id == NPC.id)
+        .where(
+            SceneNPCPresence.scene_id == scene.id,
+            SceneNPCPresence.status == "present",
+            NPC.status == "active",
         )
     )
+    if audience == "player":
+        npc_query = npc_query.where(NPC.visibility == "player")
+    npcs = list(session.scalars(npc_query.order_by(NPC.created_at, NPC.id)))
+    visibility_filter = ["player"] if audience == "player" else ["player", "dm_only"]
     facts = list(
         session.scalars(
             select(WorldFact)
             .where(
                 WorldFact.campaign_id == campaign_id,
                 WorldFact.status == "current",
-                WorldFact.visibility == "player",
+                WorldFact.visibility.in_(visibility_filter),
             )
             .order_by(WorldFact.created_at, WorldFact.id)
         )
@@ -319,7 +338,10 @@ def get_world_state(session: Session, campaign_id: uuid.UUID) -> WorldStateRead:
     quests = list(
         session.scalars(
             select(Quest)
-            .where(Quest.campaign_id == campaign_id, Quest.visibility == "player")
+            .where(
+                Quest.campaign_id == campaign_id,
+                Quest.visibility.in_(visibility_filter),
+            )
             .order_by(Quest.created_at, Quest.id)
         ).unique()
     )
@@ -343,21 +365,63 @@ def get_world_state(session: Session, campaign_id: uuid.UUID) -> WorldStateRead:
             select(DecisionPoint)
             .where(
                 DecisionPoint.campaign_id == campaign_id,
-                DecisionPoint.visibility == "player",
+                DecisionPoint.visibility.in_(visibility_filter),
             )
             .order_by(DecisionPoint.created_at, DecisionPoint.id)
         ).unique()
     )
     decision_reads = [DecisionRead.model_validate(decision) for decision in decisions]
+    known_npc_ids = set(
+        session.scalars(
+            select(NPC.id).where(
+                NPC.campaign_id == campaign_id,
+                NPC.visibility.in_(visibility_filter),
+            )
+        )
+    )
+    factions = list(
+        session.scalars(
+            select(Faction)
+            .where(
+                Faction.campaign_id == campaign_id,
+                Faction.visibility.in_(visibility_filter),
+            )
+            .order_by(Faction.created_at, Faction.id)
+        ).unique()
+    )
+    faction_reads = []
+    for faction in factions:
+        relationships = [
+            relation
+            for relation in faction.relationships
+            if relation.visibility in visibility_filter
+            and (relation.npc_id is None or relation.npc_id in known_npc_ids)
+        ]
+        faction_reads.append(
+            FactionRead(
+                id=faction.id,
+                faction_key=faction.faction_key,
+                name=faction.name,
+                description=faction.description,
+                status=faction.status,
+                revision=faction.revision,
+                relationships=[
+                    FactionRelationshipRead.model_validate(relation) for relation in relationships
+                ],
+                created_at=faction.created_at,
+            )
+        )
     return WorldStateRead(
         campaign_id=campaign.id,
         world_revision=campaign.world_revision,
+        narrative_time_minutes=campaign.narrative_time_minutes,
         location=location,
         scene=scene,
         present_npcs=npcs,
         facts=facts,
         quests=quest_reads,
         decisions=decision_reads,
+        factions=faction_reads,
     )
 
 
@@ -476,6 +540,155 @@ def record_world_fact(
     session.commit()
     session.refresh(fact)
     return fact
+
+
+def record_faction(
+    session: Session,
+    campaign_id: uuid.UUID,
+    *,
+    faction_key: str,
+    name: str,
+    description: str | None = None,
+    visibility: str = "player",
+) -> Faction:
+    """Record trusted setup/GM faction state with an explicit audience."""
+    campaign = _campaign_for_update(session, campaign_id)
+    if visibility not in {"player", "dm_only"}:
+        raise InvalidStateChange("Unsupported faction visibility")
+    key = faction_key.strip()
+    if re.fullmatch(r"[a-z0-9][a-z0-9._-]{0,79}", key) is None:
+        raise InvalidStateChange("Faction key has an invalid format")
+    faction_name = name.strip()
+    if not faction_name or len(faction_name) > 160:
+        raise InvalidStateChange("Faction name must contain 1 to 160 characters")
+    if description is not None and len(description) > 2000:
+        raise InvalidStateChange("Faction description cannot exceed 2000 characters")
+    if session.scalar(
+        select(Faction.id).where(Faction.campaign_id == campaign_id, Faction.faction_key == key)
+    ):
+        raise ConflictError("Faction key already exists in campaign")
+    faction_id = uuid.uuid4()
+    next_revision = campaign.world_revision + 1
+    event = _add_event(
+        session,
+        campaign_id,
+        "faction_created",
+        {
+            "faction_id": str(faction_id),
+            "faction_key": key,
+            "name": faction_name,
+            "description": description,
+            "world_revision": next_revision,
+        },
+        visibility=visibility,
+    )
+    faction = Faction(
+        id=faction_id,
+        campaign_id=campaign_id,
+        faction_key=key,
+        name=faction_name,
+        description=description,
+        status="active",
+        visibility=visibility,
+        revision=0,
+        created_by_event_id=event.id,
+    )
+    session.add(faction)
+    campaign.world_revision = next_revision
+    session.commit()
+    session.refresh(faction)
+    return faction
+
+
+def record_faction_relationship(
+    session: Session,
+    campaign_id: uuid.UUID,
+    faction_id: uuid.UUID,
+    *,
+    relation_type: str,
+    value: str,
+    character_id: uuid.UUID | None = None,
+    npc_id: uuid.UUID | None = None,
+    visibility: str = "player",
+) -> FactionRelationship:
+    """Record trusted setup/GM faction relationships with an explicit audience."""
+    campaign = _campaign_for_update(session, campaign_id)
+    faction = session.get(Faction, faction_id)
+    if faction is None or faction.campaign_id != campaign_id:
+        raise InvalidStateChange("Faction does not belong to the campaign")
+    if visibility not in {"player", "dm_only"}:
+        raise InvalidStateChange("Unsupported faction relationship visibility")
+    if faction.visibility == "dm_only" and visibility == "player":
+        raise InvalidStateChange("Faction relationship cannot be more visible than its faction")
+    if relation_type == "attitude":
+        if character_id is not None or npc_id is not None:
+            raise InvalidStateChange("Faction attitude must apply to the party")
+        if value not in {"friendly", "neutral", "wary", "hostile"}:
+            raise InvalidStateChange("Unsupported faction attitude")
+    elif relation_type == "membership":
+        if (character_id is None) == (npc_id is None):
+            raise InvalidStateChange("Faction membership requires exactly one member")
+        if value not in {"member", "associate", "former_member"}:
+            raise InvalidStateChange("Unsupported faction membership")
+        if character_id is not None:
+            character = session.get(Character, character_id)
+            if character is None or character.campaign_id != campaign_id:
+                raise InvalidStateChange("Faction member character does not belong to campaign")
+        if npc_id is not None:
+            npc = session.get(NPC, npc_id)
+            if npc is None or npc.campaign_id != campaign_id:
+                raise InvalidStateChange("Faction member NPC does not belong to campaign")
+            if npc.visibility == "dm_only" and visibility == "player":
+                raise InvalidStateChange(
+                    "Faction membership cannot be more visible than its NPC member"
+                )
+    else:
+        raise InvalidStateChange("Unsupported faction relationship type")
+    existing = session.scalar(
+        select(FactionRelationship.id).where(
+            FactionRelationship.faction_id == faction_id,
+            FactionRelationship.relation_type == relation_type,
+            FactionRelationship.character_id == character_id,
+            FactionRelationship.npc_id == npc_id,
+        )
+    )
+    if existing is not None:
+        raise ConflictError("Faction relationship already exists")
+    relationship_id = uuid.uuid4()
+    next_world_revision = campaign.world_revision + 1
+    event = _add_event(
+        session,
+        campaign_id,
+        ("faction_attitude_set" if relation_type == "attitude" else "faction_membership_set"),
+        {
+            "faction_id": str(faction_id),
+            "relationship_id": str(relationship_id),
+            "relation_type": relation_type,
+            "character_id": str(character_id) if character_id else None,
+            "npc_id": str(npc_id) if npc_id else None,
+            "value": value,
+            "relationship_revision": 0,
+            "world_revision": next_world_revision,
+        },
+        visibility=visibility,
+    )
+    relationship = FactionRelationship(
+        id=relationship_id,
+        campaign_id=campaign_id,
+        faction_id=faction_id,
+        relation_type=relation_type,
+        character_id=character_id,
+        npc_id=npc_id,
+        value=value,
+        visibility=visibility,
+        revision=0,
+        created_by_event_id=event.id,
+    )
+    session.add(relationship)
+    campaign.world_revision = next_world_revision
+    session.commit()
+    session.refresh(relationship)
+    return relationship
 
 
 def _validate_turn_target(
@@ -2648,8 +2861,27 @@ def _provider_context(
         omitted_decision_count = max(0, len(relevant_decisions) - MAX_PROVIDER_DECISIONS)
         if omitted_decision_count:
             relevant_decisions = relevant_decisions[-MAX_PROVIDER_DECISIONS:]
+        relevant_factions = [faction for faction in world.factions if faction.status == "active"]
+        omitted_faction_count = max(0, len(relevant_factions) - MAX_PROVIDER_FACTIONS)
+        if omitted_faction_count:
+            relevant_factions = relevant_factions[-MAX_PROVIDER_FACTIONS:]
+        faction_payload: list[dict[str, Any]] = []
+        remaining_relationships = MAX_PROVIDER_FACTION_RELATIONSHIPS
+        for faction in reversed(relevant_factions):
+            relationships = faction.relationships
+            included_count = min(len(relationships), remaining_relationships)
+            included = relationships[-included_count:] if included_count else []
+            remaining_relationships -= included_count
+            compact_faction = faction.model_dump(mode="json", exclude={"relationships"})
+            compact_faction["relationships"] = [
+                relationship.model_dump(mode="json") for relationship in included
+            ]
+            compact_faction["relationships_truncated"] = len(relationships) - included_count
+            faction_payload.append(compact_faction)
+        faction_payload.reverse()
         context["world"] = {
             "world_revision": world.world_revision,
+            "narrative_time_minutes": world.narrative_time_minutes,
             "scene": world.scene.model_dump(mode="json"),
             "present_npcs": [npc.model_dump(mode="json") for npc in world.present_npcs],
             "facts": [fact.model_dump(mode="json") for fact in relevant_facts],
@@ -2658,6 +2890,8 @@ def _provider_context(
             "quests_truncated": omitted_quest_count,
             "decisions": [decision.model_dump(mode="json") for decision in relevant_decisions],
             "decisions_truncated": omitted_decision_count,
+            "factions": faction_payload,
+            "factions_truncated": omitted_faction_count,
             "selected_target": (
                 selected_target.model_dump(mode="json") if selected_target is not None else None
             ),
@@ -2828,6 +3062,62 @@ def _validate_decision_consequences(
             )
 
 
+def _faction_for_change(session: Session, campaign_id: uuid.UUID, faction_id: uuid.UUID) -> Faction:
+    faction = session.get(Faction, faction_id)
+    if faction is None or faction.campaign_id != campaign_id:
+        raise InvalidStateChange("Faction does not belong to the campaign")
+    if faction.status != "active" or faction.visibility != "player":
+        raise InvalidStateChange("Faction must be active and player-visible")
+    return faction
+
+
+def _faction_relationship_for_change(
+    session: Session,
+    campaign_id: uuid.UUID,
+    change: FactionAttitudeSet | FactionMembershipSet,
+) -> tuple[Faction, FactionRelationship | None, uuid.UUID | None, uuid.UUID | None]:
+    faction = _faction_for_change(session, campaign_id, change.faction_id)
+    character_id = None
+    npc_id = None
+    relation_type = "attitude"
+    if isinstance(change, FactionMembershipSet):
+        relation_type = "membership"
+        if change.member_type == "character":
+            character = session.get(Character, change.member_id)
+            if character is None or character.campaign_id != campaign_id:
+                raise InvalidStateChange("Faction member character does not belong to campaign")
+            if character.creation_status != "finalized" or character.party_status != "active":
+                raise InvalidStateChange("Faction member character must be finalized and active")
+            character_id = character.id
+        else:
+            npc = session.get(NPC, change.member_id)
+            if npc is None or npc.campaign_id != campaign_id:
+                raise InvalidStateChange("Faction member NPC does not belong to campaign")
+            if npc.status != "active" or npc.visibility != "player":
+                raise InvalidStateChange("Faction member NPC must be active and player-visible")
+            npc_id = npc.id
+    relation = session.scalar(
+        select(FactionRelationship).where(
+            FactionRelationship.faction_id == faction.id,
+            FactionRelationship.relation_type == relation_type,
+            FactionRelationship.character_id == character_id,
+            FactionRelationship.npc_id == npc_id,
+        )
+    )
+    if relation is None:
+        if change.expected_revision is not None:
+            raise InvalidStateChange("Faction relationship revision is stale")
+    else:
+        if relation.visibility != "player":
+            raise InvalidStateChange("A hidden faction relationship cannot be changed here")
+        if change.expected_revision is None or relation.revision != change.expected_revision:
+            raise InvalidStateChange("Faction relationship revision is stale")
+        value = change.attitude if isinstance(change, FactionAttitudeSet) else change.membership
+        if relation.value == value:
+            raise InvalidStateChange("Faction relationship already has the proposed value")
+    return faction, relation, character_id, npc_id
+
+
 def _validate_world_changes(
     session: Session, campaign_id: uuid.UUID, changes: list
 ) -> tuple[set[uuid.UUID], set[uuid.UUID], set[uuid.UUID]]:
@@ -2837,6 +3127,11 @@ def _validate_world_changes(
     touched_objectives: set[uuid.UUID] = set()
     new_quest_keys: set[str] = set()
     new_decision_keys: set[str] = set()
+    new_faction_keys: set[str] = set()
+    touched_faction_relationships: set[
+        tuple[uuid.UUID, str, uuid.UUID | None, uuid.UUID | None]
+    ] = set()
+    time_advance_count = 0
     for change in changes:
         parts = _proposal_fact_parts(change)
         if parts is not None:
@@ -2935,6 +3230,37 @@ def _validate_world_changes(
             )
             if existing is not None:
                 raise InvalidStateChange("Decision key already exists in campaign")
+        elif isinstance(change, FactionCreate):
+            if change.faction_key in new_faction_keys:
+                raise InvalidStateChange("A turn cannot create duplicate faction keys")
+            new_faction_keys.add(change.faction_key)
+            existing = session.scalar(
+                select(Faction.id).where(
+                    Faction.campaign_id == campaign_id,
+                    Faction.faction_key == change.faction_key,
+                )
+            )
+            if existing is not None:
+                raise InvalidStateChange("Faction key already exists in campaign")
+        elif isinstance(change, (FactionAttitudeSet, FactionMembershipSet)):
+            _faction, _relation, character_id, npc_id = _faction_relationship_for_change(
+                session, campaign_id, change
+            )
+            relation_type = "attitude" if isinstance(change, FactionAttitudeSet) else "membership"
+            identity = (change.faction_id, relation_type, character_id, npc_id)
+            if identity in touched_faction_relationships:
+                raise InvalidStateChange(
+                    "A faction relationship can be changed at most once per turn"
+                )
+            touched_faction_relationships.add(identity)
+        elif isinstance(change, NarrativeTimeAdvance):
+            time_advance_count += 1
+            if time_advance_count > 1:
+                raise InvalidStateChange("A turn can advance narrative time at most once")
+            campaign = session.get(Campaign, campaign_id)
+            assert campaign is not None
+            if campaign.narrative_time_minutes + change.minutes > MAX_NARRATIVE_TIME_MINUTES:
+                raise InvalidStateChange("Narrative time exceeds the supported campaign range")
     for change in changes:
         if not isinstance(change, DecisionOpen):
             continue
@@ -3314,6 +3640,124 @@ def _apply_quest_decision_change(
     return False
 
 
+def _apply_faction_time_change(
+    session: Session,
+    campaign: Campaign,
+    change: Any,
+    *,
+    turn_id: uuid.UUID | None,
+    actor_character_id: uuid.UUID | None,
+) -> bool:
+    if isinstance(change, FactionCreate):
+        faction_id = uuid.uuid4()
+        next_revision = campaign.world_revision + 1
+        event = _add_event(
+            session,
+            campaign.id,
+            "faction_created",
+            {
+                "faction_id": str(faction_id),
+                "faction_key": change.faction_key,
+                "name": change.name,
+                "description": change.description,
+                "world_revision": next_revision,
+            },
+            turn_id=turn_id,
+            actor_character_id=actor_character_id,
+        )
+        session.add(
+            Faction(
+                id=faction_id,
+                campaign_id=campaign.id,
+                faction_key=change.faction_key,
+                name=change.name,
+                description=change.description,
+                status="active",
+                visibility="player",
+                revision=0,
+                created_by_event_id=event.id,
+            )
+        )
+        campaign.world_revision = next_revision
+        return True
+    if isinstance(change, (FactionAttitudeSet, FactionMembershipSet)):
+        faction, relation, character_id, npc_id = _faction_relationship_for_change(
+            session, campaign.id, change
+        )
+        relation_type = "attitude" if isinstance(change, FactionAttitudeSet) else "membership"
+        value = change.attitude if isinstance(change, FactionAttitudeSet) else change.membership
+        relation_id = relation.id if relation is not None else uuid.uuid4()
+        next_relation_revision = relation.revision + 1 if relation is not None else 0
+        next_world_revision = campaign.world_revision + 1
+        event_type = (
+            "faction_attitude_set"
+            if isinstance(change, FactionAttitudeSet)
+            else "faction_membership_set"
+        )
+        event = _add_event(
+            session,
+            campaign.id,
+            event_type,
+            {
+                "faction_id": str(faction.id),
+                "faction_key": faction.faction_key,
+                "relationship_id": str(relation_id),
+                "relation_type": relation_type,
+                "character_id": str(character_id) if character_id else None,
+                "npc_id": str(npc_id) if npc_id else None,
+                "previous_value": relation.value if relation is not None else None,
+                "value": value,
+                "relationship_revision": next_relation_revision,
+                "world_revision": next_world_revision,
+            },
+            turn_id=turn_id,
+            actor_character_id=actor_character_id,
+        )
+        if relation is None:
+            session.add(
+                FactionRelationship(
+                    id=relation_id,
+                    campaign_id=campaign.id,
+                    faction_id=faction.id,
+                    relation_type=relation_type,
+                    character_id=character_id,
+                    npc_id=npc_id,
+                    value=value,
+                    visibility="player",
+                    revision=0,
+                    created_by_event_id=event.id,
+                )
+            )
+        else:
+            relation.value = value
+            relation.revision = next_relation_revision
+            relation.updated_by_event_id = event.id
+        campaign.world_revision = next_world_revision
+        return True
+    if isinstance(change, NarrativeTimeAdvance):
+        previous_minutes = campaign.narrative_time_minutes
+        next_minutes = previous_minutes + change.minutes
+        next_world_revision = campaign.world_revision + 1
+        _add_event(
+            session,
+            campaign.id,
+            "narrative_time_advanced",
+            {
+                "minutes": change.minutes,
+                "reason": change.reason,
+                "previous_time_minutes": previous_minutes,
+                "narrative_time_minutes": next_minutes,
+                "world_revision": next_world_revision,
+            },
+            turn_id=turn_id,
+            actor_character_id=actor_character_id,
+        )
+        campaign.narrative_time_minutes = next_minutes
+        campaign.world_revision = next_world_revision
+        return True
+    return False
+
+
 def _apply_decision_consequence(
     session: Session,
     campaign: Campaign,
@@ -3523,7 +3967,15 @@ def _apply_state_changes(
                 actor_character_id=actor_character_id,
             )
             if not handled:
-                _apply_quest_decision_change(
+                handled = _apply_quest_decision_change(
+                    session,
+                    campaign,
+                    change,
+                    turn_id=turn_id,
+                    actor_character_id=actor_character_id,
+                )
+            if not handled:
+                _apply_faction_time_change(
                     session,
                     campaign,
                     change,

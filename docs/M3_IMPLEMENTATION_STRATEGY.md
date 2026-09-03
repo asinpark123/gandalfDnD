@@ -1,9 +1,9 @@
 # M3 Persistent World Implementation Strategy
 
-- **Status:** In progress — M3.1–M3.3 Done; M3.4 Ready
+- **Status:** In progress — M3.1–M3.4 Done; M3.5 Ready
 - **Prepared:** 2026-09-03
 - **Depends on:** M2 two-stage AI turn and model-authored feasibility (Done)
-- **Owner input required now:** No; M3 begins with a neutral, mechanically inert world fixture
+- **Owner input required now:** At the M3.5 API acceptance gate, after its deterministic scenario
 - **Owner checkpoint:** M3.5, after a complete branching world loop is stable through the API
 
 ## 1. Objective
@@ -191,14 +191,15 @@ mechanical write.
 
 ### 5.5 Factions, time, clues, and knowledge
 
-`factions` receive the same stable identity, visibility, lifecycle, revision, and causal-event
-requirements as NPCs. Membership and party/faction attitudes use typed world facts rather than
-numeric reputation.
+`factions` use stable campaign-scoped UUID/key identity, explicit visibility, lifecycle, revision,
+and causal creation events. Dedicated `faction_relationships` hold one typed party attitude or
+typed character/NPC memberships with their own revisions and causal create/update events. Values
+are fixed narrative labels rather than numeric reputation and have no mechanical effect.
 
-Narrative world time begins as monotonic elapsed minutes on the campaign. A typed `advance_time`
-proposal has a positive upper bound and records its reason. It does not trigger rests, resource
-recovery, spell durations, exhaustion, or travel mechanics until those deterministic resolvers
-exist.
+Narrative world time is monotonic elapsed minutes on the campaign. A typed
+`narrative_time_advance` proposal advances 1 to 10,080 minutes, records its reason, and is limited to
+one per turn. It does not trigger rests, resource recovery, spell durations, exhaustion, or travel
+mechanics until those deterministic resolvers exist.
 
 Clues are typed world facts. A reveal creates an auditable player-visible successor or knowledge
 record; it does not mutate a hidden row in place and lose history. Public APIs and provider context
@@ -393,6 +394,8 @@ Implemented evidence:
 
 ### M3.4 — Factions, narrative clock, and complete visibility projection
 
+**Status:** Done (2026-09-03)
+
 Player outcome: faction membership, elapsed narrative time, revealed clues, and current objectives
 remain coherent after movement and restart without causing unimplemented rest/combat mechanics.
 
@@ -406,6 +409,28 @@ Deliver:
 
 Exit evidence: time monotonicity/bounds, no automatic resource refresh, faction isolation,
 visibility adversarial suite, 100+ world-fact context budget, restart, and zero migration drift pass.
+
+Implemented evidence:
+
+- migration `0011_factions_time` adds nonnegative campaign elapsed minutes, stable faction rows,
+  typed party-attitude and character/NPC-membership rows, revision/event links, constrained values,
+  campaign ownership foreign keys, uniqueness rules, and guarded downgrade;
+- strict proposals create player-visible factions, create or revision-update fixed-label
+  relationships, and advance narrative time by 1–10,080 minutes at most once per turn; validation
+  rejects stale, duplicate, unchanged, hidden, cross-campaign, and overflow states before writes;
+- faction labels and elapsed time are mechanically inert: no HP, resource, inventory, rest,
+  duration, travel, or condition behavior is inferred from them;
+- `get_world_state` now supports explicit internal `player` or `dm` audiences and safely defaults
+  to `player`, while the public API and both provider stages use the player projection; hidden NPCs, facts, quests,
+  decisions, factions, relationships, and DM-only events remain absent from all player paths;
+- the canonical player read retains complete visible current/history projections, while provider
+  context keeps only 50 relevant facts, 20 active quests, 20 open decisions, 20 active factions,
+  and 50 faction relationships with explicit omitted counts;
+- six focused M3.4 tests prove typed relation create/update, time bounds and monotonicity, no
+  mechanical refresh, atomic rollback, faction/member campaign isolation, full visibility
+  adversarial projection, restart durability, 101-fact plus large-entity context budgets, and
+  destructive-migration refusal; all 123 normal tests pass with one opt-in live test skipped, plus
+  lint, compilation, ruleset/schema integrity, and zero Alembic drift.
 
 ### M3.5 — Branching Lantern verification and owner gate
 
@@ -489,5 +514,5 @@ domain validation failure before provider work creates no provider audit.
 Each slice is committed only when it crosses migration, ORM, schema, API, service, events, tests,
 and documentation. A later slice that invalidates an earlier visibility, identity, causality, or
 restart guarantee moves that slice back to Rework. M3 planning is complete with this document.
-M3.1–M3.3 are verified and complete; implementation proceeds to M3.4's factions, bounded narrative
-clock, full visibility matrix, and expanded context-budget evidence.
+M3.1–M3.4 are verified and complete; implementation proceeds to M3.5's deterministic branching
+Lantern scenario, owner API acceptance gate, and separately authorized capped live OpenClaw run.

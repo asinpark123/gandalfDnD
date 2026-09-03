@@ -244,5 +244,5 @@ def test_m2_turn_blocks_destructive_migration_downgrade(client: TestClient) -> N
         command.downgrade(config, "0005_check_save_resolution")
     with get_engine().connect() as connection:
         assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == (
-            "0010_quests_decisions"
+            "0011_factions_time"
         )

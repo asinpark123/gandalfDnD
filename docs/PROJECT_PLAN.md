@@ -4,8 +4,8 @@
 - **Last updated:** 2026-09-03
 - **Rules baseline:** SRD 5.2.1 (pinned; character-state and check/save-resolution catalogs pass
   integrity and schema verification)
-- **Current delivery stage:** M3 In Progress — M3.1–M3.3 are Done and M3.4 factions, narrative
-  clock, visibility, and context budgets is Ready; M2 remains Done, while direct paid-provider integration
+- **Current delivery stage:** M3 In Progress — M3.1–M3.4 are Done and M3.5 deterministic branching
+  verification plus owner acceptance is Ready; M2 remains Done, while direct paid-provider integration
   remains deferred and not authorized
 - **Canonical repository:** `~/Git/gandalfDnD`
 
@@ -319,7 +319,7 @@ Use these values consistently:
 | M0 | Persistence and safety foundation | Done | Canonical state and auditable turn skeleton |
 | M1 | Party character creation and deterministic mechanics | Done | The selected acting character's choices drive calculated outcomes |
 | M2 | Two-stage AI turn and model-authored feasibility | Done | Real DM-authored output uses recorded dice results safely through a private provider boundary |
-| M3 | Persistent world model | In Progress (M3.1–M3.3 Done; M3.4 Ready) | NPCs, quests, scenes, clues, time, decisions, and visibility |
+| M3 | Persistent world model | In Progress (M3.1–M3.4 Done; M3.5 Ready) | NPCs, quests, scenes, clues, time, decisions, and visibility |
 | M4 | Long-term memory and retrieval | Proposed | Coherent recall without full history in context |
 | M5 | Basic deterministic combat | Proposed | Reproducible initiative, actions, attacks, and damage |
 | M6 | Spoiler-safe Guide | Proposed | Beginner help with enforceable knowledge boundaries |
@@ -927,7 +927,7 @@ optional direct paid-provider route remains deferred and is not required for M2 
 
 ### M3 — Persistent world model
 
-- **Status:** In Progress — M3.1–M3.3 Done; M3.4 Ready
+- **Status:** In Progress — M3.1–M3.4 Done; M3.5 Ready
 - **Depends on:** M2
 - **Detailed strategy:** [`M3_IMPLEMENTATION_STRATEGY.md`](M3_IMPLEMENTATION_STRATEGY.md)
 
@@ -977,6 +977,20 @@ Eight focused tests prove legal/illegal transitions, idempotency conflict, doubl
 two-campaign divergence, restart, event order, rollback, overlap rejection, migration safety, and
 the no-implicit-reward firewall. All 117 normal tests pass with the opt-in OpenClaw test skipped,
 plus lint, compilation, and zero Alembic drift.
+
+M3.4 completion evidence (2026-09-03): migration `0011_factions_time` stores nonnegative campaign
+elapsed minutes, stable faction identities, and constrained revisioned party attitudes plus
+character/NPC memberships with causal event links and guarded downgrade. Strict narration
+proposals create visible factions, revision-update fixed narrative labels, and advance time by
+1–10,080 minutes once per turn. Labels and time cannot imply numeric reputation, HP/resource
+changes, rests, durations, travel, or conditions. The world service supports explicit player/DM
+audiences and public/provider paths always select the player projection; a full adversarial fixture
+keeps hidden NPCs, facts, quests, objectives, decisions, factions, relationships, and events out of
+those paths. Provider context caps visible current state at 50 facts, 20 active quests, 20 open
+decisions, 20 active factions, and 50 faction relationships. Six focused tests prove relation
+create/update, time bounds/monotonicity, no mechanical refresh, rollback, campaign isolation,
+visibility, restart, 101-fact plus large-world budgets, and migration safety. All 123 normal tests
+pass with the opt-in OpenClaw test skipped, plus static, ruleset/schema, and zero-drift gates.
 
 World state is relational and causal. Names are display data; UUIDs are authoritative. Narrative
 facts are mechanically inert unless a separately implemented rule or versioned house-rule resolver
@@ -1064,7 +1078,7 @@ agent direct database or unvalidated state-mutation access.
 | DEBT-001 | Architecture | Resolved | M2.2 routes typed Party Commander turn checks/saves through M1.4 and rejects any legacy provider dice request before writes | Every accepted new turn roll now derives canonical actor modifiers and application dice; M2.3 subsequently added post-resolution narration | Strict intent contract, authoritative turn resolution, no-reroll retry, legacy rejection, and actor-isolation fixtures; M2.2 |
 | DEBT-002 | Architecture | Resolved | M2.3 narration receives the stored intent and immutable resolution only after M1.4 resolution, and must echo the exact resolution ID/outcome | Narration can no longer precede or silently contradict an accepted check/save result; prose alone cannot change mechanics | Typed narration contract, contradiction and prose-only fixtures, atomic finalization, and no-open-transaction assertion; M2.3 |
 | GAP-001 | Product | Resolved | M1.3 supports an ordered 2–4 character Party Commander party with independently derived equipment/defense/resource state and actor isolation | Party Commander foundation now exists; character content breadth remains intentionally narrow | Migration `0004`, automated evidence, owner acceptance, and final M1 review passed; broader breadth remains deferred to M1.5 |
-| GAP-002 | Product | Resolved | M3.3 adds deterministic quest/objective transitions and explicit exact-once branch selection on top of durable scenes and facts | Visible choices now produce validated, durable, explainable divergence; faction/time breadth remains in M3.4 | Migration `0010`, eight focused branch/transition fixtures, and full regression gate; M3.3 |
+| GAP-002 | Product | Resolved | M3.3 adds deterministic quest/objective transitions and exact-once branch selection; M3.4 adds typed factions, elapsed time, and complete audience projection | Visible choices now produce validated, durable, explainable divergence inside a bounded persistent world | Migrations `0010`–`0011`, fourteen focused world fixtures, and full regression gates; M3.3–M3.4 |
 | TEST-001 | Validation | Deferred | The direct automated OpenAI provider has no paid live evaluation and API spend is not authorized | Direct API authentication, billing/cap behavior, SDK compatibility, and usage accounting remain unproven | Optional M2.5B after explicit provider/cap authorization |
 | TEST-002 | Validation | Resolved | The private OpenClaw route passed real interpretation/narration smokes and three ten-scenario model-authored Lantern runs | Gateway authentication, model behavior, structured output, latency/usage audits, restart/resume, and application boundaries now have live evidence | `M2_5_OPENCLAW_EVALUATION.md`; M2.5A |
 | GAP-005 | Provider integration | Open | The two-stage provider factory supports OpenClaw but intentionally rejects direct OpenAI; the existing OpenAI adapter serves only the legacy Phase 0 contract | Subscription-backed automated play can proceed through OpenClaw after activation, while direct paid API play remains unavailable by design | M2.5B only after explicit authorization: implement direct-provider deadline plus failure/usage mapping, then run its separately capped evaluation |
@@ -1150,6 +1164,8 @@ because a workaround exists; record both the workaround and the permanent resolu
 | ADR-024 | 2026-09-03 | Limit M3.2 facts to five typed narrative predicates and four fixed NPC attitudes, with explicit supersession rather than in-place rewriting | An arbitrary predicate/value store would become an unvalidated shadow database, while numeric reputation would imply unsupported mechanics | When a reviewed product requirement and migration adds another typed narrative predicate or a cited resolver adds mechanics |
 | ADR-025 | 2026-09-03 | Send at most the newest 50 relevant visible facts to a provider and report the omitted count | Public canonical history may grow without bound, but provider context must remain current-scene relevant and predictably bounded | When M4 retrieval supplies a stronger relevance ranking within an equal or smaller measured budget |
 | ADR-026 | 2026-09-03 | Store immutable bounded narrative consequences on two-to-four-option decision records, validate an explicit option before provider work, and apply it exactly once only at successful finalization | The LLM needs the selected branch for coherent narration, but it must not choose, rewrite, or mechanically amplify the player's decision; delayed application keeps failed/cancelled turns mutation-free | When a typed reward/rules resolver or decision-editing workflow is explicitly designed |
+| ADR-027 | 2026-09-03 | Represent factions with stable identities and constrained revisioned relationship rows, and represent world time as bounded monotonic elapsed minutes with no implicit mechanics | Membership/attitude continuity and story chronology must persist now, while numeric reputation, automatic modifiers, rests, duration processing, and travel rules are not implemented | When a cited deterministic resolver or versioned house rule adds one exact mechanical semantic |
+| ADR-028 | 2026-09-03 | Use one audience-aware world projection that defaults to player-safe output, keep all M3 providers on that player path, and cap every growing provider collection | A separate DM projection is needed for future orchestration, but hidden values and unbounded history must not reach current player-facing model output | When a tested planner/narrator separation or M4 retrieval layer introduces a narrower hidden-data capability |
 
 ## 14. Milestone review template
 
@@ -1238,14 +1254,15 @@ Destination milestone:
 
 ## 17. Immediate next actions
 
-1. Implement M3.4 faction identities and typed, narrative-only memberships/attitudes without
-   numeric reputation or automatic modifiers.
-2. Add bounded monotonic narrative-clock advancement that cannot imply a rest, resource refresh,
-   spell-duration rule, exhaustion, or travel mechanic.
-3. Complete the M3 entity visibility matrix and keep compact provider projection bounded under
-   synthetic historical growth.
-4. Prove faction/time isolation, hidden-record exclusion, restart, migration safety, context size,
-   and all prior regressions before M3.5. No owner input or live model call is required for M3.4.
+1. Implement and run the M3.5 deterministic branching Lantern scenario across two otherwise
+   identical campaigns, including presence, movement, facts, reveal, quest choice, faction/time,
+   restart, ordered events, and exact world-revision replay.
+2. Prepare a concise player-safe M3.5 API acceptance checklist and preserve the owner's results in
+   the repository; this is the next required owner testing checkpoint.
+3. Fix any deterministic or owner-observed defect and rerun the affected/full gates before closing
+   M3; frontend presentation remains deferred to M7.
+4. Request separate permission immediately before the capped live OpenClaw version of the complete
+   scenario. A live provider result supplements but never replaces deterministic acceptance.
 
 ## 18. Documentation change log
 
@@ -1280,3 +1297,4 @@ Destination milestone:
 | 2026-09-03 | DOC-027 | Completed M3.1 and advanced M3.2 to Ready with migration `0008`, stable NPC identity/presence, player-safe world reads, explicit targets, causal scene transitions, and world-revision concurrency checks | Six focused tests cover duplicate names, visibility/presence/campaign isolation, target idempotency, restart, migration safety, bounded provider context, and interpretation/narration races; all 102 normal tests, lint, and zero drift pass without external calls | Implement M3.2 typed narrative-only facts, relationships, supersession, and controlled reveal while preserving the no-hidden-context and no-implicit-mechanics boundaries |
 | 2026-09-03 | DOC-028 | Completed M3.2 and advanced M3.3 to Ready with migration `0009`, typed narrative-only facts, durable supersession, controlled reveal, and bounded visible provider context | Seven focused fixtures prove all five allowed fact types, no mechanical mutation, hidden API/event/provider exclusion, reveal history, atomic rollback, campaign isolation, restart, migration guard, and a 101-fact context budget; all 109 normal tests and static/schema gates pass | Implement M3.3 quests, objectives, explicit decisions, and deterministic branch consequences; retain the M3.5 live OpenClaw gate |
 | 2026-09-03 | DOC-029 | Completed M3.3, resolved GAP-002, and advanced M3.4 to Ready with migration `0010`, durable quests/objectives, explicit keyed decisions, and deterministic exact-once branch consequences | Eight focused fixtures prove legal/illegal revisioned transitions, stable two-to-four-option contracts, changed-choice idempotency conflict, double-selection rejection, two-campaign divergence, selected-option context, ordered events, rollback/overlap safety, restart, guarded downgrade, and no implicit rewards; all 117 normal tests and static/schema gates pass | Implement M3.4 factions, bounded narrative time, full visibility projection, and expanded context budgets; retain the M3.5 owner and live OpenClaw gates |
+| 2026-09-03 | DOC-030 | Completed M3.4 and advanced M3.5 to Ready with migration `0011`, typed factions/relationships, bounded elapsed time, explicit audience projection, and complete provider collection budgets | Six focused fixtures prove relationship revisions, mechanically inert time, rollback, campaign isolation, hidden-record exclusion across every M3 entity/event/provider path, restart, 101-fact/large-world context caps, and guarded downgrade; all 123 normal tests and integrity/static/schema gates pass | Run the deterministic complete branching Lantern scenario, prepare and conduct the owner API gate, then request permission for the capped live OpenClaw supplement |

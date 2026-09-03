@@ -358,5 +358,5 @@ def test_migration_refuses_to_discard_world_facts(client: TestClient) -> None:
         command.downgrade(config, "0008_world_presence")
     with get_engine().connect() as connection:
         assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == (
-            "0010_quests_decisions"
+            "0011_factions_time"
         )

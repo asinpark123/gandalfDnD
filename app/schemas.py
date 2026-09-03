@@ -69,6 +69,7 @@ class CampaignRead(BaseModel):
     party_min_active: int
     party_max_active: int
     world_revision: int
+    narrative_time_minutes: int
     created_at: datetime
 
 
@@ -215,15 +216,42 @@ class DecisionRead(BaseModel):
     created_at: datetime
 
 
+class FactionRelationshipRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    relation_type: Literal["attitude", "membership"]
+    character_id: uuid.UUID | None
+    npc_id: uuid.UUID | None
+    value: str
+    revision: int
+    created_at: datetime
+
+
+class FactionRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    faction_key: str
+    name: str
+    description: str | None
+    status: str
+    revision: int
+    relationships: list[FactionRelationshipRead]
+    created_at: datetime
+
+
 class WorldStateRead(BaseModel):
     campaign_id: uuid.UUID
     world_revision: int
+    narrative_time_minutes: int
     location: LocationRead
     scene: SceneRead
     present_npcs: list[NPCRead]
     facts: list[WorldFactRead]
     quests: list[QuestRead]
     decisions: list[DecisionRead]
+    factions: list[FactionRead]
 
 
 class HPDelta(BaseModel):
@@ -404,6 +432,43 @@ class DecisionOpen(BaseModel):
         return self
 
 
+class FactionCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    type: Literal["faction_create"]
+    faction_key: StableKey
+    name: ShortText
+    description: str | None = Field(default=None, max_length=2000)
+
+
+class FactionAttitudeSet(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    type: Literal["faction_attitude_set"]
+    faction_id: uuid.UUID
+    expected_revision: int | None = Field(default=None, ge=0)
+    attitude: Literal["friendly", "neutral", "wary", "hostile"]
+
+
+class FactionMembershipSet(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    type: Literal["faction_membership_set"]
+    faction_id: uuid.UUID
+    member_type: Literal["character", "npc"]
+    member_id: uuid.UUID
+    expected_revision: int | None = Field(default=None, ge=0)
+    membership: Literal["member", "associate", "former_member"]
+
+
+class NarrativeTimeAdvance(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    type: Literal["narrative_time_advance"]
+    minutes: int = Field(ge=1, le=10_080)
+    reason: ShortText
+
+
 StateChange = Annotated[
     HPDelta
     | MoveLocation
@@ -418,7 +483,11 @@ StateChange = Annotated[
     | QuestCreate
     | QuestTransition
     | QuestObjectiveTransition
-    | DecisionOpen,
+    | DecisionOpen
+    | FactionCreate
+    | FactionAttitudeSet
+    | FactionMembershipSet
+    | NarrativeTimeAdvance,
     Field(discriminator="type"),
 ]
 

@@ -100,6 +100,7 @@ class Campaign(TimestampMixin, Base):
     party_min_active: Mapped[int] = mapped_column(Integer, nullable=False, default=2)
     party_max_active: Mapped[int] = mapped_column(Integer, nullable=False, default=4)
     world_revision: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    narrative_time_minutes: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
     ruleset_release: Mapped[RulesetRelease] = relationship(back_populates="campaigns")
     characters: Mapped[list["Character"]] = relationship(back_populates="campaign")
@@ -118,6 +119,7 @@ class Campaign(TimestampMixin, Base):
             name="campaign_party_size_bounds",
         ),
         CheckConstraint("world_revision >= 0", name="campaign_world_revision_nonnegative"),
+        CheckConstraint("narrative_time_minutes >= 0", name="campaign_narrative_time_nonnegative"),
     )
 
 
@@ -539,6 +541,117 @@ class DecisionOption(TimestampMixin, Base):
         CheckConstraint(
             "jsonb_typeof(consequences) = 'array' AND jsonb_array_length(consequences) <= 10",
             name="decision_option_consequences_shape",
+        ),
+    )
+
+
+class Faction(TimestampMixin, Base):
+    __tablename__ = "factions"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    campaign_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("campaigns.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    faction_key: Mapped[str] = mapped_column(String(80), nullable=False)
+    name: Mapped[str] = mapped_column(String(160), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="active")
+    visibility: Mapped[str] = mapped_column(String(20), nullable=False, default="player")
+    revision: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    created_by_event_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey(
+            "campaign_events.id",
+            name="factions_created_by_event_id_fkey",
+            ondelete="RESTRICT",
+            use_alter=True,
+        ),
+        nullable=False,
+    )
+
+    relationships: Mapped[list["FactionRelationship"]] = relationship(
+        back_populates="faction", order_by="FactionRelationship.created_at"
+    )
+
+    __table_args__ = (
+        UniqueConstraint("campaign_id", "faction_key", name="uq_factions_campaign_key"),
+        CheckConstraint("status IN ('active', 'inactive')", name="faction_status"),
+        CheckConstraint("visibility IN ('player', 'dm_only')", name="faction_visibility"),
+        CheckConstraint("revision >= 0", name="faction_revision_nonnegative"),
+        CheckConstraint("faction_key ~ '^[a-z0-9][a-z0-9._-]{0,79}$'", name="faction_key_format"),
+    )
+
+
+class FactionRelationship(TimestampMixin, Base):
+    __tablename__ = "faction_relationships"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    campaign_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("campaigns.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    faction_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("factions.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    relation_type: Mapped[str] = mapped_column(String(20), nullable=False)
+    character_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("characters.id", ondelete="CASCADE"), index=True
+    )
+    npc_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("npcs.id", ondelete="CASCADE"), index=True
+    )
+    value: Mapped[str] = mapped_column(String(30), nullable=False)
+    visibility: Mapped[str] = mapped_column(String(20), nullable=False, default="player")
+    revision: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    created_by_event_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey(
+            "campaign_events.id",
+            name="faction_relationships_created_by_event_id_fkey",
+            ondelete="RESTRICT",
+            use_alter=True,
+        ),
+        nullable=False,
+    )
+    updated_by_event_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey(
+            "campaign_events.id",
+            name="faction_relationships_updated_by_event_id_fkey",
+            ondelete="SET NULL",
+            use_alter=True,
+        )
+    )
+
+    faction: Mapped[Faction] = relationship(back_populates="relationships")
+
+    __table_args__ = (
+        CheckConstraint(
+            "(relation_type = 'attitude' AND character_id IS NULL AND npc_id IS NULL "
+            "AND value IN ('friendly', 'neutral', 'wary', 'hostile')) OR "
+            "(relation_type = 'membership' AND ((character_id IS NULL) <> (npc_id IS NULL)) "
+            "AND value IN ('member', 'associate', 'former_member'))",
+            name="faction_relationship_shape",
+        ),
+        CheckConstraint(
+            "visibility IN ('player', 'dm_only')", name="faction_relationship_visibility"
+        ),
+        CheckConstraint("revision >= 0", name="faction_relationship_revision_nonnegative"),
+        Index(
+            "uq_faction_party_attitude",
+            "faction_id",
+            unique=True,
+            postgresql_where=text("relation_type = 'attitude'"),
+        ),
+        Index(
+            "uq_faction_character_membership",
+            "faction_id",
+            "character_id",
+            unique=True,
+            postgresql_where=text("relation_type = 'membership' AND character_id IS NOT NULL"),
+        ),
+        Index(
+            "uq_faction_npc_membership",
+            "faction_id",
+            "npc_id",
+            unique=True,
+            postgresql_where=text("relation_type = 'membership' AND npc_id IS NOT NULL"),
         ),
     )
 

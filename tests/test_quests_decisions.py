@@ -431,5 +431,5 @@ def test_migration_refuses_to_discard_quest_or_decision_data(client: TestClient)
         command.downgrade(config, "0009_world_facts")
     with get_engine().connect() as connection:
         assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == (
-            "0010_quests_decisions"
+            "0011_factions_time"
         )

@@ -1,6 +1,6 @@
 # M4 Long-Term Memory and Retrieval Implementation Strategy
 
-- **Status:** In progress; M4.1 passed and M4.2 local embedding/source projection is next
+- **Status:** In progress; M4.2 passed and M4.3 hybrid retrieval/audit is next
 - **Prepared:** 2026-09-04
 - **Depends on:** M3 persistent world (Done, including live OpenClaw supplement)
 - **Infrastructure audit:** [`M4_POSTGRES_PGVECTOR_AUDIT.md`](M4_POSTGRES_PGVECTOR_AUDIT.md)
@@ -12,8 +12,8 @@
   [`POSTGRESQL_18_DEVELOPMENT_REHEARSAL.md`](POSTGRESQL_18_DEVELOPMENT_REHEARSAL.md)
 - **PG18 cutover evidence:** [`POSTGRESQL_18_CUTOVER_EXECUTION.md`](POSTGRESQL_18_CUTOVER_EXECUTION.md)
 - **M4.1 evidence:** [`M4_1_MEMORY_FOUNDATION.md`](M4_1_MEMORY_FOUNDATION.md)
-- **Owner input required next:** Review the M4.2 local embedding-model comparison before a material
-  one-time model download if no candidate is clearly superior within the recorded bounds
+- **M4.2 evidence:** [`M4_2_SOURCE_INDEXING.md`](M4_2_SOURCE_INDEXING.md)
+- **Owner input required next:** None before the M4.5 relevance/continuity acceptance gate
 - **Owner checkpoint:** M4.5 retrieval/re-index acceptance, followed by any separately authorized
   live narrative-coherence supplement
 
@@ -304,6 +304,14 @@ health, 9 focused tests, and all 135 repository tests passed. No provider contex
 Exit: eligible sources index exactly once, hidden/error sources never index, failure does not affect
 turns, and a new profile can build without altering the active profile.
 
+Result (2026-09-04): Passed. Completed-turn projection, canonical tags, content hashes, deterministic
+and checksum-verified local providers, leased jobs, bounded backfill/recovery, failure safety,
+restart recovery, and side-by-side activation guards pass. BGE small English v1.5 was selected at
+an immutable quantized ONNX revision; its 64 MiB local artifact produced 384-dimensional vectors at
+16.613 ms warm p95 on the MacBook. Development backfill created and embedded exactly 115 documents
+across 11 ready, inactive builds. Migration `0013_memory_lifecycle` repaired the M4.1 shared-trigger
+record-shape defect. Memory remains outside provider context.
+
 ### M4.3 — Hybrid retrieval and audit
 
 - implement filter-before-rank SQL, lexical plus cosine candidates, versioned rank fusion, and
@@ -391,9 +399,9 @@ Owner input is required at three bounded points:
 1. **M4.1 complete:** the bounded extension, adapter, migration, recovery, rollback, isolation, and
    regression gate passed. PostgreSQL 15 rollback copies, retirement, deletion, and unrelated
    services remained excluded.
-2. **M4.2 model selection:** review measured local model size, one-time download, CPU latency,
-   retrieval quality, and license if candidates differ materially. Codex may choose autonomously if
-   one candidate clearly meets every recorded bound with no new service or cost.
+2. **M4.2 model selection (resolved):** BGE small English v1.5 clearly met the recorded size,
+   license, input, maintenance, CPU, and no-cost bounds. The exact model/runtime revision and every
+   artifact checksum are committed; corpus retrieval quality remains an M4.3/M4.5 gate.
 3. **M4.5 acceptance:** test whether recalled details feel relevant, correctly attributed,
    non-repetitive, and consistent after restart. Live OpenClaw testing remains a separate opt-in
    decision with a maximum-call budget.
@@ -408,7 +416,6 @@ quality/latency results, defects, workarounds, and next actions. M4 moves to Rew
 shows hidden/cross-campaign retrieval, uncited memory, mixed profiles, canonical-state substitution,
 unbounded context, or a completed turn depending on index availability.
 
-M4.1 is complete. Proceed with repository-only M4.2 source projection and deterministic provider
-work, but stop before a material local model download if candidate evidence requires owner choice.
-Paid/network embeddings, provider-memory context, PostgreSQL 15 retirement, and unrelated-service
-changes remain outside the current authority boundary.
+M4.2 is complete. Proceed with M4.3 hybrid retrieval and immutable audit work. Paid/network
+embeddings, provider-memory context, PostgreSQL 15 retirement, and unrelated-service changes remain
+outside the current authority boundary.

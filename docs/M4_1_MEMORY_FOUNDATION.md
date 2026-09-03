@@ -4,6 +4,8 @@
 - **Execution date:** 2026-09-04
 - **Database platform:** PostgreSQL 18.6 on `postgresvm`
 - **Migration:** `0012_memory_foundation`
+- **Current successor head:** `0013_memory_lifecycle` repairs the shared lifecycle trigger exposed
+  during M4.2; see [`M4_2_SOURCE_INDEXING.md`](M4_2_SOURCE_INDEXING.md)
 - **Server extension:** pgvector `0.8.6`
 - **Python adapter:** `pgvector==0.5.0`
 - **Strategy:** [`M4_IMPLEMENTATION_STRATEGY.md`](M4_IMPLEMENTATION_STRATEGY.md)

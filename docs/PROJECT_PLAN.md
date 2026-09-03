@@ -4,11 +4,11 @@
 - **Last updated:** 2026-09-04
 - **Rules baseline:** SRD 5.2.1 (pinned; character-state and check/save-resolution catalogs pass
   integrity and schema verification)
-- **Current delivery stage:** M4 In progress. M4.1 enabled pgvector 0.8.6 only in the two
-  PostgreSQL 18 Gandalf databases and added guarded migration `0012_memory_foundation`; all 135
-  tests and extension, vector, migration, drift, isolation, API, and shared-service gates pass.
-  PG18 stabilization and PG15 rollback retention continue; M4.2 source projection/local embedding
-  work is next, with a checkpoint before any material real-model download
+- **Current delivery stage:** M4 In progress. M4.2 adds player-safe completed-turn projection,
+  durable leased indexing, a deterministic provider, and checksum-verified local BGE embeddings;
+  migration `0013_memory_lifecycle` repairs the M4.1 trigger defect. All 143 tests and integrity,
+  migration, drift, API, and isolation gates pass. Eleven development builds covering 115 documents
+  are ready but intentionally inactive. M4.3 hybrid retrieval and audit is next
 - **Canonical repository:** `~/Git/gandalfDnD`
 
 ## 1. Purpose of this document
@@ -1082,7 +1082,7 @@ while DM-only facts remain absent from player-visible APIs.
 
 ### M4 — Long-term memory and retrieval
 
-- **Status:** In progress; M4.1 Done (2026-09-04), M4.2 next
+- **Status:** In progress; M4.2 Done (2026-09-04), M4.3 next
 - **Depends on:** M3
 - **Detailed strategy:** [`M4_IMPLEMENTATION_STRATEGY.md`](M4_IMPLEMENTATION_STRATEGY.md)
 - **Infrastructure audit:** [`M4_POSTGRES_PGVECTOR_AUDIT.md`](M4_POSTGRES_PGVECTOR_AUDIT.md)
@@ -1092,6 +1092,7 @@ while DM-only facts remain absent from player-visible APIs.
 - **PG18 development rehearsal:** [`POSTGRESQL_18_DEVELOPMENT_REHEARSAL.md`](POSTGRESQL_18_DEVELOPMENT_REHEARSAL.md)
 - **PG18 active cutover:** [`POSTGRESQL_18_CUTOVER_EXECUTION.md`](POSTGRESQL_18_CUTOVER_EXECUTION.md)
 - **M4.1 execution:** [`M4_1_MEMORY_FOUNDATION.md`](M4_1_MEMORY_FOUNDATION.md)
+- **M4.2 execution:** [`M4_2_SOURCE_INDEXING.md`](M4_2_SOURCE_INDEXING.md)
 
 Add player-visible, source-cited narrative memory for completed turns/events, a local embedding
 provider, versioned profiles, durable idempotent indexing, exact-vector plus lexical hybrid search,
@@ -1103,7 +1104,7 @@ Delivery sequence:
 1. M4.0 completes the architecture and read-only PostgreSQL/pgvector audit without changing the VM.
 2. M4.1 (Done) enabled the pinned PostgreSQL 18 pgvector extension only in the intended Gandalf
    databases and added the guarded memory foundation.
-3. M4.2 adds player-safe source extraction, a deterministic test provider, one pinned local CPU
+3. M4.2 (Done) adds player-safe source extraction, a deterministic test provider, one pinned local CPU
    embedding model, durable leased jobs, backfill, failure recovery, and side-by-side re-indexing.
 4. M4.3 implements campaign/audience/profile filtering before versioned hybrid ranking and stores
    reconstructable retrieval audits under strict count/character budgets.
@@ -1161,6 +1162,16 @@ finite-value, lifecycle, and downgrade guards. Exact cosine probes passed throug
 roles, mutual database denial remained intact, both schemas have zero drift, API/PG15/PG18/Bluebuild
 health passed, and the final isolated suite reported 135 passed with two opt-in live tests skipped.
 No memory reaches provider context yet and no embedding model was downloaded.
+
+M4.2 execution (2026-09-04): completed turns now project after canonical commit into bounded,
+player-visible, source-cited documents, with a durable backfill scanner covering missed work.
+Deterministic and pinned local providers feed leased idempotent jobs outside database transactions;
+failure/retry, expiry, restart, hash drift, and side-by-side profile activation rules pass. The
+selected BGE small English v1.5 quantized ONNX artifact is pinned by full revision and seven file
+checksums, occupies 64 MiB locally, and measured 16.613 ms warm query p95 on ARM64 CPU. Development
+backfill created exactly 115 documents/embeddings across 11 ready inactive indexes. Migration
+`0013_memory_lifecycle` resolves ISSUE-013. All 143 tests pass with two optional live skips; memory
+still does not reach either provider stage.
 
 Exit gate: in a synthetic campaign of at least 500 events, a relevant early clue is retrieved late
 without placing full history in the prompt, while irrelevant/hidden/cross-campaign records remain
@@ -1258,6 +1269,7 @@ agent direct database or unvalidated state-mutation access.
 | ISSUE-010 | Acceptance fixture | Resolved | The initial M3.5 fixture selected duplicate-name NPCs by nondeterministic UUID order and preselected both player decisions | One branch could show the wrong Mira returning, and passive final-state inspection could not validate subjective continuity or player choice | Stable role lookup, promise/attitude identity assertions, guided decision checkpoints, corrected focused/full gates, and the 2026-09-04 targeted owner retest all pass |
 | ISSUE-011 | Decision/fact finalization | Resolved | The first live M3 OpenClaw run repeated each selected decision's deterministic discovery as a narrator fact proposal | The same canonical fact could be recorded twice and inflate world history/revisions | Narration prompt `1.2.0`, normalized cross-source fact-identity validation, atomic regression, and corrected 12/12-call live rerun all pass; `M3_OPENCLAW_EVALUATION.md` |
 | ISSUE-012 | Migration regression fixture | Resolved | Six older guarded-downgrade tests expected former head `0011` after M4.1 added `0012` | The first full M4.1 run showed six assertion failures even though Alembic correctly rolled each destructive attempt back atomically to current head | Capture the pre-attempt head and assert it is unchanged, restore repository head before fixture cleanup when needed, and retain the original lower-migration error checks; focused migration tests and all 135 tests pass |
+| ISSUE-013 | Database trigger | Resolved | M4.1 used one identity trigger function for campaign indexes and jobs with different record shapes | Legitimate campaign-index progress updates failed because PostgreSQL resolved a job-only `OLD.document_id` field | Migration `0013_memory_lifecycle` and the corrected fresh `0012` definition use table-specific functions; lifecycle, downgrade, and full regression gates pass |
 | ISSUE-004 | Character-state provenance | Resolved | The first M1.3 owner run showed empty projected source/acquisition provenance for Dice Set and GP; ordinary package items were unaffected | The visible equipment projection did not meet GF-004 even though canonical grants remained intact | The corrected projection and exhaustive regression passed 39 automated tests; the 2026-09-01 owner retest confirmed complete Dice Set/GP definition, source, and acquisition-event provenance for both existing characters |
 | UX-001 | Player interface | Deferred/partially prepared | M3 absent/inactive/hidden-target conflicts now provide stable codes and safe recovery text, but JSON cannot validate visual actor/state clarity and other endpoints still need error normalization | Ordinary players may not know what happened or how to correct every invalid action when the frontend is introduced | In M7, map stable typed API errors to actionable messages, normalize remaining error contracts, and test actor visibility, calculated-value explanations, and isolated character changes through the full player journey |
 
@@ -1339,6 +1351,7 @@ because a workaround exists; record both the workaround and the permanent resolu
 | ADR-032 | 2026-09-04 | Use exact pgvector cosine search plus PostgreSQL lexical search and versioned rank fusion for M4; defer approximate indexes | The 500-event target is small enough for exact scans, while hybrid ranking handles paraphrases and exact names without premature HNSW operations | When measured corpus size or p95 exceeds the recorded gate and an approximate-index plan passes recall/rebuild tests |
 | ADR-033 | 2026-09-04 | Persist idempotent leased memory-index jobs but use bounded in-process/CLI draining rather than Redis, Celery, or an in-memory-only queue | Index work must survive restart and remain outside canonical turn transactions without adding unneeded distributed infrastructure | When deployment throughput and measured backlog cannot meet freshness targets on one application worker |
 | ADR-034 | 2026-09-04 | Treat summaries as mechanically inert, player-visible derived documents that retain immutable source citations and prompt/model versions | Summaries reduce context but can omit or invent details; cited canonical sources must remain reconstructable | When M6 or a future planner defines a separately tested audience and summary policy |
+| ADR-038 | 2026-09-04 | Use pinned BGE small English v1.5 through FastEmbed/ONNX on CPU, verify the exact local artifact before load, and keep model weights outside Git | It is the smallest compared maintained 384-dimensional English retrieval option, supports 512 tokens, needs no API/service/GPU, and measured 16.613 ms p95 locally | Replace only through a new immutable profile, side-by-side rebuild, quality gate, and atomic activation |
 | ADR-035 | 2026-09-04 | Target PostgreSQL 18 through a parallel Gandalf-only migration rather than an in-place shared-cluster upgrade | PostgreSQL 18 extends the support horizon to 2030, while parallel restore/testing preserves PostgreSQL 15 as rollback and avoids coupling Gandalf to unrelated service migrations | Revisit only if PG18.0 prerequisites fail; never broaden shared-host scope without affected-owner approval |
 | ADR-036 | 2026-09-04 | Complete the conditionally safe PostgreSQL 18 migration before M4.1 and install pgvector only for PostgreSQL 18 | PG18.0 found sufficient resources, small databases, compatible driver/schema, and a pinned no-removal transaction; migrating now avoids duplicate extension work, while staged test restore and preserved PG15 contain the shared-package risk | Revisit only if the signed pre-install simulation changes, recovery evidence is insufficient, or an unrelated-service health gate fails |
 | ADR-037 | 2026-09-04 | Cut active Gandalf development to PostgreSQL 18 only after exact final source/target and API fingerprints, under an automatic PG15 rollback trap, while retaining the old copies and roles | A tunnel-only target change preserves the application URL, and a single rollback-protected boundary prevents an ambiguous half-cutover or silent write divergence | Revisit after stabilization only to decide old-role disablement or copy retention; never infer PostgreSQL 15 retirement |
@@ -1434,11 +1447,10 @@ Destination milestone:
 1. Monitor the active PG18 connection, application/database errors, startup behavior, connections,
    disk, extension compatibility, and migration behavior while retaining all recovery bundles and
    both PG15 Gandalf copies/roles unchanged.
-2. Begin repository-only M4.2 work: player-safe completed-source projection, deterministic embedding
-   provider, idempotent leased indexing, explicit backfill/recovery, and side-by-side profile build.
-3. Compare maintained local CPU embedding candidates by artifact size, license, exact revision,
-   maximum input, MacBook latency, and golden-fixture quality. Present the evidence before a
-   material model download if no option is clearly superior; do not use paid/network embeddings.
+2. Implement M4.3 filter-before-rank exact vector plus lexical retrieval, deterministic hybrid
+   scoring, bounded cited results, and immutable retrieval audits without provider integration.
+3. Run the first golden-query quality and database-latency gate before activating any of the 11
+   ready local development indexes; leave all profiles inactive if the gate is incomplete.
 4. Request a later explicit destructive-action decision before disabling old PG15 logins, deleting
    rollback copies, changing unrelated services, or considering PostgreSQL 15 retirement.
 
@@ -1487,3 +1499,4 @@ Destination milestone:
 | 2026-09-04 | DOC-039 | Completed the authorized PG18 development restore and cutover rehearsal, preserved fresh recovery evidence, and advanced PG18 to Verification | All source/restore row counts and version-stable schema properties matched; PG18 development migration/drift checks, two complete 66-response comparisons across 11 campaigns separated by restart, 126 tests, isolation, and shared-service health passed. The active API/tunnel remains on PG15 | Obtain explicit authorization for the bounded active tunnel/API cutover and immediate rollback gate; retain both PG15 copies/roles and defer pgvector enablement |
 | 2026-09-04 | DOC-040 | Completed the rollback-protected active PostgreSQL 18 cutover, preserved final recovery evidence, advanced PG18 to Done/Monitoring, and returned M4 to its implementation gate | Final fingerprints matched; PG18 automatic startup, tunnel/API switch, transactional write/rollback, all 68 API hashes, active migration/drift checks, explicit test-role 126-test suite, isolation, and PG15/Bluebuild health passed. Rollback was armed but not invoked; PG15 retains zero active Gandalf sessions and both copies/roles | Monitor stabilization and obtain explicit M4.1 authorization for per-database vector enablement, Python adapter, and guarded `0012`; retain PG15 rollback assets |
 | 2026-09-04 | DOC-041 | Completed M4.1 and advanced M4 to In progress at M4.2 with pgvector enabled only in both PG18 Gandalf databases, pinned adapter 0.5.0, and guarded migration `0012_memory_foundation` | Fresh checksummed recovery, seven-table source-cited memory foundation, immutable/profile/campaign/hash/dimension/lifecycle guards, exact vector probes in both databases, empty/populated downgrade behavior, mutual role denial, zero drift, 9 focused tests, and all 135 regressions passed; ISSUE-012 stale head assertions were resolved | Implement repository-only M4.2 projection/deterministic indexing, then present local-model comparison before a material download if owner choice is needed; memory remains outside provider context |
+| 2026-09-04 | DOC-042 | Completed M4.2, resolved ISSUE-013, selected and pinned local BGE/ONNX embeddings, and advanced M4 to M4.3 | Player-safe source projection, exact hashes/tags/citations, fail-soft post-commit hooks, durable lease/retry/restart, side-by-side activation guards, 64 MiB verified model, 16.613 ms query p95, 115/115 development embeddings across 11 ready inactive indexes, 17 focused and all 143 regression tests pass | Implement filter-before-rank hybrid retrieval and audit; do not activate profiles or send memory to providers before their later gates |

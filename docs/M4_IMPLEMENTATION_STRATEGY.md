@@ -1,6 +1,6 @@
 # M4 Long-Term Memory and Retrieval Implementation Strategy
 
-- **Status:** Ready; PostgreSQL 18 cutover passed and the per-database M4.1 extension gate is next
+- **Status:** In progress; M4.1 passed and M4.2 local embedding/source projection is next
 - **Prepared:** 2026-09-04
 - **Depends on:** M3 persistent world (Done, including live OpenClaw supplement)
 - **Infrastructure audit:** [`M4_POSTGRES_PGVECTOR_AUDIT.md`](M4_POSTGRES_PGVECTOR_AUDIT.md)
@@ -11,8 +11,9 @@
 - **PG18 development evidence:**
   [`POSTGRESQL_18_DEVELOPMENT_REHEARSAL.md`](POSTGRESQL_18_DEVELOPMENT_REHEARSAL.md)
 - **PG18 cutover evidence:** [`POSTGRESQL_18_CUTOVER_EXECUTION.md`](POSTGRESQL_18_CUTOVER_EXECUTION.md)
-- **Owner input required now:** Authorize or defer M4.1's per-database `vector` enablement, pinned
-  Python adapter, and guarded memory-foundation migration
+- **M4.1 evidence:** [`M4_1_MEMORY_FOUNDATION.md`](M4_1_MEMORY_FOUNDATION.md)
+- **Owner input required next:** Review the M4.2 local embedding-model comparison before a material
+  one-time model download if no candidate is clearly superior within the recorded bounds
 - **Owner checkpoint:** M4.5 retrieval/re-index acceptance, followed by any separately authorized
   live narrative-coherence supplement
 
@@ -113,7 +114,7 @@ M4 does not include:
 
 ## 5. Data model direction
 
-Names are directional until M4.1 validates them in a migration and focused tests.
+M4.1 validated these names and boundaries in migration `0012_memory_foundation` and focused tests.
 
 ### 5.1 `memory_documents`
 
@@ -273,19 +274,24 @@ mechanical state.
 
 Exit: strategy and audit committed; M4 is Ready; no VM mutation occurred.
 
-### M4.1 — Extension and memory foundation
+### M4.1 — Extension and memory foundation — Done
 
 - after PG18 cutover approval, enable the already pinned PostgreSQL 18 pgvector package only in the
   two Gandalf databases under a separate per-database mutation gate;
 - add the Python pgvector/SQLAlchemy adapter with a pinned compatible dependency;
-- migration `0012` (expected name, finalized during implementation) asserts the extension and adds
-  profiles, documents, embeddings, jobs, campaign indexes, and retrieval audits;
+- migration `0012_memory_foundation` asserts PostgreSQL 18 and pgvector 0.8.6 and adds profiles,
+  documents, embeddings, jobs, campaign indexes, and retrieval audits;
 - add guarded downgrade, role/isolation checks, extension/version health, and deterministic vector
   fixtures;
 - do not integrate memory into provider context yet.
 
 Exit: both databases migrate under their restricted roles, exact vector insert/query works, full
 pre-M4 tests pass, and no unrelated VM service/package changed.
+
+Result (2026-09-04): Passed. pgvector 0.8.6 is enabled only in both PG18 Gandalf databases;
+`pgvector==0.5.0` is pinned; the seven-table foundation, database invariants, reversible empty and
+guarded populated downgrade, exact cosine probes, role isolation, zero drift, API/shared-service
+health, 9 focused tests, and all 135 repository tests passed. No provider context uses memory yet.
 
 ### M4.2 — Source projection, local embeddings, and re-indexing
 
@@ -382,10 +388,9 @@ or cross-campaign output is fail-closed and blocks the memory path until repaire
 
 Owner input is required at three bounded points:
 
-1. **Now:** authorize or defer M4.1's bounded database gate: enable the already installed `vector`
-   extension only in both PostgreSQL 18 Gandalf databases, add the pinned Python adapter, apply the
-   guarded memory-foundation migration, and run dual-database rollback/isolation/regression checks.
-   PostgreSQL 15 rollback copies, retirement, deletion, and unrelated services remain excluded.
+1. **M4.1 complete:** the bounded extension, adapter, migration, recovery, rollback, isolation, and
+   regression gate passed. PostgreSQL 15 rollback copies, retirement, deletion, and unrelated
+   services remained excluded.
 2. **M4.2 model selection:** review measured local model size, one-time download, CPU latency,
    retrieval quality, and license if candidates differ materially. Codex may choose autonomously if
    one candidate clearly meets every recorded bound with no new service or cost.
@@ -403,6 +408,7 @@ quality/latency results, defects, workarounds, and next actions. M4 moves to Rew
 shows hidden/cross-campaign retrieval, uncited memory, mixed profiles, canonical-state substitution,
 unbounded context, or a completed turn depending on index availability.
 
-M4 planning is complete and PostgreSQL 18 cutover passed. Implementation must stop before the
-per-database pgvector/memory-foundation gate until the owner explicitly authorizes its extension,
-migration, rollback, dependency, and dual-database boundaries.
+M4.1 is complete. Proceed with repository-only M4.2 source projection and deterministic provider
+work, but stop before a material local model download if candidate evidence requires owner choice.
+Paid/network embeddings, provider-memory context, PostgreSQL 15 retirement, and unrelated-service
+changes remain outside the current authority boundary.

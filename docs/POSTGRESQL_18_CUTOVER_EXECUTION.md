@@ -8,6 +8,7 @@
 - **Development rehearsal:**
   [`POSTGRESQL_18_DEVELOPMENT_REHEARSAL.md`](POSTGRESQL_18_DEVELOPMENT_REHEARSAL.md)
 - **Migration strategy:** [`POSTGRESQL_18_MIGRATION_STRATEGY.md`](POSTGRESQL_18_MIGRATION_STRATEGY.md)
+- **Subsequent M4.1 evidence:** [`M4_1_MEMORY_FOUNDATION.md`](M4_1_MEMORY_FOUNDATION.md)
 
 ## 1. Outcome
 
@@ -93,21 +94,20 @@ Through the active tunnel:
 - the development role reaches only `gandalfdnd_dev` and is rejected from `gandalfdnd_test` and
   `postgres`;
 - the test role reaches only `gandalfdnd_test` and is rejected from `postgres`;
-- both databases remain at head `0011` with `vector` absent.
+- at cutover acceptance, both databases were at head `0011` with `vector` absent.
 
 Both PG15 and PG18 HBA parsers report zero errors. PG18 remains bound only to `127.0.0.1:5433`.
 PostgreSQL 15, PostgreSQL 18, and Bluebuild are active. Bluebuild returns HTTP 200 for `/`, `/docs`,
 and `/openapi.json`.
 
-## 6. Stabilization and next gate
+## 6. Stabilization and completed next gate
 
 Keep the PostgreSQL 15 Gandalf databases, roles, HBA rollback path, and all three recovery bundles
 unchanged during stabilization. Monitor API/database errors, connection placement, disk, migration
 behavior, and restart behavior as development continues. Any unexplained PG18 regression should
 pause writes and use the preserved rollback procedure rather than modifying both copies.
 
-The next product-development step is M4.1, but it has a separate database mutation gate. Owner
-authorization is required before enabling `vector` in the two PostgreSQL 18 Gandalf databases,
-adding the pinned Python adapter, or applying the guarded `0012` memory-foundation migration.
-PostgreSQL 15 role disablement, copy deletion, and cluster retirement remain later destructive
-decisions and are not part of M4.1.
+The owner subsequently authorized M4.1. Exact pgvector 0.8.6 enablement in the two PostgreSQL 18
+Gandalf databases, the pinned Python adapter, and guarded `0012_memory_foundation` migration passed;
+see `M4_1_MEMORY_FOUNDATION.md`. PostgreSQL 15 role disablement, copy deletion, and cluster
+retirement remain later destructive decisions and were not part of M4.1.

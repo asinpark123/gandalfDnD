@@ -2,11 +2,13 @@ import uuid
 from datetime import date, datetime
 from typing import Any
 
+from pgvector.sqlalchemy import VECTOR
 from sqlalchemy import (
     Boolean,
     CheckConstraint,
     Date,
     DateTime,
+    Float,
     ForeignKey,
     Index,
     Integer,
@@ -1083,5 +1085,346 @@ class CharacterGrant(TimestampMixin, Base):
             "choice_slot",
             "definition_key",
             name="uq_character_grant_revision_slot_definition",
+        ),
+    )
+
+
+class MemoryEmbeddingProfile(TimestampMixin, Base):
+    __tablename__ = "memory_embedding_profiles"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    profile_key: Mapped[str] = mapped_column(String(80), nullable=False, unique=True)
+    provider_kind: Mapped[str] = mapped_column(String(30), nullable=False)
+    model_name: Mapped[str] = mapped_column(String(160), nullable=False)
+    model_revision: Mapped[str] = mapped_column(String(120), nullable=False)
+    artifact_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    license_id: Mapped[str] = mapped_column(String(80), nullable=False)
+    dimensions: Mapped[int] = mapped_column(Integer, nullable=False)
+    normalization: Mapped[str] = mapped_column(String(20), nullable=False)
+    distance_metric: Mapped[str] = mapped_column(String(20), nullable=False, default="cosine")
+    adapter_version: Mapped[str] = mapped_column(String(40), nullable=False)
+
+    __table_args__ = (
+        CheckConstraint(
+            "profile_key ~ '^[a-z0-9][a-z0-9._-]{0,79}$'",
+            name="memory_profile_key_format",
+        ),
+        CheckConstraint(
+            "provider_kind IN ('deterministic', 'local_onnx')",
+            name="memory_profile_provider_kind",
+        ),
+        CheckConstraint("dimensions BETWEEN 1 AND 4096", name="memory_profile_dimensions"),
+        CheckConstraint("normalization IN ('none', 'l2')", name="memory_profile_normalization"),
+        CheckConstraint("distance_metric = 'cosine'", name="memory_profile_distance_metric"),
+        CheckConstraint(
+            "artifact_sha256 ~ '^[0-9a-f]{64}$'", name="memory_profile_artifact_sha256"
+        ),
+    )
+
+
+class MemoryDocument(TimestampMixin, Base):
+    __tablename__ = "memory_documents"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    campaign_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("campaigns.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    source_kind: Mapped[str] = mapped_column(String(20), nullable=False)
+    source_turn_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("turns.id", ondelete="RESTRICT"), index=True
+    )
+    source_event_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("campaign_events.id", ondelete="RESTRICT"), index=True
+    )
+    source_version: Mapped[int] = mapped_column(Integer, nullable=False)
+    chunk_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    event_sequence_start: Mapped[int] = mapped_column(Integer, nullable=False)
+    event_sequence_end: Mapped[int] = mapped_column(Integer, nullable=False)
+    visibility: Mapped[str] = mapped_column(String(20), nullable=False, default="player")
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    content_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    chunker_version: Mapped[str] = mapped_column(String(40), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="active")
+    source_world_revision: Mapped[int | None] = mapped_column(Integer)
+    source_time_minutes: Mapped[int | None] = mapped_column(Integer)
+    location_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("locations.id", ondelete="RESTRICT"), index=True
+    )
+    npc_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("npcs.id", ondelete="RESTRICT"), index=True
+    )
+    character_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("characters.id", ondelete="RESTRICT"), index=True
+    )
+    quest_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("quests.id", ondelete="RESTRICT"), index=True
+    )
+    decision_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("decision_points.id", ondelete="RESTRICT"), index=True
+    )
+    faction_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("factions.id", ondelete="RESTRICT"), index=True
+    )
+    superseded_by_document_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("memory_documents.id", ondelete="RESTRICT"), unique=True
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "(source_kind = 'turn' AND source_turn_id IS NOT NULL AND source_event_id IS NULL) "
+            "OR (source_kind = 'event' AND source_event_id IS NOT NULL AND source_turn_id IS NULL)",
+            name="memory_document_source_shape",
+        ),
+        CheckConstraint("source_version > 0", name="memory_document_source_version_positive"),
+        CheckConstraint("chunk_index >= 0", name="memory_document_chunk_index_nonnegative"),
+        CheckConstraint(
+            "event_sequence_start > 0 AND event_sequence_end >= event_sequence_start",
+            name="memory_document_event_sequence_range",
+        ),
+        CheckConstraint("visibility = 'player'", name="memory_document_player_visible"),
+        CheckConstraint(
+            "char_length(content) BETWEEN 1 AND 6000", name="memory_document_content_length"
+        ),
+        CheckConstraint("content_sha256 ~ '^[0-9a-f]{64}$'", name="memory_document_content_sha256"),
+        CheckConstraint("status IN ('active', 'superseded')", name="memory_document_status"),
+        CheckConstraint(
+            "(status = 'active' AND superseded_by_document_id IS NULL) OR "
+            "(status = 'superseded' AND superseded_by_document_id IS NOT NULL)",
+            name="memory_document_supersession_shape",
+        ),
+        CheckConstraint(
+            "source_world_revision IS NULL OR source_world_revision >= 0",
+            name="memory_document_world_revision_nonnegative",
+        ),
+        CheckConstraint(
+            "source_time_minutes IS NULL OR source_time_minutes >= 0",
+            name="memory_document_time_nonnegative",
+        ),
+        Index(
+            "uq_memory_documents_turn_version_chunk",
+            "campaign_id",
+            "source_turn_id",
+            "source_version",
+            "chunk_index",
+            unique=True,
+            postgresql_where=text("source_kind = 'turn'"),
+        ),
+        Index(
+            "uq_memory_documents_event_version_chunk",
+            "campaign_id",
+            "source_event_id",
+            "source_version",
+            "chunk_index",
+            unique=True,
+            postgresql_where=text("source_kind = 'event'"),
+        ),
+        Index(
+            "ix_memory_documents_campaign_active_sequence",
+            "campaign_id",
+            "event_sequence_end",
+            postgresql_where=text("status = 'active'"),
+        ),
+    )
+
+
+class MemoryEmbedding(TimestampMixin, Base):
+    __tablename__ = "memory_embeddings"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    document_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("memory_documents.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    profile_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("memory_embedding_profiles.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    document_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    embedding: Mapped[list[float]] = mapped_column(VECTOR(), nullable=False)
+    embedded_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    __table_args__ = (
+        UniqueConstraint("document_id", "profile_id", name="uq_memory_embeddings_document_profile"),
+        CheckConstraint(
+            "document_sha256 ~ '^[0-9a-f]{64}$'", name="memory_embedding_document_sha256"
+        ),
+    )
+
+
+class CampaignMemoryIndex(TimestampMixin, Base):
+    __tablename__ = "campaign_memory_indexes"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    campaign_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("campaigns.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    profile_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("memory_embedding_profiles.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="building")
+    indexed_through_event_sequence: Mapped[int | None] = mapped_column(Integer)
+    source_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    last_error_code: Mapped[str | None] = mapped_column(String(80))
+    last_error_detail: Mapped[str | None] = mapped_column(Text)
+    quality_gate: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    activated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    __table_args__ = (
+        UniqueConstraint("campaign_id", "profile_id", name="uq_campaign_memory_index_profile"),
+        CheckConstraint(
+            "status IN ('building', 'ready', 'active', 'failed', 'retired')",
+            name="campaign_memory_index_status",
+        ),
+        CheckConstraint(
+            "indexed_through_event_sequence IS NULL OR indexed_through_event_sequence >= 0",
+            name="campaign_memory_index_sequence_nonnegative",
+        ),
+        CheckConstraint("source_count >= 0", name="campaign_memory_index_source_count"),
+        CheckConstraint(
+            "(status = 'failed' AND last_error_code IS NOT NULL) OR "
+            "(status <> 'failed' AND last_error_code IS NULL AND last_error_detail IS NULL)",
+            name="campaign_memory_index_error_shape",
+        ),
+        CheckConstraint(
+            "(status = 'active' AND activated_at IS NOT NULL AND quality_gate IS NOT NULL) OR "
+            "(status <> 'active' AND activated_at IS NULL)",
+            name="campaign_memory_index_activation_shape",
+        ),
+        Index(
+            "uq_campaign_memory_indexes_one_active",
+            "campaign_id",
+            unique=True,
+            postgresql_where=text("status = 'active'"),
+        ),
+    )
+
+
+class MemoryIndexJob(TimestampMixin, Base):
+    __tablename__ = "memory_index_jobs"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    campaign_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("campaigns.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    document_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("memory_documents.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    profile_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("memory_embedding_profiles.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending")
+    attempt_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    lease_owner: Mapped[str | None] = mapped_column(String(120))
+    lease_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    next_attempt_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    error_code: Mapped[str | None] = mapped_column(String(80))
+    error_detail: Mapped[str | None] = mapped_column(Text)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    __table_args__ = (
+        UniqueConstraint("document_id", "profile_id", name="uq_memory_index_jobs_document_profile"),
+        CheckConstraint(
+            "status IN ('pending', 'claimed', 'complete', 'failed')",
+            name="memory_index_job_status",
+        ),
+        CheckConstraint("attempt_count >= 0", name="memory_index_job_attempt_count"),
+        CheckConstraint(
+            "(status = 'claimed' AND lease_owner IS NOT NULL AND lease_expires_at IS NOT NULL "
+            "AND error_code IS NULL AND error_detail IS NULL) OR "
+            "(status = 'failed' AND lease_owner IS NULL AND lease_expires_at IS NULL "
+            "AND error_code IS NOT NULL) OR "
+            "(status IN ('pending', 'complete') AND lease_owner IS NULL "
+            "AND lease_expires_at IS NULL AND error_code IS NULL AND error_detail IS NULL)",
+            name="memory_index_job_state_shape",
+        ),
+        Index("ix_memory_index_jobs_claim", "status", "next_attempt_at", "created_at"),
+    )
+
+
+class MemoryRetrieval(TimestampMixin, Base):
+    __tablename__ = "memory_retrievals"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    campaign_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("campaigns.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    turn_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("turns.id", ondelete="SET NULL"), index=True
+    )
+    provider_call_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("provider_calls.id", ondelete="SET NULL"), index=True
+    )
+    profile_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("memory_embedding_profiles.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    ranking_policy: Mapped[str] = mapped_column(String(60), nullable=False)
+    query_source_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    filters: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
+    requested_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    returned_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    latency_ms: Mapped[int] = mapped_column(Integer, nullable=False)
+    context_budget_chars: Mapped[int] = mapped_column(Integer, nullable=False)
+    truncated: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False)
+    error_code: Mapped[str | None] = mapped_column(String(80))
+
+    __table_args__ = (
+        CheckConstraint(
+            "query_source_sha256 ~ '^[0-9a-f]{64}$'",
+            name="memory_retrieval_query_source_sha256",
+        ),
+        CheckConstraint(
+            "requested_count BETWEEN 1 AND 50 AND returned_count BETWEEN 0 AND requested_count",
+            name="memory_retrieval_count_bounds",
+        ),
+        CheckConstraint("latency_ms >= 0", name="memory_retrieval_latency_nonnegative"),
+        CheckConstraint(
+            "context_budget_chars BETWEEN 1 AND 24000", name="memory_retrieval_context_budget"
+        ),
+        CheckConstraint(
+            "(status = 'succeeded' AND error_code IS NULL) OR "
+            "(status = 'failed' AND error_code IS NOT NULL AND returned_count = 0)",
+            name="memory_retrieval_result_shape",
+        ),
+    )
+
+
+class MemoryRetrievalItem(TimestampMixin, Base):
+    __tablename__ = "memory_retrieval_items"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    retrieval_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("memory_retrievals.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    document_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("memory_documents.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    rank: Mapped[int] = mapped_column(Integer, nullable=False)
+    semantic_score: Mapped[float | None] = mapped_column(Float)
+    lexical_score: Mapped[float | None] = mapped_column(Float)
+    recency_score: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    entity_score: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    combined_score: Mapped[float] = mapped_column(Float, nullable=False)
+    selected_chars: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("retrieval_id", "rank", name="uq_memory_retrieval_items_rank"),
+        UniqueConstraint("retrieval_id", "document_id", name="uq_memory_retrieval_items_document"),
+        CheckConstraint("rank BETWEEN 1 AND 50", name="memory_retrieval_item_rank"),
+        CheckConstraint(
+            "semantic_score IS NOT NULL OR lexical_score IS NOT NULL",
+            name="memory_retrieval_item_candidate_score",
+        ),
+        CheckConstraint(
+            "recency_score >= 0 AND entity_score >= 0 AND combined_score >= 0",
+            name="memory_retrieval_item_score_nonnegative",
+        ),
+        CheckConstraint(
+            "selected_chars BETWEEN 1 AND 6000", name="memory_retrieval_item_selected_chars"
         ),
     )

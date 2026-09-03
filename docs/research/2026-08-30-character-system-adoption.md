@@ -6,7 +6,8 @@
 - **Decision:** Adopt the architectural recommendations with an intentionally narrower delivery
   sequence.
 - **Implementation status:** This review is a decision record rather than implementation evidence.
-  M1–M3 are now Done and M4 is Ready; the living project plan links their executable evidence.
+  M1–M3 are Done and M4 is In progress after M4.1; the living project plan links current executable
+  evidence.
 
 ## Why the research was commissioned
 

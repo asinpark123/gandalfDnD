@@ -475,11 +475,16 @@ def test_branch_consequence_cannot_duplicate_narrator_fact_proposal(
 def test_migration_refuses_to_discard_quest_or_decision_data(client: TestClient) -> None:
     campaign_id, characters, _npcs = _ready_world(client)
     _create_quest(client, campaign_id, characters[0])
+    with get_engine().connect() as connection:
+        expected_revision = connection.execute(
+            text("SELECT version_num FROM alembic_version")
+        ).scalar_one()
     get_engine().dispose()
     config = Config(str(Path(__file__).parents[1] / "alembic.ini"))
     with pytest.raises(DBAPIError, match="Cannot downgrade after M3.3 quest or decision data"):
         command.downgrade(config, "0009_world_facts")
     with get_engine().connect() as connection:
-        assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == (
-            "0011_factions_time"
+        assert (
+            connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
+            == expected_revision
         )

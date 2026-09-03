@@ -1,7 +1,7 @@
 # M4 PostgreSQL and pgvector Readiness Audit
 
-- **Status:** Historical read-only audit complete; PostgreSQL 18 package provisioning later passed,
-  while per-database extension enablement remains pending
+- **Status:** Historical read-only audit complete; PostgreSQL 18 provisioning, cutover, and M4.1
+  per-database enablement subsequently passed
 - **Audit date:** 2026-09-04
 - **Host:** `postgresvm`
 - **Scope:** M4 compatibility, least privilege, capacity, and safe installation planning
@@ -19,11 +19,13 @@ the audit never permitted a silent source-build fallback.
 
 The owner subsequently accepted PostgreSQL 18 as Gandalf's long-term target and authorized its
 foundation. The signed exact transaction installed `postgresql-18-pgvector` 0.8.6 without changing
-the PostgreSQL 15 server/client; no database has enabled the `vector` extension. See
+the PostgreSQL 15 server/client. See
 [`POSTGRESQL_18_FOUNDATION_EXECUTION.md`](POSTGRESQL_18_FOUNDATION_EXECUTION.md). The source-build
 comparison remains historical rationale, not the current package plan. Active Gandalf development
 subsequently cut over successfully to PostgreSQL 18; see
-[`POSTGRESQL_18_CUTOVER_EXECUTION.md`](POSTGRESQL_18_CUTOVER_EXECUTION.md).
+[`POSTGRESQL_18_CUTOVER_EXECUTION.md`](POSTGRESQL_18_CUTOVER_EXECUTION.md). M4.1 later enabled exact
+extension version 0.8.6 only in both PostgreSQL 18 Gandalf databases and passed its full acceptance
+gate; see [`M4_1_MEMORY_FOUNDATION.md`](M4_1_MEMORY_FOUNDATION.md).
 
 ## 2. Verified host and cluster state
 
@@ -73,9 +75,10 @@ installed database extension version. It must not track an unpinned branch or ac
 `latest` version. Re-check upstream and package state immediately before provisioning because both
 are external, changing inputs.
 
-## 5. Recommended provisioning gate
+## 5. Historical recommended provisioning gate
 
-This is a plan, not an authorization to execute it.
+This was the audit-stage plan, not its authorization. The PostgreSQL 18 version of the gate later
+passed as recorded in `M4_1_MEMORY_FOUNDATION.md`.
 
 1. Confirm current backups and take fresh logical backups of only `gandalfdnd_dev` and
    `gandalfdnd_test`; do not read, dump, or change unrelated databases.
@@ -111,15 +114,16 @@ automatic source compile. Return for approval of a controlled source-build/host-
 - A failed embedding or retrieval operation must not roll back a completed game turn or canonical
   world state. Memory indexing is a rebuildable derived subsystem.
 
-## 7. Authorization boundary
+## 7. Authorization boundary and disposition
 
-The following still require explicit owner approval because they change shared VM state:
+At audit time, the following required explicit owner approval because they changed shared VM state:
 
 - adding the official PostgreSQL APT signing key/source and package pin;
 - installing a pgvector OS package;
 - enabling `vector` in the two Gandalf databases;
 - any PostgreSQL package upgrade, service restart, or source-build dependency installation.
 
-Repository-only M4 code and deterministic tests may proceed after the extension foundation exists.
-No OpenClaw calls, paid API calls, embedding-model download, or unrelated VM work are authorized by
-this audit alone.
+The owner separately authorized the safe PostgreSQL 18 package, migration, cutover, and M4.1
+extension boundaries; all passed. Future package/extension upgrades or removal still need a new
+decision. Repository-only M4 code and deterministic tests may proceed. No OpenClaw calls, paid API
+calls, embedding-model download, or unrelated VM work are authorized by this audit alone.

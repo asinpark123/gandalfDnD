@@ -4,10 +4,11 @@
 - **Last updated:** 2026-09-04
 - **Rules baseline:** SRD 5.2.1 (pinned; character-state and check/save-resolution catalogs pass
   integrity and schema verification)
-- **Current delivery stage:** M4 Ready. The rollback-protected PostgreSQL 18 cutover passed after
-  signed/pinned infrastructure, PG15 HBA hardening, exact test/development restores, dual-runtime
-  comparison, and full post-cutover regression. M3 remains Done; PG18 is under stabilization
-  monitoring with PG15 rollback retained. M4.1's per-database extension/migration gate is next
+- **Current delivery stage:** M4 In progress. M4.1 enabled pgvector 0.8.6 only in the two
+  PostgreSQL 18 Gandalf databases and added guarded migration `0012_memory_foundation`; all 135
+  tests and extension, vector, migration, drift, isolation, API, and shared-service gates pass.
+  PG18 stabilization and PG15 rollback retention continue; M4.2 source projection/local embedding
+  work is next, with a checkpoint before any material real-model download
 - **Canonical repository:** `~/Git/gandalfDnD`
 
 ## 1. Purpose of this document
@@ -105,6 +106,7 @@ Current documentation index:
 | M3 supplemental live OpenClaw branching evaluation | [`M3_OPENCLAW_EVALUATION.md`](M3_OPENCLAW_EVALUATION.md) |
 | M4 long-term-memory architecture, slices, and acceptance strategy | [`M4_IMPLEMENTATION_STRATEGY.md`](M4_IMPLEMENTATION_STRATEGY.md) |
 | M4 PostgreSQL/pgvector read-only readiness and provisioning gate | [`M4_POSTGRES_PGVECTOR_AUDIT.md`](M4_POSTGRES_PGVECTOR_AUDIT.md) |
+| M4.1 pgvector and guarded memory-foundation execution evidence | [`M4_1_MEMORY_FOUNDATION.md`](M4_1_MEMORY_FOUNDATION.md) |
 | PostgreSQL 18 Gandalf-only parallel migration and rollback strategy | [`POSTGRESQL_18_MIGRATION_STRATEGY.md`](POSTGRESQL_18_MIGRATION_STRATEGY.md) |
 | PostgreSQL 18 verified readiness, package impact, compatibility, and authorization gate | [`POSTGRESQL_18_READINESS_AUDIT.md`](POSTGRESQL_18_READINESS_AUDIT.md) |
 | PostgreSQL 18 package/cluster/HBA/test-restore execution evidence | [`POSTGRESQL_18_FOUNDATION_EXECUTION.md`](POSTGRESQL_18_FOUNDATION_EXECUTION.md) |
@@ -214,7 +216,7 @@ presented separately from the immutable SRD baseline.
 | `gandalfdnd_test` | Automated integration-test state | Active on PostgreSQL 18.6; PostgreSQL 15 rollback copy retained |
 | Clawvis VM | Existing services plus the restricted private OpenClaw provider route | No Gandalf application/database deployment; loopback-only gateway integration |
 | Gandalf application VM | Future persistent runtime | Deferred |
-| pgvector | M4 semantic-memory index | PostgreSQL 18 package 0.8.6 installed; extension not enabled in any database and M4.1 approval remains required |
+| pgvector | M4 semantic-memory index | PostgreSQL 18 extension 0.8.6 enabled only in both Gandalf databases; Python adapter 0.5.0 pinned; exact search foundation active |
 | PostgreSQL 18 | Long-term Gandalf database target | Active on 18.6 with automatic startup; stabilization monitoring in progress |
 
 Database roles are separate, non-superuser, non-`CREATEDB`, non-`CREATEROLE`, non-replication
@@ -299,7 +301,7 @@ results, known limitations, and where observations will be recorded.
 | M1.4 deterministic resolution | Completed 2026-09-02; no further input required | All nine owner actions passed, including canonical modifiers, modifier rejection, Advantage/Disadvantage, actor attribution, and confirmed post-restart replay |
 | M2 model-authored feasibility | Completed 2026-09-02; no further input required. Any optional direct paid-provider test still needs separate authorization and a cap | The private OpenClaw activation, smoke checks, and three ten-scenario live Lantern runs passed; manual fallback and direct paid transport remain separately classified evidence |
 | M3 persistent world | Completed 2026-09-04; authorized live OpenClaw supplement also complete | Owner-guided retest passed NPC continuity, distinct decisions and branches, restart persistence, and corrective error guidance; the live two-branch supplement passed after resolving ISSUE-011 |
-| M4 long-term memory | Approve or reject the narrow pgvector package/per-database extension plan; a simulation showing unrelated upgrades stops the work | At M4.5, review whether cited recall is relevant, non-repetitive, branch-correct, and continuous after restart; live OpenClaw evaluation remains separately capped |
+| M4 long-term memory | M4.1 authorization completed. At M4.2, review measured local-model size/license/latency/quality before a material download if candidates differ | At M4.5, review whether cited recall is relevant, non-repetitive, branch-correct, and continuous after restart; live OpenClaw evaluation remains separately capped |
 | M1.5 content expansion | Prioritize desired species, backgrounds, classes, feats, equipment routes, spellcasting, and play styles | Create contrasting supported characters and confirm their choices produce understandable, distinct state and later gameplay |
 | M5 party combat | Provide difficulty/lethality feedback for standard party play; companion autonomy and lone-hero compensation remain later decisions | Repeated Party Commander combat tests across favorable, difficult, defeat, recovery, and restart scenarios |
 | Protagonist with Companions | Choose desired companion autonomy, instruction granularity, personality influence, and player override behavior after Party Commander is proven | Compare delegated companion proposals with direct Party Commander control and verify the same deterministic rules constrain both |
@@ -337,7 +339,7 @@ Use these values consistently:
 | M1 | Party character creation and deterministic mechanics | Done | The selected acting character's choices drive calculated outcomes |
 | M2 | Two-stage AI turn and model-authored feasibility | Done | Real DM-authored output uses recorded dice results safely through a private provider boundary |
 | M3 | Persistent world model | Done | NPCs, quests, scenes, clues, time, decisions, and visibility |
-| M4 | Long-term memory and retrieval | Ready | Coherent recall without full history in context |
+| M4 | Long-term memory and retrieval | In progress | Coherent recall without full history in context |
 | PG18 | PostgreSQL 18 migration | Done/Monitoring | Active cutover passed; PG15 rollback retained during stabilization |
 | M5 | Basic deterministic combat | Proposed | Reproducible initiative, actions, attacks, and damage |
 | M6 | Spoiler-safe Guide | Proposed | Beginner help with enforceable knowledge boundaries |
@@ -1080,7 +1082,7 @@ while DM-only facts remain absent from player-visible APIs.
 
 ### M4 — Long-term memory and retrieval
 
-- **Status:** Ready (2026-09-04)
+- **Status:** In progress; M4.1 Done (2026-09-04), M4.2 next
 - **Depends on:** M3
 - **Detailed strategy:** [`M4_IMPLEMENTATION_STRATEGY.md`](M4_IMPLEMENTATION_STRATEGY.md)
 - **Infrastructure audit:** [`M4_POSTGRES_PGVECTOR_AUDIT.md`](M4_POSTGRES_PGVECTOR_AUDIT.md)
@@ -1089,6 +1091,7 @@ while DM-only facts remain absent from player-visible APIs.
 - **PG18 foundation/test evidence:** [`POSTGRESQL_18_FOUNDATION_EXECUTION.md`](POSTGRESQL_18_FOUNDATION_EXECUTION.md)
 - **PG18 development rehearsal:** [`POSTGRESQL_18_DEVELOPMENT_REHEARSAL.md`](POSTGRESQL_18_DEVELOPMENT_REHEARSAL.md)
 - **PG18 active cutover:** [`POSTGRESQL_18_CUTOVER_EXECUTION.md`](POSTGRESQL_18_CUTOVER_EXECUTION.md)
+- **M4.1 execution:** [`M4_1_MEMORY_FOUNDATION.md`](M4_1_MEMORY_FOUNDATION.md)
 
 Add player-visible, source-cited narrative memory for completed turns/events, a local embedding
 provider, versioned profiles, durable idempotent indexing, exact-vector plus lexical hybrid search,
@@ -1098,8 +1101,8 @@ re-indexing. Exact state continues to come from relational tables rather than re
 Delivery sequence:
 
 1. M4.0 completes the architecture and read-only PostgreSQL/pgvector audit without changing the VM.
-2. M4.1 enables the already pinned PostgreSQL 18 pgvector package only in the intended Gandalf
-   databases after cutover approval, then adds the guarded memory foundation.
+2. M4.1 (Done) enabled the pinned PostgreSQL 18 pgvector extension only in the intended Gandalf
+   databases and added the guarded memory foundation.
 3. M4.2 adds player-safe source extraction, a deterministic test provider, one pinned local CPU
    embedding model, durable leased jobs, backfill, failure recovery, and side-by-side re-indexing.
 4. M4.3 implements campaign/audience/profile filtering before versioned hybrid ranking and stores
@@ -1147,7 +1150,17 @@ target, and restarted the API. Direct PostgreSQL 18 identity and transactional w
 checks passed; all 68 pre/post-cutover API fingerprints matched; Alembic reported head with zero
 drift; and an explicitly isolated post-cutover run passed all 126 tests. PG15 has zero Gandalf
 development sessions but remains online with both rollback copies/roles. Bluebuild remained active
-and healthy. The rollback was armed but not invoked; pgvector remains disabled in both databases.
+and healthy. The rollback was armed but not invoked; pgvector was still disabled at that gate.
+
+M4.1 execution (2026-09-04): fresh owner-only PG18 dumps of both Gandalf databases passed checksum
+verification before the database administrator enabled exact pgvector 0.8.6 only in development
+and test. The application pins `pgvector==0.5.0`; migration `0012_memory_foundation` asserts the
+server/extension versions and creates immutable profiles/documents/embeddings, durable campaign
+indexes/jobs, and reconstructable retrieval audits with campaign, visibility, hash, dimension,
+finite-value, lifecycle, and downgrade guards. Exact cosine probes passed through both restricted
+roles, mutual database denial remained intact, both schemas have zero drift, API/PG15/PG18/Bluebuild
+health passed, and the final isolated suite reported 135 passed with two opt-in live tests skipped.
+No memory reaches provider context yet and no embedding model was downloaded.
 
 Exit gate: in a synthetic campaign of at least 500 events, a relevant early clue is retrieved late
 without placing full history in the prompt, while irrelevant/hidden/cross-campaign records remain
@@ -1227,7 +1240,7 @@ agent direct database or unvalidated state-mutation access.
 | GAP-006 | OpenClaw activation | Resolved | The owner authorized a dedicated restricted `gandalf` agent and authenticated Chat Completions endpoint while retaining loopback binding and the OAuth-only route | Gandalf can now use the owner's private Clawvis deployment without exposing it publicly or granting database access | Health, smoke, restart, and three passing live Lantern runs recorded in `M2_5_OPENCLAW_EVALUATION.md`; M2.5A |
 | WARN-001 | Dependency | Monitoring | Current TestClient emits an `httpx` deprecation warning | No functional failure today | Reassess FastAPI/Starlette test client during dependency maintenance |
 | OPS-001 | Source control | Resolved | Initial push was blocked because HTTPS lacked credentials and Git did not automatically select the nonstandard SSH key filename | GitHub was temporarily behind local `main` | Registered the existing Ed25519 key, verified GitHub's host fingerprint, configured this repository's SSH command, and synchronized `main`; 2026-08-30 |
-| OPS-002 | Infrastructure | Partially resolved/approval required | The pinned PostgreSQL 18 pgvector 0.8.6 package installed under a signed exact transaction without the rejected 14-upgrade/26-install source-build path | Package availability is resolved, but no database has the extension and M4 tables cannot use vectors yet | After PG18 cutover approval, enable and test `vector` only in the intended Gandalf databases at the M4.1 gate; `M4_POSTGRES_PGVECTOR_AUDIT.md` |
+| OPS-002 | Infrastructure | Resolved/monitoring | The pinned PostgreSQL 18 pgvector 0.8.6 package and exact per-database extensions are active without the rejected 14-upgrade/26-install source-build path | Both Gandalf databases support vectors and migration `0012`; `postgres` and unrelated databases remain outside the extension scope | Monitor extension/server compatibility and require a separate decision before any upgrade or extension removal; `M4_1_MEMORY_FOUNDATION.md` |
 | OPS-003 | Infrastructure | Resolved/monitoring | Final recovery and unchanged-data gates passed; the rollback-protected tunnel/API cutover, automatic startup, 68-response comparison, transactional probe, and isolated 126-test suite passed while PG15 and Bluebuild remained healthy | Active Gandalf development/tests now use PostgreSQL 18.6; PG15 copies remain available during stabilization | Monitor PG18 and retain recovery/PG15 rollback assets; require separate approval before old-role disablement, deletion, or retirement; `POSTGRESQL_18_CUTOVER_EXECUTION.md` |
 | OPS-004 | Access control | Resolved/monitoring | Ordered PG15 role/database loopback allows plus all-database rejects were applied; own-database access and cross/unrelated denial passed. PG18 is loopback-only with matching allows and reject-all TCP fallback | The observed Gandalf-role path to unrelated databases is closed without changing unrelated database ACLs | Retest after connection or HBA changes; disable old PG15 Gandalf logins only after separately accepted cutover; `POSTGRESQL_18_FOUNDATION_EXECUTION.md` |
 | DOC-001 | Documentation | Open | RES-001's verbatim export contains temporary Deep Research citation tokens | Tokens are not durable implementation citations | Preserve the source unchanged; use official URLs and SRD pages in specifications and rule definitions; M1.1 onward |
@@ -1244,6 +1257,7 @@ agent direct database or unvalidated state-mutation access.
 | PERF-001 | Provider efficiency | Resolved/Monitoring | The first passing live run sent full provenance-heavy character state and consumed 754,469 input tokens across 20 calls | Subscription usage was unnecessarily high and would worsen as state grows | Compact mechanically complete context reduced the same run to 419,727 input tokens (44.4% less); retain `RISK-008` budgets and revisit during M3/M4 |
 | ISSUE-010 | Acceptance fixture | Resolved | The initial M3.5 fixture selected duplicate-name NPCs by nondeterministic UUID order and preselected both player decisions | One branch could show the wrong Mira returning, and passive final-state inspection could not validate subjective continuity or player choice | Stable role lookup, promise/attitude identity assertions, guided decision checkpoints, corrected focused/full gates, and the 2026-09-04 targeted owner retest all pass |
 | ISSUE-011 | Decision/fact finalization | Resolved | The first live M3 OpenClaw run repeated each selected decision's deterministic discovery as a narrator fact proposal | The same canonical fact could be recorded twice and inflate world history/revisions | Narration prompt `1.2.0`, normalized cross-source fact-identity validation, atomic regression, and corrected 12/12-call live rerun all pass; `M3_OPENCLAW_EVALUATION.md` |
+| ISSUE-012 | Migration regression fixture | Resolved | Six older guarded-downgrade tests expected former head `0011` after M4.1 added `0012` | The first full M4.1 run showed six assertion failures even though Alembic correctly rolled each destructive attempt back atomically to current head | Capture the pre-attempt head and assert it is unchanged, restore repository head before fixture cleanup when needed, and retain the original lower-migration error checks; focused migration tests and all 135 tests pass |
 | ISSUE-004 | Character-state provenance | Resolved | The first M1.3 owner run showed empty projected source/acquisition provenance for Dice Set and GP; ordinary package items were unaffected | The visible equipment projection did not meet GF-004 even though canonical grants remained intact | The corrected projection and exhaustive regression passed 39 automated tests; the 2026-09-01 owner retest confirmed complete Dice Set/GP definition, source, and acquisition-event provenance for both existing characters |
 | UX-001 | Player interface | Deferred/partially prepared | M3 absent/inactive/hidden-target conflicts now provide stable codes and safe recovery text, but JSON cannot validate visual actor/state clarity and other endpoints still need error normalization | Ordinary players may not know what happened or how to correct every invalid action when the frontend is introduced | In M7, map stable typed API errors to actionable messages, normalize remaining error contracts, and test actor visibility, calculated-value explanations, and isolated character changes through the full player journey |
 
@@ -1328,6 +1342,7 @@ because a workaround exists; record both the workaround and the permanent resolu
 | ADR-035 | 2026-09-04 | Target PostgreSQL 18 through a parallel Gandalf-only migration rather than an in-place shared-cluster upgrade | PostgreSQL 18 extends the support horizon to 2030, while parallel restore/testing preserves PostgreSQL 15 as rollback and avoids coupling Gandalf to unrelated service migrations | Revisit only if PG18.0 prerequisites fail; never broaden shared-host scope without affected-owner approval |
 | ADR-036 | 2026-09-04 | Complete the conditionally safe PostgreSQL 18 migration before M4.1 and install pgvector only for PostgreSQL 18 | PG18.0 found sufficient resources, small databases, compatible driver/schema, and a pinned no-removal transaction; migrating now avoids duplicate extension work, while staged test restore and preserved PG15 contain the shared-package risk | Revisit only if the signed pre-install simulation changes, recovery evidence is insufficient, or an unrelated-service health gate fails |
 | ADR-037 | 2026-09-04 | Cut active Gandalf development to PostgreSQL 18 only after exact final source/target and API fingerprints, under an automatic PG15 rollback trap, while retaining the old copies and roles | A tunnel-only target change preserves the application URL, and a single rollback-protected boundary prevents an ambiguous half-cutover or silent write divergence | Revisit after stabilization only to decide old-role disablement or copy retention; never infer PostgreSQL 15 retirement |
+| ADR-038 | 2026-09-04 | Use pgvector 0.8.6 with pinned Python adapter 0.5.0, unconstrained vector columns validated against immutable profile dimensions, exact search, and no approximate index in M4.1 | Side-by-side future profiles may differ in dimension; profile-filtered exact scans preserve correctness at the bounded corpus size while database triggers reject drift, non-finite values, wrong hashes, and cross-campaign records | Revisit the adapter/version only through compatibility tests; consider an approximate index only after M4.5 measurements justify it |
 
 ## 14. Milestone review template
 
@@ -1417,14 +1432,13 @@ Destination milestone:
 ## 17. Immediate next actions
 
 1. Monitor the active PG18 connection, application/database errors, startup behavior, connections,
-   disk, and migration behavior while retaining all three recovery bundles and both PG15 Gandalf
-   copies/roles unchanged.
-2. Obtain explicit owner authorization for M4.1's bounded database change: enable the already
-   installed `vector` extension only in both PG18 Gandalf databases, add the pinned Python adapter,
-   and apply the guarded memory-foundation migration.
-3. If authorized, implement M4.1 with extension/version, migration upgrade/downgrade,
-   role-isolation, transactional vector, full-regression, and dual-database drift gates; do not add
-   provider memory context yet.
+   disk, extension compatibility, and migration behavior while retaining all recovery bundles and
+   both PG15 Gandalf copies/roles unchanged.
+2. Begin repository-only M4.2 work: player-safe completed-source projection, deterministic embedding
+   provider, idempotent leased indexing, explicit backfill/recovery, and side-by-side profile build.
+3. Compare maintained local CPU embedding candidates by artifact size, license, exact revision,
+   maximum input, MacBook latency, and golden-fixture quality. Present the evidence before a
+   material model download if no option is clearly superior; do not use paid/network embeddings.
 4. Request a later explicit destructive-action decision before disabling old PG15 logins, deleting
    rollback copies, changing unrelated services, or considering PostgreSQL 15 retirement.
 
@@ -1472,3 +1486,4 @@ Destination milestone:
 | 2026-09-04 | DOC-038 | Completed the authorized PG18 foundation and test-restore gate, preserved an operator execution record, resolved OPS-004, and advanced PG18 to In progress | Checksummed dual-version backups, signed exact pins, three shared upgrades/four installs, loopback-only checksum-enabled PostgreSQL 18.6, PG15 HBA isolation, exact test fingerprints, 126 passing tests, and repeated PG15/Bluebuild health checks passed; pgvector is packaged but not enabled, and no PG18 development identity exists | Obtain separate authorization for fresh development restore and reversible Gandalf-only cutover; retain PG15 rollback and exclude unrelated services |
 | 2026-09-04 | DOC-039 | Completed the authorized PG18 development restore and cutover rehearsal, preserved fresh recovery evidence, and advanced PG18 to Verification | All source/restore row counts and version-stable schema properties matched; PG18 development migration/drift checks, two complete 66-response comparisons across 11 campaigns separated by restart, 126 tests, isolation, and shared-service health passed. The active API/tunnel remains on PG15 | Obtain explicit authorization for the bounded active tunnel/API cutover and immediate rollback gate; retain both PG15 copies/roles and defer pgvector enablement |
 | 2026-09-04 | DOC-040 | Completed the rollback-protected active PostgreSQL 18 cutover, preserved final recovery evidence, advanced PG18 to Done/Monitoring, and returned M4 to its implementation gate | Final fingerprints matched; PG18 automatic startup, tunnel/API switch, transactional write/rollback, all 68 API hashes, active migration/drift checks, explicit test-role 126-test suite, isolation, and PG15/Bluebuild health passed. Rollback was armed but not invoked; PG15 retains zero active Gandalf sessions and both copies/roles | Monitor stabilization and obtain explicit M4.1 authorization for per-database vector enablement, Python adapter, and guarded `0012`; retain PG15 rollback assets |
+| 2026-09-04 | DOC-041 | Completed M4.1 and advanced M4 to In progress at M4.2 with pgvector enabled only in both PG18 Gandalf databases, pinned adapter 0.5.0, and guarded migration `0012_memory_foundation` | Fresh checksummed recovery, seven-table source-cited memory foundation, immutable/profile/campaign/hash/dimension/lifecycle guards, exact vector probes in both databases, empty/populated downgrade behavior, mutual role denial, zero drift, 9 focused tests, and all 135 regressions passed; ISSUE-012 stale head assertions were resolved | Implement repository-only M4.2 projection/deterministic indexing, then present local-model comparison before a material download if owner choice is needed; memory remains outside provider context |

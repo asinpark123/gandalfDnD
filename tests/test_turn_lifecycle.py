@@ -239,10 +239,15 @@ def test_provider_call_records_are_immutable(client: TestClient) -> None:
 def test_m2_turn_blocks_destructive_migration_downgrade(client: TestClient) -> None:
     campaign_id, characters = _ready_campaign(client)
     _create_execution(client, campaign_id, characters[0])
+    with get_engine().connect() as connection:
+        expected_revision = connection.execute(
+            text("SELECT version_num FROM alembic_version")
+        ).scalar_one()
     config = Config(str(Path(__file__).parents[1] / "alembic.ini"))
     with pytest.raises(DBAPIError, match="Cannot downgrade after two-stage turns"):
         command.downgrade(config, "0005_check_save_resolution")
     with get_engine().connect() as connection:
-        assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == (
-            "0011_factions_time"
+        assert (
+            connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
+            == expected_revision
         )

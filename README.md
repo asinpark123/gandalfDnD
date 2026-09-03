@@ -44,6 +44,8 @@ maintained in the [living development plan](docs/PROJECT_PLAN.md).
   local embeddings, hybrid retrieval, re-indexing, and 500-event acceptance gates
 - [M4 PostgreSQL/pgvector audit](docs/M4_POSTGRES_PGVECTOR_AUDIT.md) — read-only readiness findings,
   least privilege, package-impact boundary, and conditional provisioning plan
+- [M4.1 memory foundation](docs/M4_1_MEMORY_FOUNDATION.md) — scoped extension enablement,
+  migration `0012`, schema invariants, recovery, and acceptance evidence
 - [PostgreSQL 18 migration strategy](docs/POSTGRESQL_18_MIGRATION_STRATEGY.md) — parallel-cluster,
   Gandalf-only migration, acceptance, rollback, and longevity gates
 - [PostgreSQL 18 readiness audit](docs/POSTGRESQL_18_READINESS_AUDIT.md) — verified package impact,
@@ -67,15 +69,17 @@ branch decisions, typed factions, bounded narrative time, and audience-safe worl
 is Done after its corrected deterministic and owner-guided branching, NPC continuity, restart,
 causal replay, and recoverable-error gates passed. Its separately authorized capped live OpenClaw
 supplement also passed both persistent branches after exposing and resolving an exact duplicate
-decision-fact edge case. M4 is Ready but waits on the staged PostgreSQL 18 migration. Its authorized
-foundation and restore rehearsals passed: signed pinned packages installed PostgreSQL 18.6 and
+decision-fact edge case. M4 is now In progress after the staged PostgreSQL 18 migration and M4.1
+memory foundation passed. The database foundation and restore rehearsals installed PostgreSQL 18.6 and
 pgvector 0.8.6 without changing PostgreSQL 15 server/client; `18/gandalf` is checksum-enabled and
 loopback-only; PG15 role isolation is hardened; and exact test/development copies passed the full
 suite plus two complete dual-runtime comparisons while PostgreSQL 15 and Bluebuild remained
 healthy. The rollback-protected active cutover then passed: Gandalf development and tests now use
 PostgreSQL 18, its startup policy is automatic, and the post-cutover isolated suite passed again.
-PostgreSQL 15 rollback copies/roles remain intact. The `vector` extension is not enabled; M4.1's
-per-database extension and memory-foundation migration require the next explicit authorization.
+PostgreSQL 15 rollback copies/roles remain intact. M4.1 then enabled pgvector 0.8.6 only in the two
+PostgreSQL 18 Gandalf databases and added the guarded `0012_memory_foundation` schema; 135 tests and
+all migration, drift, isolation, vector, API, and shared-service gates pass. M4 is In progress at
+M4.2's local embedding-model selection boundary; memory is not connected to gameplay yet.
 
 ## Versioned rulesets
 

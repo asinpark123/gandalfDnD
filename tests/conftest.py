@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 from alembic.config import Config
+from alembic.script import ScriptDirectory
 from fastapi.testclient import TestClient
 from sqlalchemy import text
 
@@ -39,10 +40,22 @@ def migrated_test_database() -> Generator[None, None, None]:
 
 @pytest.fixture(autouse=True)
 def clean_database(migrated_test_database: None) -> Generator[None, None, None]:
+    config = Config(str(Path(__file__).parents[1] / "alembic.ini"))
+    expected_revision = ScriptDirectory.from_config(config).get_current_head()
+    with get_engine().connect() as connection:
+        current_revision = connection.execute(
+            text("SELECT version_num FROM alembic_version")
+        ).scalar_one()
+    if current_revision != expected_revision:
+        get_engine().dispose()
+        command.upgrade(config, "head")
     with get_engine().begin() as connection:
         connection.execute(
             text(
-                "TRUNCATE faction_relationships, factions, decision_selections, "
+                "TRUNCATE memory_retrieval_items, memory_retrievals, memory_index_jobs, "
+                "memory_embeddings, campaign_memory_indexes, memory_documents, "
+                "memory_embedding_profiles, faction_relationships, factions, "
+                "decision_selections, "
                 "decision_options, decision_points, "
                 "quest_objectives, quests, world_facts, scene_npc_presences, npcs, scenes, "
                 "provider_calls, rule_resolutions, character_grants, "

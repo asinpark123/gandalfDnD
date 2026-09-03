@@ -13,6 +13,7 @@
   [`POSTGRESQL_18_DEVELOPMENT_REHEARSAL.md`](POSTGRESQL_18_DEVELOPMENT_REHEARSAL.md)
 - **Active cutover evidence:**
   [`POSTGRESQL_18_CUTOVER_EXECUTION.md`](POSTGRESQL_18_CUTOVER_EXECUTION.md)
+- **Subsequent M4.1 evidence:** [`M4_1_MEMORY_FOUNDATION.md`](M4_1_MEMORY_FOUNDATION.md)
 
 ## 1. Decision and purpose
 
@@ -114,7 +115,7 @@ at a separate endpoint and accepts only the intended Gandalf access.
 
 ### PG18.3 — Gandalf restore and acceptance
 
-**Status: Relational restore/runtime acceptance done; pgvector checks remain deferred to M4.1.**
+**Status: Done; relational runtime and subsequent M4.1 pgvector checks passed.**
 
 - restore fresh Gandalf-only backups to PostgreSQL 18;
 - reconcile sequences, ownership, grants, Alembic heads, row counts, constraints, and application
@@ -185,9 +186,8 @@ The migration is complete only when:
 
 ## 7. Immediate next decision
 
-Foundation, both restores, and the rollback-protected active cutover passed. During stabilization,
-retain PostgreSQL 15 databases/roles and all recovery evidence while monitoring PG18 health,
-connections, migrations, disk, and application behavior. The next development decision is the
-separate M4.1 gate to enable pgvector only in the two PostgreSQL 18 Gandalf databases and add the
-guarded memory schema. Old-role disablement, database deletion, package downgrade, PostgreSQL 15
-retirement, and unrelated-service changes remain unauthorized.
+Foundation, both restores, the rollback-protected active cutover, and the subsequent M4.1 extension
+and guarded memory-schema gate passed. During stabilization, retain PostgreSQL 15 databases/roles
+and all recovery evidence while monitoring PG18 health, connections, migrations, disk, extension
+compatibility, and application behavior. Old-role disablement, database deletion, package
+downgrade, PostgreSQL 15 retirement, and unrelated-service changes remain unauthorized.

@@ -352,10 +352,15 @@ def test_migration_backfills_default_scene_and_blocks_world_data_loss(
             ),
             {"id": npc_id, "campaign_id": uuid.UUID(campaign_id)},
         )
+    with get_engine().connect() as connection:
+        expected_revision = connection.execute(
+            text("SELECT version_num FROM alembic_version")
+        ).scalar_one()
     get_engine().dispose()
     with pytest.raises(DBAPIError, match="Cannot downgrade after M3 world data"):
         command.downgrade(config, "0007_turn_stage_recovery")
     with get_engine().connect() as connection:
-        assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == (
-            "0011_factions_time"
+        assert (
+            connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
+            == expected_revision
         )

@@ -396,11 +396,16 @@ def test_migration_refuses_to_discard_recorded_resolutions(client: TestClient) -
     )
     assert response.status_code == 201, response.text
 
+    with get_engine().connect() as connection:
+        expected_revision = connection.execute(
+            text("SELECT version_num FROM alembic_version")
+        ).scalar_one()
     get_engine().dispose()
     config = Config(str(Path(__file__).parents[1] / "alembic.ini"))
     with pytest.raises(DBAPIError, match="Cannot downgrade after rule resolutions"):
         command.downgrade(config, "0004_party_commander_state")
     with get_engine().connect() as connection:
-        assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == (
-            "0011_factions_time"
+        assert (
+            connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
+            == expected_revision
         )

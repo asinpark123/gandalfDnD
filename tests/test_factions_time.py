@@ -570,11 +570,16 @@ def test_provider_projection_is_bounded_under_large_visible_world(client: TestCl
 def test_migration_refuses_to_discard_faction_or_elapsed_time(client: TestClient) -> None:
     campaign_id, characters, _npcs = _ready_world(client)
     _create_faction(client, campaign_id, characters[0])
+    with get_engine().connect() as connection:
+        expected_revision = connection.execute(
+            text("SELECT version_num FROM alembic_version")
+        ).scalar_one()
     get_engine().dispose()
     config = Config(str(Path(__file__).parents[1] / "alembic.ini"))
     with pytest.raises(DBAPIError, match="Cannot downgrade after M3.4 faction or narrative time"):
         command.downgrade(config, "0010_quests_decisions")
     with get_engine().connect() as connection:
-        assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == (
-            "0011_factions_time"
+        assert (
+            connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
+            == expected_revision
         )

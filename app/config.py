@@ -34,6 +34,7 @@ class Settings(BaseSettings):
     turn_stage_timeout_seconds: int = Field(default=120, ge=1, le=3600)
     ruleset_registry_path: Path = Path("rulesets/registry.json")
     ruleset_cache_dir: Path = Path(".cache/rulesets")
+    embedding_model_dir: Path = Path(".cache/embedding_models/bge-small-en-v1.5-onnx-q-c32e6154")
 
 
 @lru_cache

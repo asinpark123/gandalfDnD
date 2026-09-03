@@ -1,3 +1,4 @@
+import logging
 import re
 import uuid
 from datetime import UTC, datetime, timedelta
@@ -131,6 +132,8 @@ from app.turn_interpretation import (
 )
 from app.validation import CharacterSnapshot, InvalidStateChange, StateChangeValidator
 
+logger = logging.getLogger(__name__)
+
 
 class NotFoundError(LookupError):
     pass
@@ -226,6 +229,26 @@ def _next_event_sequence(session: Session, campaign_id: uuid.UUID) -> int:
         select(func.max(CampaignEvent.sequence)).where(CampaignEvent.campaign_id == campaign_id)
     )
     return (current or 0) + 1
+
+
+def _project_completed_turn_best_effort(session: Session, turn: Turn) -> None:
+    """Project only after canonical commit; indexing faults must never fail gameplay."""
+    try:
+        from app.memory import project_completed_turns
+
+        project_completed_turns(
+            session,
+            campaign_id=turn.campaign_id,
+            turn_id=turn.id,
+            limit=1,
+        )
+        session.commit()
+    except Exception:
+        session.rollback()
+        logger.exception(
+            "memory source projection failed after completed turn",
+            extra={"campaign_id": str(turn.campaign_id), "turn_id": str(turn.id)},
+        )
 
 
 def _add_event(
@@ -1742,6 +1765,7 @@ def finalize_turn_execution(
     turn.stage_started_at = None
     turn.completed_at = datetime.now(UTC)
     session.commit()
+    _project_completed_turn_best_effort(session, turn)
     session.refresh(turn)
     return _turn_finalization_result(session, campaign_id, turn, intent)
 
@@ -4367,6 +4391,7 @@ def process_turn(
             actor_character_id=character.id if character else None,
         )
     session.commit()
+    _project_completed_turn_best_effort(session, turn)
     state_after = get_campaign_state(session, campaign_id)
     return TurnRead(
         id=turn.id,

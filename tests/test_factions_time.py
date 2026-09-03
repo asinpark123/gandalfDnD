@@ -567,7 +567,12 @@ def test_provider_projection_is_bounded_under_large_visible_world(client: TestCl
     assert len(json.dumps(context)) < 100_000
 
 
-def test_migration_refuses_to_discard_faction_or_elapsed_time(client: TestClient) -> None:
+def test_migration_refuses_to_discard_faction_or_elapsed_time(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        "app.services._project_completed_turn_best_effort", lambda _session, _turn: None
+    )
     campaign_id, characters, _npcs = _ready_world(client)
     _create_faction(client, campaign_id, characters[0])
     with get_engine().connect() as connection:

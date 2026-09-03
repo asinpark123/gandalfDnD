@@ -1,0 +1,64 @@
+{
+  "schema_version": "1.0.0",
+  "profile": {
+    "profile_key": "local-bge-small-en-v1.5-q-v1",
+    "provider_kind": "local_onnx",
+    "model_name": "BAAI/bge-small-en-v1.5",
+    "model_revision": "Qdrant/bge-small-en-v1.5-onnx-Q@c32e6154d1bb7a0e47c5e745fd895e7700f44385",
+    "artifact_sha256": "51f1bd0addd6e859e42c2c8021a5e5461385bb676a649f4b269aa445449f2431",
+    "license_id": "MIT",
+    "dimensions": 384,
+    "normalization": "l2",
+    "distance_metric": "cosine",
+    "adapter_version": "fastembed-0.8.0:gandalf-memory-1.0.0",
+    "maximum_input_tokens": 512,
+    "document_method": "passage_embed",
+    "query_method": "query_embed"
+  },
+  "source": {
+    "upstream_model": "BAAI/bge-small-en-v1.5",
+    "upstream_license": "MIT",
+    "onnx_repository": "Qdrant/bge-small-en-v1.5-onnx-Q",
+    "onnx_revision": "c32e6154d1bb7a0e47c5e745fd895e7700f44385",
+    "runtime": "fastembed==0.8.0",
+    "execution_provider": "CPUExecutionProvider",
+    "expected_download_bytes": 67411945
+  },
+  "artifacts": [
+    {
+      "path": "config.json",
+      "size_bytes": 706,
+      "sha256": "13582bcf2effc85b7bf3d3f5532e686bc1c9ce86bb009d10f0ec33cbe92299dd"
+    },
+    {
+      "path": "model_optimized.onnx",
+      "size_bytes": 66465124,
+      "sha256": "51f1bd0addd6e859e42c2c8021a5e5461385bb676a649f4b269aa445449f2431"
+    },
+    {
+      "path": "ort_config.json",
+      "size_bytes": 1274,
+      "sha256": "ae8eb2a686022a4fbfb7f6a8d1c1bd4328f0997fab27f9ffe41d67fe5607b172"
+    },
+    {
+      "path": "special_tokens_map.json",
+      "size_bytes": 695,
+      "sha256": "5d5b662e421ea9fac075174bb0688ee0d9431699900b90662acd44b2a350503a"
+    },
+    {
+      "path": "tokenizer.json",
+      "size_bytes": 711396,
+      "sha256": "d241a60d5e8f04cc1b2b3e9ef7a4921b27bf526d9f6050ab90f9267a1f9e5c66"
+    },
+    {
+      "path": "tokenizer_config.json",
+      "size_bytes": 1242,
+      "sha256": "0b29c7bfc889e53b36d9dd3e686dd4300f6525110eaa98c76a5dafceb2029f53"
+    },
+    {
+      "path": "vocab.txt",
+      "size_bytes": 231508,
+      "sha256": "07eced375cec144d27c900241f3e339478dec958f92fddbc551f295c992038a3"
+    }
+  ]
+}

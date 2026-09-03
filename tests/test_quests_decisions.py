@@ -472,7 +472,12 @@ def test_branch_consequence_cannot_duplicate_narrator_fact_proposal(
     assert world["facts"] == []
 
 
-def test_migration_refuses_to_discard_quest_or_decision_data(client: TestClient) -> None:
+def test_migration_refuses_to_discard_quest_or_decision_data(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        "app.services._project_completed_turn_best_effort", lambda _session, _turn: None
+    )
     campaign_id, characters, _npcs = _ready_world(client)
     _create_quest(client, campaign_id, characters[0])
     with get_engine().connect() as connection:

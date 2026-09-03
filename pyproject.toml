@@ -19,6 +19,9 @@ include = ["app*"]
 testpaths = ["tests"]
 addopts = "-ra --strict-markers"
 pythonpath = ["."]
+markers = [
+  "local_embedding: requires the explicitly downloaded checksum-verified local ONNX model",
+]
 
 [tool.ruff]
 target-version = "py311"

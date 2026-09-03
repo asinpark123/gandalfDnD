@@ -692,20 +692,33 @@ def upgrade() -> None:
     )
     op.execute(
         """
-        CREATE FUNCTION gandalfdnd_protect_memory_work_identity()
+        CREATE FUNCTION gandalfdnd_protect_campaign_memory_index_identity()
         RETURNS trigger LANGUAGE plpgsql AS $$
         BEGIN
             IF TG_OP = 'DELETE' THEN
                 RAISE EXCEPTION '% cannot be deleted', TG_TABLE_NAME;
             END IF;
-            IF TG_TABLE_NAME = 'campaign_memory_indexes' AND ROW(
+            IF ROW(
                 OLD.campaign_id, OLD.profile_id, OLD.created_at
             ) IS DISTINCT FROM ROW(
                 NEW.campaign_id, NEW.profile_id, NEW.created_at
             ) THEN
                 RAISE EXCEPTION 'campaign memory index identity is immutable';
             END IF;
-            IF TG_TABLE_NAME = 'memory_index_jobs' AND ROW(
+            RETURN NEW;
+        END;
+        $$
+        """
+    )
+    op.execute(
+        """
+        CREATE FUNCTION gandalfdnd_protect_memory_index_job_identity()
+        RETURNS trigger LANGUAGE plpgsql AS $$
+        BEGIN
+            IF TG_OP = 'DELETE' THEN
+                RAISE EXCEPTION '% cannot be deleted', TG_TABLE_NAME;
+            END IF;
+            IF ROW(
                 OLD.campaign_id, OLD.document_id, OLD.profile_id, OLD.created_at
             ) IS DISTINCT FROM ROW(
                 NEW.campaign_id, NEW.document_id, NEW.profile_id, NEW.created_at
@@ -717,14 +730,20 @@ def upgrade() -> None:
         $$
         """
     )
-    for table in ("campaign_memory_indexes", "memory_index_jobs"):
-        op.execute(
-            f"""
-            CREATE TRIGGER {table}_identity_immutable
-            BEFORE UPDATE OR DELETE ON {table}
-            FOR EACH ROW EXECUTE FUNCTION gandalfdnd_protect_memory_work_identity()
-            """
-        )
+    op.execute(
+        """
+        CREATE TRIGGER campaign_memory_indexes_identity_immutable
+        BEFORE UPDATE OR DELETE ON campaign_memory_indexes
+        FOR EACH ROW EXECUTE FUNCTION gandalfdnd_protect_campaign_memory_index_identity()
+        """
+    )
+    op.execute(
+        """
+        CREATE TRIGGER memory_index_jobs_identity_immutable
+        BEFORE UPDATE OR DELETE ON memory_index_jobs
+        FOR EACH ROW EXECUTE FUNCTION gandalfdnd_protect_memory_index_job_identity()
+        """
+    )
     op.execute(
         """
         CREATE FUNCTION gandalfdnd_validate_memory_retrieval_scope()
@@ -819,7 +838,8 @@ def downgrade() -> None:
     op.execute("DROP TRIGGER memory_embedding_profiles_immutable ON memory_embedding_profiles")
     op.execute("DROP FUNCTION gandalfdnd_validate_memory_retrieval_item_scope()")
     op.execute("DROP FUNCTION gandalfdnd_validate_memory_retrieval_scope()")
-    op.execute("DROP FUNCTION IF EXISTS gandalfdnd_protect_memory_work_identity()")
+    op.execute("DROP FUNCTION IF EXISTS gandalfdnd_protect_memory_index_job_identity()")
+    op.execute("DROP FUNCTION IF EXISTS gandalfdnd_protect_campaign_memory_index_identity()")
     op.execute("DROP FUNCTION gandalfdnd_validate_memory_job_scope()")
     op.execute("DROP FUNCTION gandalfdnd_prevent_memory_audit_mutation()")
     op.execute("DROP FUNCTION gandalfdnd_validate_memory_embedding()")

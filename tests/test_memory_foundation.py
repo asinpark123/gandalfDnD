@@ -419,6 +419,10 @@ def test_empty_downgrade_is_reversible_and_keeps_the_extension() -> None:
 
 
 def test_downgrade_refuses_to_discard_memory_data() -> None:
+    with get_engine().connect() as connection:
+        pre_attempt_head = connection.execute(
+            text("SELECT version_num FROM alembic_version")
+        ).scalar_one()
     with get_session_factory()() as session:
         session.add(_profile())
         session.commit()
@@ -427,6 +431,7 @@ def test_downgrade_refuses_to_discard_memory_data() -> None:
     with pytest.raises(DBAPIError, match="Cannot downgrade after M4.1 memory data"):
         command.downgrade(config, "0011_factions_time")
     with get_engine().connect() as connection:
-        assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == (
-            "0012_memory_foundation"
+        assert (
+            connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
+            == pre_attempt_head
         )

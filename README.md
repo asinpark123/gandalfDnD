@@ -46,6 +46,8 @@ maintained in the [living development plan](docs/PROJECT_PLAN.md).
   least privilege, package-impact boundary, and conditional provisioning plan
 - [M4.1 memory foundation](docs/M4_1_MEMORY_FOUNDATION.md) — scoped extension enablement,
   migration `0012`, schema invariants, recovery, and acceptance evidence
+- [M4.4 summaries/provider integration](docs/M4_4_SUMMARIES_PROVIDER_INTEGRATION.md) — immutable
+  source coverage, bounded untrusted context, prompt separation, and failure-safety evidence
 - [PostgreSQL 18 migration strategy](docs/POSTGRESQL_18_MIGRATION_STRATEGY.md) — parallel-cluster,
   Gandalf-only migration, acceptance, rollback, and longevity gates
 - [PostgreSQL 18 readiness audit](docs/POSTGRESQL_18_READINESS_AUDIT.md) — verified package impact,
@@ -81,8 +83,9 @@ PostgreSQL 18 Gandalf databases and added the guarded `0012_memory_foundation` s
 all migration, drift, isolation, vector, API, and shared-service gates pass. M4.2 added durable,
 player-safe indexing with the pinned local BGE model. M4.3 now adds versioned exact-vector plus
 lexical retrieval, strict source/context bounds, replayable raw-query-free audits, and a passing
-500-record local-model gate. All 147 tests pass; the 11 development indexes remain intentionally
-inactive, and memory is not connected to gameplay or providers yet. M4.4 is next.
+500-record local-model gate. M4.4 adds immutable source-cited summaries and fail-soft historical
+context to both provider stages while keeping exact state separate. The 11 development indexes
+remain intentionally inactive; M4.5 acceptance is next.
 
 ## Versioned rulesets
 
@@ -137,14 +140,17 @@ checksum, size, license, attribution, normalized-data catalogs, and schema versi
 - auditable application dice rolls, including internally logged hidden rolls
 - provider-neutral DM interface
 - deterministic offline provider for development and repeatable tests
+- player-visible completed-turn memory with immutable sources, pinned local embeddings, exact-vector
+  plus lexical retrieval, replayable score audits, source-complete summaries, and fail-soft cited
+  context that remains separate from canonical state
 - optional OpenClaw two-stage provider with layered strict-JSON/Pydantic validation, stable
   transport errors, a compact provider context, and independently configurable model route and GM
   style; the owner's private deployment passed the live ten-scenario gate
 - legacy Phase 0 OpenAI Responses adapter with Pydantic structured output; the two-stage automated
   direct-API adapter remains disabled because API spend is not authorized
 
-Not included yet: RAG/pgvector, the spoiler-safe Guide, combat, a web UI, Redis, Celery, or a
-permanent application VM.
+Not included yet: activated production memory profiles, approximate vector indexes, the spoiler-safe
+Guide, combat, a web UI, Redis, Celery, or a permanent application VM.
 
 ## Local setup
 

@@ -38,6 +38,7 @@ from app.llm.base import (
     TurnInterpretationProvider,
     TurnNarrationProvider,
 )
+from app.memory_context import TurnMemoryContextService
 from app.models import (
     NPC,
     Campaign,
@@ -1115,6 +1116,7 @@ def interpret_turn_execution(
     turn_id: uuid.UUID,
     provider: TurnInterpretationProvider,
     dice_service: DiceService | None = None,
+    memory_context_service: TurnMemoryContextService | None = None,
 ) -> TurnInterpretationRead:
     campaign = _campaign_for_update(session, campaign_id)
     turn = session.scalar(
@@ -1173,6 +1175,15 @@ def interpret_turn_execution(
         turn.status = "interpreting"
         turn.stage_started_at = datetime.now(UTC)
         session.commit()
+
+        context = _with_historical_memory(
+            context,
+            memory_context_service,
+            campaign_id=campaign_id,
+            turn_id=turn_id,
+            stage="interpretation",
+            player_action=player_action,
+        )
 
         started = perf_counter()
         try:
@@ -1480,6 +1491,7 @@ def finalize_turn_execution(
     campaign_id: uuid.UUID,
     turn_id: uuid.UUID,
     provider: TurnNarrationProvider,
+    memory_context_service: TurnMemoryContextService | None = None,
 ) -> TurnFinalizationRead:
     campaign = _campaign_for_update(session, campaign_id)
     turn = session.scalar(
@@ -1558,6 +1570,15 @@ def finalize_turn_execution(
     turn.status = "narrating"
     turn.stage_started_at = datetime.now(UTC)
     session.commit()
+
+    context = _with_historical_memory(
+        context,
+        memory_context_service,
+        campaign_id=campaign_id,
+        turn_id=turn_id,
+        stage="narration",
+        player_action=player_action,
+    )
 
     started = perf_counter()
     try:
@@ -2950,6 +2971,35 @@ def _provider_context(
             "selected_choice": selected_choice,
         }
     return context
+
+
+def _with_historical_memory(
+    context: dict[str, Any],
+    service: TurnMemoryContextService | None,
+    *,
+    campaign_id: uuid.UUID,
+    turn_id: uuid.UUID,
+    stage: Literal["interpretation", "narration"],
+    player_action: str,
+) -> dict[str, Any]:
+    if service is None:
+        return context
+    try:
+        historical_memory = service.build(
+            campaign_id=campaign_id,
+            turn_id=turn_id,
+            stage=stage,
+            player_action=player_action,
+        )
+    except Exception:
+        logger.exception(
+            "historical memory context failed safely",
+            extra={"campaign_id": str(campaign_id), "turn_id": str(turn_id), "stage": stage},
+        )
+        return context
+    if historical_memory is None:
+        return context
+    return {**context, "historical_memory": historical_memory}
 
 
 def _proposal_fact_parts(change: Any) -> tuple[str, uuid.UUID | None, str] | None:

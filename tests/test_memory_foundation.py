@@ -92,6 +92,9 @@ def test_pgvector_extension_identity_and_memory_schema_are_explicit() -> None:
         "memory_index_jobs",
         "memory_retrieval_items",
         "memory_retrievals",
+        "memory_summaries",
+        "memory_summary_sources",
+        "memory_summary_uses",
     }
     with get_engine().connect() as connection:
         identity = connection.execute(

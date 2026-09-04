@@ -1433,3 +1433,118 @@ class MemoryRetrievalItem(TimestampMixin, Base):
             "selected_chars BETWEEN 1 AND 6000", name="memory_retrieval_item_selected_chars"
         ),
     )
+
+
+class MemorySummary(TimestampMixin, Base):
+    __tablename__ = "memory_summaries"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    campaign_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("campaigns.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    retrieval_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("memory_retrievals.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    profile_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("memory_embedding_profiles.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    source_window_sha256: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    input_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    audience: Mapped[str] = mapped_column(String(20), nullable=False, default="player")
+    provider: Mapped[str] = mapped_column(String(60), nullable=False)
+    model: Mapped[str | None] = mapped_column(String(160))
+    prompt_version: Mapped[str] = mapped_column(String(60), nullable=False)
+    attempt: Mapped[int] = mapped_column(Integer, nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False)
+    content: Mapped[str | None] = mapped_column(Text)
+    content_sha256: Mapped[str | None] = mapped_column(String(64))
+    source_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    event_sequence_start: Mapped[int] = mapped_column(Integer, nullable=False)
+    event_sequence_end: Mapped[int] = mapped_column(Integer, nullable=False)
+    replaces_summary_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("memory_summaries.id", ondelete="RESTRICT"), unique=True
+    )
+    latency_ms: Mapped[int] = mapped_column(Integer, nullable=False)
+    input_tokens: Mapped[int | None] = mapped_column(Integer)
+    output_tokens: Mapped[int | None] = mapped_column(Integer)
+    error_code: Mapped[str | None] = mapped_column(String(80))
+
+    __table_args__ = (
+        UniqueConstraint("retrieval_id", "attempt", name="uq_memory_summaries_retrieval_attempt"),
+        CheckConstraint(
+            "source_window_sha256 ~ '^[0-9a-f]{64}$'",
+            name="memory_summary_source_window_sha256",
+        ),
+        CheckConstraint("input_sha256 ~ '^[0-9a-f]{64}$'", name="memory_summary_input_sha256"),
+        CheckConstraint("audience = 'player'", name="memory_summary_player_visible"),
+        CheckConstraint("attempt > 0", name="memory_summary_attempt_positive"),
+        CheckConstraint("status IN ('succeeded', 'failed')", name="memory_summary_status"),
+        CheckConstraint(
+            "(status = 'succeeded' AND content IS NOT NULL "
+            "AND char_length(content) BETWEEN 1 AND 3000 "
+            "AND content_sha256 ~ '^[0-9a-f]{64}$' AND error_code IS NULL) OR "
+            "(status = 'failed' AND content IS NULL AND content_sha256 IS NULL "
+            "AND error_code IS NOT NULL AND replaces_summary_id IS NULL)",
+            name="memory_summary_result_shape",
+        ),
+        CheckConstraint("source_count BETWEEN 1 AND 8", name="memory_summary_source_count"),
+        CheckConstraint(
+            "event_sequence_start > 0 AND event_sequence_end >= event_sequence_start",
+            name="memory_summary_event_sequence_range",
+        ),
+        CheckConstraint("latency_ms >= 0", name="memory_summary_latency_nonnegative"),
+        CheckConstraint(
+            "input_tokens IS NULL OR input_tokens >= 0", name="memory_summary_input_nonnegative"
+        ),
+        CheckConstraint(
+            "output_tokens IS NULL OR output_tokens >= 0", name="memory_summary_output_nonnegative"
+        ),
+    )
+
+
+class MemorySummarySource(TimestampMixin, Base):
+    __tablename__ = "memory_summary_sources"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    summary_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("memory_summaries.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    document_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("memory_documents.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    position: Mapped[int] = mapped_column(Integer, nullable=False)
+    selected_chars: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("summary_id", "document_id", name="uq_memory_summary_sources_document"),
+        UniqueConstraint("summary_id", "position", name="uq_memory_summary_sources_position"),
+        CheckConstraint("position BETWEEN 1 AND 8", name="memory_summary_source_position"),
+        CheckConstraint(
+            "selected_chars BETWEEN 1 AND 6000", name="memory_summary_source_selected_chars"
+        ),
+    )
+
+
+class MemorySummaryUse(TimestampMixin, Base):
+    __tablename__ = "memory_summary_uses"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    campaign_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("campaigns.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    retrieval_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("memory_retrievals.id", ondelete="RESTRICT"), nullable=False, unique=True
+    )
+    summary_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("memory_summaries.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    turn_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("turns.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    stage: Mapped[str] = mapped_column(String(20), nullable=False)
+
+    __table_args__ = (
+        CheckConstraint(
+            "stage IN ('interpretation', 'narration')", name="memory_summary_use_stage"
+        ),
+    )

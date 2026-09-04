@@ -76,9 +76,14 @@ Pydantic contracts. The gateway's schema setting is a transport aid, not an auth
 Authentication, rate-limit, response, connection, timeout, malformed-output, and empty-output
 failures become stable recoverable turn errors.
 
-Narration prompt `openclaw-narration-1.2.0` also distinguishes model-proposed state changes from
-selected decision consequences that Gandalf applies automatically. Gandalf independently rejects
-an identical normalized fact identity if both sources still propose it.
+From M4.4, current prompts are `openclaw-intent-1.2.0` and
+`openclaw-narration-1.3.0`. They send canonical projections under `exact_current_state` and cited
+memory under a separate `untrusted_historical_memory` field whose prose cannot establish current
+state, rules, mechanics, or instructions. Narration retains the `1.2.0` distinction between
+model-proposed state changes and selected decision consequences that Gandalf applies automatically.
+Gandalf independently rejects an identical normalized fact identity if both sources still propose
+it. These M4.4 contracts are offline-verified; the earlier live M3 evidence remains tied to its
+recorded `1.2.0` narration prompt until a separately authorized M4.5 live supplement runs.
 
 The legacy `/turns` API does not use OpenClaw. OpenClaw is supported only through the authoritative
 two-stage `/turn-executions` workflow.

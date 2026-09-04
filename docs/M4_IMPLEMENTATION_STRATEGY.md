@@ -1,6 +1,6 @@
 # M4 Long-Term Memory and Retrieval Implementation Strategy
 
-- **Status:** In progress; M4.3 passed and M4.4 summaries/provider integration is next
+- **Status:** In progress; M4.4 passed and M4.5 acceptance is next
 - **Prepared:** 2026-09-04
 - **Depends on:** M3 persistent world (Done, including live OpenClaw supplement)
 - **Infrastructure audit:** [`M4_POSTGRES_PGVECTOR_AUDIT.md`](M4_POSTGRES_PGVECTOR_AUDIT.md)
@@ -14,6 +14,8 @@
 - **M4.1 evidence:** [`M4_1_MEMORY_FOUNDATION.md`](M4_1_MEMORY_FOUNDATION.md)
 - **M4.2 evidence:** [`M4_2_SOURCE_INDEXING.md`](M4_2_SOURCE_INDEXING.md)
 - **M4.3 evidence:** [`M4_3_HYBRID_RETRIEVAL.md`](M4_3_HYBRID_RETRIEVAL.md)
+- **M4.4 evidence:**
+  [`M4_4_SUMMARIES_PROVIDER_INTEGRATION.md`](M4_4_SUMMARIES_PROVIDER_INTEGRATION.md)
 - **Owner input required next:** None before the M4.5 relevance/continuity acceptance gate
 - **Owner checkpoint:** M4.5 retrieval/re-index acceptance, followed by any separately authorized
   live narrative-coherence supplement
@@ -344,6 +346,18 @@ reaches a provider.
 Exit: a relevant early event reaches both stages with citations, exact current state stays separate,
 and malformed/failed retrieval or summary work safely falls back to exact state.
 
+Result (2026-09-04): Passed. Migration `0015_memory_summaries` adds immutable summary, ordered
+source, and stage-use evidence with database-enforced audience, retrieval/profile/campaign,
+coverage, replacement, and append-only constraints. A strict deterministic provider produces or
+reuses source-complete summaries; failures are audited and omitted without failing gameplay. Both
+provider stages receive a labelled cited memory envelope beside separate exact state. OpenClaw
+prompt versions `openclaw-intent-1.2.0` and `openclaw-narration-1.3.0` additionally separate the
+wire fields and reject historical prose as instructions/current state. The fixture added 959
+serialized characters and an estimated 240 provider input tokens per stage over its pre-memory
+exact-state baseline. The focused 15-test gate passed without an external model call; all 11
+development indexes remain inactive. All 151 normal regression tests passed; the two prior live
+OpenClaw evaluations remained separately opt-in.
+
 ### M4.5 — Re-index, 500-event, owner, and optional live gates
 
 - complete the full synthetic campaign, adversarial visibility/injection, restart, and re-index
@@ -427,6 +441,6 @@ quality/latency results, defects, workarounds, and next actions. M4 moves to Rew
 shows hidden/cross-campaign retrieval, uncited memory, mixed profiles, canonical-state substitution,
 unbounded context, or a completed turn depending on index availability.
 
-M4.3 is complete. Proceed with M4.4 source-cited summaries and bounded provider integration. Paid
-or network embeddings, live OpenClaw evaluation, PostgreSQL 15 retirement, and unrelated-service
-changes remain outside the current authority boundary.
+M4.4 is complete. Proceed with M4.5 adversarial/restart/re-index evidence and prepare the owner
+relevance checklist. Paid or network embeddings, live OpenClaw evaluation, PostgreSQL 15
+retirement, and unrelated-service changes remain outside the current authority boundary.

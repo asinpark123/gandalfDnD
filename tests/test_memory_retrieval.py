@@ -89,8 +89,10 @@ def _add_document(
     status: str = "active",
     superseded_by_document_id: uuid.UUID | None = None,
     location_id: uuid.UUID | None = None,
+    document_id: uuid.UUID | None = None,
 ) -> MemoryDocument:
     document = MemoryDocument(
+        id=document_id or uuid.uuid4(),
         campaign_id=campaign_id,
         source_kind="event",
         source_event_id=event.id,
@@ -416,6 +418,9 @@ def test_500_event_golden_gate_activates_only_after_quality_thresholds(
                 campaign_id=campaign_id,
                 event=event,
                 content=content,
+                document_id=uuid.uuid5(
+                    uuid.NAMESPACE_URL, f"gandalfdnd:m4.3:golden-corpus:{offset}"
+                ),
             )
             documents.append(document)
             if offset < 20:

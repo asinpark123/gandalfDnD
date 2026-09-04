@@ -17,6 +17,7 @@ from app.db import get_session
 from app.dice import DiceService, get_dice_service
 from app.llm.base import DMProvider, TurnInterpretationProvider, TurnNarrationProvider
 from app.llm.factory import get_dm_provider, get_turn_interpreter, get_turn_narrator
+from app.memory_context import TurnMemoryContextService, get_turn_memory_context_service
 from app.resolution import ResolutionCreate, ResolutionError
 from app.rulesets import UnknownRulesetDataCatalogError, UnknownRulesetError, get_ruleset_registry
 from app.schemas import (
@@ -79,6 +80,7 @@ InterpreterDep = Annotated[TurnInterpretationProvider, Depends(get_turn_interpre
 NarratorDep = Annotated[TurnNarrationProvider, Depends(get_turn_narrator)]
 DiceDep = Annotated[DiceService, Depends(get_dice_service)]
 SettingsDep = Annotated[Settings, Depends(get_settings)]
+MemoryContextDep = Annotated[TurnMemoryContextService, Depends(get_turn_memory_context_service)]
 
 
 def create_app() -> FastAPI:
@@ -418,6 +420,7 @@ def create_app() -> FastAPI:
         session: SessionDep,
         provider: InterpreterDep,
         dice_service: DiceDep,
+        memory_context: MemoryContextDep,
     ) -> TurnInterpretationRead:
         try:
             return interpret_turn_execution(
@@ -425,7 +428,8 @@ def create_app() -> FastAPI:
                 campaign_id,
                 turn_id,
                 provider,
-                dice_service,
+                dice_service=dice_service,
+                memory_context_service=memory_context,
             )
         except NotFoundError as exc:
             session.rollback()
@@ -449,6 +453,7 @@ def create_app() -> FastAPI:
         turn_id: uuid.UUID,
         session: SessionDep,
         provider: NarratorDep,
+        memory_context: MemoryContextDep,
     ) -> TurnFinalizationRead:
         try:
             return finalize_turn_execution(
@@ -456,6 +461,7 @@ def create_app() -> FastAPI:
                 campaign_id,
                 turn_id,
                 provider,
+                memory_context_service=memory_context,
             )
         except NotFoundError as exc:
             session.rollback()

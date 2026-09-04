@@ -4,12 +4,10 @@
 - **Last updated:** 2026-09-05
 - **Rules baseline:** SRD 5.2.1 (pinned; character-state and check/save-resolution catalogs pass
   integrity and schema verification)
-- **Current delivery stage:** M4 Done (accepted 2026-09-05). The focused owner retest accepted
-  accurate primary recall, relevant-only supporting selection, and distinct same-name NPC
-  attribution. Ranking policy `hybrid-rrf-entity-recency-1.1.0`, the revised 500-memory local gate,
-  all 27 focused tests, and all 154 repository tests pass. The authorized six-call live OpenClaw
-  supplement also passed cited recall, injection/visibility, reconnect, and exact-state safety.
-  M5 deterministic-combat strategy preparation is next
+- **Current delivery stage:** M5 Ready at M5.1. M5.0 reconciled the pinned SRD combat sources,
+  accepted research, existing Fighter state, and deterministic/provider boundaries into a narrow
+  Party Commander strategy. M5.1 will add an immutable combat catalog and pure fixed-dice kernel
+  without a database migration, infrastructure change, or provider call
 - **Canonical repository:** `~/Git/gandalfDnD`
 
 ## 1. Purpose of this document
@@ -117,6 +115,7 @@ Current documentation index:
 | M4.5 focused relevance retest | [`player/M4_5_TARGETED_RETEST.md`](player/M4_5_TARGETED_RETEST.md) |
 | M4.5 accepted focused retest results | [`testM4_5_TARGETED_RETEST_RESULTS.md`](testM4_5_TARGETED_RETEST_RESULTS.md) |
 | M4 supplemental live OpenClaw memory evaluation | [`M4_OPENCLAW_EVALUATION.md`](M4_OPENCLAW_EVALUATION.md) |
+| M5 deterministic Party Commander combat strategy | [`M5_IMPLEMENTATION_STRATEGY.md`](M5_IMPLEMENTATION_STRATEGY.md) |
 | PostgreSQL 18 Gandalf-only parallel migration and rollback strategy | [`POSTGRESQL_18_MIGRATION_STRATEGY.md`](POSTGRESQL_18_MIGRATION_STRATEGY.md) |
 | PostgreSQL 18 verified readiness, package impact, compatibility, and authorization gate | [`POSTGRESQL_18_READINESS_AUDIT.md`](POSTGRESQL_18_READINESS_AUDIT.md) |
 | PostgreSQL 18 package/cluster/HBA/test-restore execution evidence | [`POSTGRESQL_18_FOUNDATION_EXECUTION.md`](POSTGRESQL_18_FOUNDATION_EXECUTION.md) |
@@ -351,7 +350,7 @@ Use these values consistently:
 | M3 | Persistent world model | Done | NPCs, quests, scenes, clues, time, decisions, and visibility |
 | M4 | Long-term memory and retrieval | Done | Coherent recall without full history in context |
 | PG18 | PostgreSQL 18 migration | Done/Monitoring | Active cutover passed; PG15 rollback retained during stabilization |
-| M5 | Basic deterministic combat | Proposed | Reproducible initiative, actions, attacks, and damage |
+| M5 | Basic deterministic combat | Ready at M5.1 | Reproducible initiative, actions, attacks, health, and encounter outcomes |
 | M6 | Spoiler-safe Guide | Proposed | Beginner help with enforceable knowledge boundaries |
 | M7 | Play interface and campaign administration | Proposed | Usable play, recap, correction, and export workflows |
 | M8 | Deployment and operations | Deferred | Dedicated reliable service with backups and monitoring |
@@ -1261,12 +1260,37 @@ search database p95 must remain at most 250 ms on the audited VM.
 
 ### M5 — Basic deterministic combat
 
-- **Status:** Proposed
+- **Status:** Ready at M5.1; M5.0 strategy complete 2026-09-05
 - **Depends on:** M1 and M3
+- **Detailed strategy:** [`M5_IMPLEMENTATION_STRATEGY.md`](M5_IMPLEMENTATION_STRATEGY.md)
 
 Add encounters, combatants, initiative, rounds/turn order, action economy, attacks, damage, healing,
 conditions, defeat, and encounter completion. Start with a deliberately small supported rules
 subset.
+
+Initial scope is strict SRD 5.2.1 Party Commander combat for the existing level-one
+Human/Soldier/Fighter characters. It covers Greatsword, Flail, melee/thrown Javelin, Defense, Great
+Weapon Fighting, Graze, Sap, Slow, Second Wind, core health/0-HP rules, and Goblin Minion/Warrior
+opponents on a bounded 5-foot grid. Fixed average monster HP is the reproducible default. The
+application owns all dice and mechanics; providers can later propose only typed intents and narrate
+accepted outcomes.
+
+Delivery sequence:
+
+1. M5.0 (Done) establishes the source map, supported content, state model, deferrals, fixtures,
+   risks, and owner checkpoints.
+2. M5.1 (Ready) adds immutable combat definitions and pure initiative, attack, damage, healing,
+   Temporary HP, and effect-duration resolvers with fixed-dice tests.
+3. M5.2 adds guarded encounter/combatant/initiative/command/event persistence and exact tie/restart
+   behavior.
+4. M5.3 adds active-turn action economy, bounded grid movement, Dodge/Disengage/Dash, and explicit
+   Opportunity Attack reaction windows.
+5. M5.4 integrates supported attacks, range/equipment, damage, Fighting Styles, and all three
+   current weapon masteries.
+6. M5.5 completes Second Wind, Temporary HP, unconsciousness/death saves/stability, knockout,
+   defeat, recovery, encounter completion, and strict-SRD party benchmarks.
+7. M5.6 connects typed provider intent/narration, persistent world, and bounded M4 memory, then runs
+   owner acceptance before requesting any separately capped live OpenClaw evaluation.
 
 Exit gate: fixed Party Commander combat fixtures replay to identical results, illegal actions are
 rejected, and a restart during combat resumes the exact per-character initiative and resource state.
@@ -1401,6 +1425,9 @@ because a workaround exists; record both the workaround and the permanent resolu
 | RISK-030 | Retrieved prose leaks hidden/cross-campaign data or acts as prompt instructions | Medium | High | Campaign/audience/status/profile SQL filters before ranking, player-only initial index, adversarial injection fixtures, untrusted-data prompt labels, cited bounded context |
 | RISK-031 | A PostgreSQL major upgrade disrupts Gandalf, unrelated databases, or shared services, or creates unrollbackable write divergence | Low/Monitoring | High | Parallel migration and rollback-protected cutover passed with exact fingerprints and shared-service health; retain all PG15 copies/roles and recovery bundles during stabilization; separate approval remains mandatory for disablement/deletion/retirement |
 | RISK-032 | Broad shared PG15 HBA plus default `PUBLIC CONNECT` lets Gandalf credentials authenticate to unrelated databases | Medium | Medium | Targeted ordered HBA allow/reject rules for Gandalf roles, SCRAM, loopback-only PG18, denial tests, and old PG15 login disablement after accepted cutover; never change unrelated database ACLs without their owners |
+| RISK-033 | Encounter state duplicates character HP/resources and the two projections diverge | Medium | High | Keep character state canonical, lock and update character/combatant projections atomically, add database consistency guards, and replay both from immutable combat evidence |
+| RISK-034 | Optional reactions, initiative ties, simultaneous effects, or concurrent commands resolve through accidental request/database order | High | High | Persist explicit tie/reaction windows and decisions, lock in stable identity order, reject stale revisions before dice, and test retries/reconnects at every timing boundary |
+| RISK-035 | Fine-grained combat state/events make provider context and M4 memory noisy or excessively expensive | High | Medium | Send only bounded active-combat state, measure tokens from M5.6, retain exact events outside prompt prose, and index one material encounter summary rather than every atomic step |
 
 ## 13. Architectural decision log
 
@@ -1448,6 +1475,9 @@ because a workaround exists; record both the workaround and the permanent resolu
 | ADR-040 | 2026-09-04 | Use filter-first semantic/lexical candidate sets with versioned weighted reciprocal-rank fusion, bounded entity/recency signals, overlapping-source deduplication, and raw-query-free immutable audits | The 500-record local-model gate meets recall and latency thresholds while fixed policy/filter evidence can replay selections without persisting player prompts; explicit evaluation access prevents a ready profile from silently becoming live | Change weights or limits only through a new ranking-policy version and golden regression evidence; approximate search remains deferred |
 | ADR-041 | 2026-09-04 | Supply source-complete player-visible summaries to both provider stages in a separately labelled untrusted-history field, with immutable prompt/provider lineage and fail-soft omission | Historical prose improves continuity but may contain mistakes or instructions; exact relational state and recorded resolutions must remain visibly distinct and authoritative, while unavailable or malformed derived memory must never stop gameplay | Add another audience or summary provider only through a versioned contract, visibility/failure tests, measured context budget, and explicit live-evaluation gate |
 | ADR-042 | 2026-09-05 | Treat requested memory count as a ceiling and require every supporting result after rank 1 to clear versioned score, query-evidence, and content-diversity checks | Owner evidence showed that quota-filling generic chronicles add noise even when the correct source is rank 1; internal provider context quality is an M4 concern independent of future frontend presentation | Tune thresholds only through another ranking-policy version, golden/adversarial regression, and owner-quality evidence; retain replay support for prior policies |
+| ADR-043 | 2026-09-05 | Build M5 as typed idempotent combat commands resolved from canonical state and application-owned dice into atomic projections plus immutable combat evidence; keep provider intent/narration outside mechanical authority | Multi-roll attacks, reactions, resources, effects, and health transitions require richer records than M1.4 checks/saves but must retain the same determinism, attribution, stale-state, and replay guarantees | Revisit record granularity only after the Fighter/Goblin vertical slice passes; never let narration or client numeric fields become authoritative |
+| ADR-044 | 2026-09-05 | Use a bounded open 5-foot integer grid as M5's canonical tactical representation, with client-supplied validated paths and explicit reaction windows | Exact reach, range, occupancy, split movement, and Opportunity Attacks cannot be reproduced safely from prose or coarse range labels; a grid is optional in the SRD but gives the backend an auditable contract | Revisit when a theatre-of-the-mind client can translate to equally exact validated positions, or when terrain/elevation requirements justify a versioned extension |
+| ADR-045 | 2026-09-05 | Limit first combat content to existing level-one Fighter parties and SRD Goblin Minion/Warrior instances using printed fixed average HP | A complete narrow martial slice tests attacks, three current masteries, action economy, recovery, defeat, and party isolation without hiding engine defects under broad class/monster complexity | Expand only as complete source-cited vertical slices after M5; add random monster HP through a separately replayed setup option |
 
 ## 14. Milestone review template
 
@@ -1539,8 +1569,8 @@ Destination milestone:
 1. Monitor the active PG18 connection, application/database errors, startup behavior, connections,
    disk, extension compatibility, and migration behavior while retaining all recovery bundles and
    both PG15 Gandalf copies/roles unchanged.
-2. Prepare M5's narrow deterministic Party Commander combat strategy, acceptance fixtures, and
-   owner decision points without expanding into full class/spell breadth.
+2. Implement M5.1's immutable `srd-5.2.1-combat-v1` catalog, pure fixed-dice combat kernel, and
+   golden tests without a migration, infrastructure change, or provider call.
 3. Keep the 11 pre-existing development indexes inactive until their own campaign-specific
    activation evidence passes.
 4. Request a later explicit destructive-action decision before disabling old PG15 logins, deleting
@@ -1599,3 +1629,4 @@ Destination milestone:
 | 2026-09-05 | DOC-047 | Analysed the first M4.5 owner review, recorded focused Rework, resolved ISSUE-016 in ranking policy `1.1.0`, added a fair same-name fixture and concise targeted retest | The owner accepted all primary memories but found supporting chronicles repetitive/unintelligible and could not judge the second Mira because no active interaction was shown. The revised 500-memory local gate preserved 1.00 recall/MRR, passed at 214 ms p95, excluded unsafe records, and returned six stable relevant-only results; 27 focused and all 154 repository tests pass | Complete the four-question targeted owner retest; if accepted, close M4 and then separately decide whether a capped live OpenClaw supplement is worthwhile |
 | 2026-09-05 | DOC-048 | Preserved the successful targeted owner retest, closed ISSUE-016 and M4, and promoted useful supporting-memory presentation into M7 acceptance | The owner confirmed unchanged primary accuracy, clearer noise suppression, unambiguous same-name NPCs, and acceptance of primary-plus-qualifying-support; all M4 technical/security/restart/quality gates already pass | Decide on the optional capped live OpenClaw supplement, then prepare the narrow M5 deterministic-combat strategy |
 | 2026-09-05 | DOC-049 | Completed the authorized capped live M4 OpenClaw supplement and preserved its credential-free evidence and opt-in harness | Six of eight allowed calls verified cited two-Mira recall, inert hostile quoted prose, DM-only exclusion, provider-stage audits, reconnection, and unchanged HP/inventory/location; two harness-only diagnostics caused no application change, Clawvis remained unchanged, and the tunnel was closed | Prepare M5's narrow deterministic Party Commander combat strategy and continue measuring provider context growth |
+| 2026-09-05 | DOC-050 | Completed M5.0 and advanced M5 to Ready at M5.1 with a source-mapped deterministic Party Commander combat strategy | The pinned SRD supports a narrow existing-Fighter/Goblin slice covering initiative, grid/action economy, Greatsword/Flail/Javelin attacks, Graze/Sap/Slow, Second Wind, health/0 HP, replay, strict XP-budget measurements, provider isolation, and owner gates; spells, broad content, companions, and lone-hero changes remain deferred | Implement repository-only M5.1 combat catalog and pure fixed-dice kernel, then run integrity and regression gates |

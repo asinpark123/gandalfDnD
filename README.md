@@ -62,6 +62,8 @@ maintained in the [living development plan](docs/PROJECT_PLAN.md).
   the M7 supporting-memory presentation requirement
 - [M4 live OpenClaw evaluation](docs/M4_OPENCLAW_EVALUATION.md) — capped same-name recall,
   injection isolation, reconnect, state-safety, usage, and latency evidence
+- [M5 implementation strategy](docs/M5_IMPLEMENTATION_STRATEGY.md) — deterministic Party Commander
+  encounters, initiative, action economy, attacks, health, replay, and acceptance gates
 - [PostgreSQL 18 migration strategy](docs/POSTGRESQL_18_MIGRATION_STRATEGY.md) — parallel-cluster,
   Gandalf-only migration, acceptance, rollback, and longevity gates
 - [PostgreSQL 18 readiness audit](docs/POSTGRESQL_18_READINESS_AUDIT.md) — verified package impact,
@@ -108,6 +110,11 @@ genuinely qualifying cited supporting memories when they are available. The sepa
 live M4 supplement also passed: the final prompt and retrieval contracts recalled two role-specific
 Miras correctly, kept hostile quoted prose mechanically inert, excluded a DM-only secret, and left
 exact state unchanged across a database reconnection.
+
+M5 is Ready at M5.1. Its deliberately narrow first combat slice uses the existing level-one
+Human/Soldier/Fighters, Greatsword/Flail/Javelin mechanics, Graze/Sap/Slow, Second Wind, and SRD
+Goblin Minion/Warrior opponents. Spells, broad content, companion autonomy, and lone-hero balancing
+remain deferred until deterministic Party Commander combat passes.
 
 ## Versioned rulesets
 

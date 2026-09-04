@@ -275,14 +275,21 @@ migrations.
 | GF-005 | Skill and tool interaction | When both legitimately apply, PB is added once and Advantage is granted | Deferred to tool-enabled slice |
 | GF-006 | Advantage cancellation | Any Advantage and any Disadvantage sources cancel to one d20 | Verified M1.4, including automatic Chain Mail Stealth Disadvantage |
 | GF-007 | Alternative base AC | Eligible base calculations are selected, never summed | Verified M1.3 for unarmored versus worn Chain Mail; future alternatives append fixtures |
-| GF-008 | Temporary HP | A new pool may replace or be declined; pools never add | Deferred to combat/resource slice |
-| GF-009 | Condition stacking | Duplicate conditions do not stack; Exhaustion uses levelled state | Deferred to combat/effect slice |
+| GF-008 | Temporary HP | A new pool may replace or be declined; pools never add | Planned M5.5 combat-health gate |
+| GF-009 | Condition stacking | Duplicate conditions do not stack; Exhaustion uses levelled state | Partial M5 plan for required combat conditions/effects; Exhaustion remains deferred |
 | GF-010 | Fixed-dice replay | Same pre-state, command, dice and definitions produce equivalent events after restart | Verified M1.4 through immutable replay and resolver/catalog checks |
 | GF-011 | Model modifier rejection | Provider-supplied modifier cannot override the canonical derived modifier | Verified for authoritative M1.4 resolution commands; legacy Phase 0 turn dice remain non-authoritative until M2 |
 | GF-012 | Narrative write rejection | Prose alone cannot apply damage, healing, conditions, resources, items, or bonuses | Verified at the final M1 gate: narration-only turn leaves characters/location unchanged and emits no roll or state-change event |
 | GF-013 | Cross-release rejection | A command using definitions from another rules release is rejected | Verified for campaign creation and M1.4 resolution commands |
 | GF-014 | Ruleset coexistence | Adding a mock later release does not alter an existing campaign or fixture | Verified M1.1: mock release coexists while the existing campaign remains pinned to SRD 5.2.1 |
 | GF-015 | Party character isolation and attribution | A command for character A derives from and mutates only A unless an explicit typed effect names another target; every roll/event identifies the actor and affected character(s) | M1.3 state/turn boundaries and M1.4 resolution derivation, roll, record, and event attribution verified |
+| GF-016 | Attack and damage boundaries | Natural 1 misses, natural 20 hits and is critical, equality with AC hits, critical dice double without doubling fixed modifiers, and recorded dice replay exactly | Planned M5.1/M5.4 |
+| GF-017 | Fighter martial interactions | Great Weapon Fighting transforms eligible die faces; Graze applies only miss damage; Sap affects the next attack; Slow is nonstacking and expires at the exact boundary | Planned M5.1/M5.4 |
+| GF-018 | Combat turn economy | Movement, Action, granted Bonus Action, Reaction, free interaction, and Opportunity Attack timing cannot be exceeded or reused | Planned M5.3 |
+| GF-019 | Initiative and restart | Initiative derives from canonical state/stat blocks, every tie is explicitly resolved, and order/round/active-turn state survives reconnect | Planned M5.2 |
+| GF-020 | Combat health and recovery | Damage ordering, Temporary HP, Second Wind, 0 HP, death saves, stability, knockout, and monster death reproduce exact state/events | Planned M5.5 |
+| GF-021 | Combat party isolation | Every action, roll, effect, resource spend, HP change, and outcome identifies exact combatant/character targets and cannot cross party or campaign boundaries | Planned M5.2-M5.6 |
+| GF-022 | Combat provider rejection | A provider-supplied bonus, AC, damage, dice, resource total, condition, or untyped state write is rejected before an authoritative roll or mutation | Planned M5.6 |
 
 Later combat, spellcasting, rests, advancement, multiclassing, and solo-balance slices must append
 their report-identified fixtures rather than weakening these contracts.

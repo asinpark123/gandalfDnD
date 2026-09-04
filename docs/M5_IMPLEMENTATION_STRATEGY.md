@@ -1,6 +1,6 @@
 # M5 Core Deterministic Combat Implementation Strategy
 
-- **Status:** In progress at M5.2; M5.0-M5.1 Done
+- **Status:** In progress at M5.3; M5.0-M5.2 Done
 - **Prepared:** 2026-09-05
 - **Depends on:** M1 character/rules foundation (Done), M3 persistent world (Done)
 - **Uses:** M2 resumable provider boundary and M4 bounded memory, only after deterministic combat
@@ -267,7 +267,8 @@ Exit: catalog/hash/schema/source checks pass and every pure resolver fixture rep
 
 ### M5.2 - Encounter persistence and initiative
 
-**Status:** Ready.
+**Status:** Done on 2026-09-05. Evidence:
+[`M5_2_ENCOUNTERS_INITIATIVE.md`](M5_2_ENCOUNTERS_INITIATIVE.md).
 
 - add guarded encounter/combatant/initiative/command/event schema;
 - instantiate finalized party members and supported monster definitions with stable IDs;
@@ -399,10 +400,12 @@ content during M5.
 
 ## 14. Immediate implementation order
 
-1. Design the guarded M5.2 schema against the state/persistence boundaries in section 6.
-2. Add encounter, combatant, initiative, idempotent command, roll, and event persistence through one
-   Alembic migration with downgrade refusal after material combat records exist.
-3. Add create/read/start/tie/replay APIs with exact campaign, scene, party, catalog, and revision
-   validation before dice.
-4. Prove campaign isolation, exact ties, retries, rollback, reconnect, and migration safety.
-5. Record M5.2 evidence and update this strategy before advancing to M5.3.
+1. Design M5.3 turn, entitlement, movement, effect, and reaction-window records on the M5.2
+   encounter/command/event boundary.
+2. Add active-turn initialization and exact Action, Bonus Action, Reaction, free-interaction, and
+   movement budgets without creating a second encounter state.
+3. Add stepwise move, Dash, Disengage, Dodge, pass-reaction, and end-turn commands with stale and
+   actor checks before any state change.
+4. Prove a full round, split movement, occupied/out-of-bounds/over-budget rejection, explicit
+   Opportunity Attack windows, reconnect, idempotency, and replay.
+5. Record M5.3 evidence before advancing to attack and damage integration in M5.4.

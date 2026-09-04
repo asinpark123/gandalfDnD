@@ -24,6 +24,7 @@ from app.character_state import (
     initial_resources,
     validate_loadout,
 )
+from app.combat import CombatRulesCatalog, resolve_initiative
 from app.dice import DiceService
 from app.llm.base import (
     DMProvider,
@@ -45,6 +46,11 @@ from app.models import (
     CampaignEvent,
     Character,
     CharacterGrant,
+    Combatant,
+    CombatCommand,
+    CombatEncounter,
+    CombatEvent,
+    CombatInitiativeTie,
     DecisionOption,
     DecisionPoint,
     DecisionSelection,
@@ -84,6 +90,14 @@ from app.schemas import (
     CharacterCreate,
     CharacterRead,
     ClueRecord,
+    CombatantRead,
+    CombatEncounterCreate,
+    CombatEncounterRead,
+    CombatEventRead,
+    CombatInitiativeTieRead,
+    CombatReplayRead,
+    CombatStartCreate,
+    CombatTieResolutionCreate,
     DecisionConsequence,
     DecisionFactConsequence,
     DecisionObjectiveConsequence,
@@ -179,6 +193,7 @@ ACTIVE_TURN_STATUSES = {
     "narrating",
 }
 RESOLUTION_CATALOG_ID = "srd-5.2.1-check-save-resolution-v1"
+COMBAT_CATALOG_ID = "srd-5.2.1-combat-v1"
 
 
 def _unpack_provider_result(result: Any) -> tuple[Any, int | None, int | None]:
@@ -2806,6 +2821,701 @@ def replay_rule_resolution(
         resolution_id=resolution_id,
         equivalent=equivalent,
         replayed=replayed,
+    )
+
+
+def _combat_event(
+    session: Session,
+    encounter_id: uuid.UUID,
+    event_type: str,
+    payload: dict[str, Any],
+) -> CombatEvent:
+    sequence = session.scalar(
+        select(func.max(CombatEvent.sequence)).where(CombatEvent.encounter_id == encounter_id)
+    )
+    event = CombatEvent(
+        encounter_id=encounter_id,
+        sequence=(sequence or 0) + 1,
+        event_type=event_type,
+        visibility="player",
+        payload=payload,
+    )
+    session.add(event)
+    session.flush()
+    return event
+
+
+def _combat_encounter_read(session: Session, encounter: CombatEncounter) -> CombatEncounterRead:
+    combatants = list(
+        session.scalars(select(Combatant).where(Combatant.encounter_id == encounter.id))
+    )
+    combatants.sort(
+        key=lambda item: (
+            item.initiative_order if item.initiative_order is not None else 1_000,
+            0 if item.side == "party" else 1,
+            int(item.source_snapshot.get("party_position", 1_000)),
+            int(item.source_snapshot.get("instance_ordinal", 1_000)),
+            item.instance_name,
+        )
+    )
+    ties = list(
+        session.scalars(
+            select(CombatInitiativeTie)
+            .where(CombatInitiativeTie.encounter_id == encounter.id)
+            .order_by(CombatInitiativeTie.initiative_total.desc())
+        )
+    )
+    events = list(
+        session.scalars(
+            select(CombatEvent)
+            .where(CombatEvent.encounter_id == encounter.id)
+            .order_by(CombatEvent.sequence)
+        )
+    )
+    return CombatEncounterRead(
+        id=encounter.id,
+        campaign_id=encounter.campaign_id,
+        scene_id=encounter.scene_id,
+        ruleset_release_id=encounter.ruleset_release_id,
+        character_state_catalog_id=encounter.character_state_catalog_id,
+        combat_catalog_id=encounter.combat_catalog_id,
+        combat_catalog_sha256=encounter.combat_catalog_sha256,
+        resolver_version=encounter.resolver_version,
+        status=encounter.status,
+        revision=encounter.revision,
+        grid_width=encounter.grid_width,
+        grid_height=encounter.grid_height,
+        round_number=encounter.round_number,
+        active_turn_index=encounter.active_turn_index,
+        combatants=[CombatantRead.model_validate(item) for item in combatants],
+        initiative_ties=[CombatInitiativeTieRead.model_validate(item) for item in ties],
+        events=[CombatEventRead.model_validate(item) for item in events],
+        created_at=encounter.created_at,
+    )
+
+
+def _existing_combat_command(
+    session: Session,
+    campaign_id: uuid.UUID,
+    command_id: uuid.UUID,
+    command_type: str,
+    payload: dict[str, Any],
+) -> CombatCommand | None:
+    existing = session.scalar(
+        select(CombatCommand).where(
+            CombatCommand.campaign_id == campaign_id,
+            CombatCommand.command_id == command_id,
+        )
+    )
+    if existing is None:
+        return None
+    if existing.command_type != command_type or existing.payload != payload:
+        raise ConflictError("command_id was already used for a different combat command")
+    return existing
+
+
+def _load_combat_catalog(
+    session: Session,
+    campaign: Campaign,
+    combat_catalog_id: str,
+) -> tuple[LoadedRulesetDataCatalog, CombatRulesCatalog, Any, Any]:
+    try:
+        catalogs = get_ruleset_registry().get_combat_catalogs(
+            campaign.ruleset_release_id,
+            campaign.ruleset_data_catalog_id,
+            combat_catalog_id,
+        )
+    except UnknownRulesetDataCatalogError as exc:
+        raise ConflictError(str(exc)) from exc
+    document = catalogs.combat.document
+    if not isinstance(document, CombatRulesCatalog):
+        raise ConflictError("Selected data catalog does not support combat")
+    _ensure_ruleset_data_catalog(session, catalogs.combat, campaign.ruleset_release_id)
+    return catalogs.combat, document, catalogs.character_creation, catalogs.character_state
+
+
+def create_combat_encounter(
+    session: Session,
+    campaign_id: uuid.UUID,
+    data: CombatEncounterCreate,
+) -> CombatEncounterRead:
+    campaign = _campaign_for_update(session, campaign_id)
+    payload = data.model_dump(mode="json")
+    existing_command = _existing_combat_command(
+        session, campaign_id, data.command_id, "create_encounter", payload
+    )
+    if existing_command is not None:
+        encounter = session.get(CombatEncounter, existing_command.encounter_id)
+        if encounter is None:
+            raise ConflictError("Recorded combat command has no encounter")
+        return _combat_encounter_read(session, encounter)
+    if campaign.status != "active":
+        raise ConflictError("Archived campaigns cannot start combat")
+    if campaign.world_revision != data.expected_world_revision:
+        raise ConflictError(
+            f"Stale world revision: expected {data.expected_world_revision}, "
+            f"current {campaign.world_revision}"
+        )
+    scene = session.scalar(
+        select(Scene).where(
+            Scene.id == data.scene_id,
+            Scene.campaign_id == campaign_id,
+            Scene.status == "active",
+        )
+    )
+    if scene is None:
+        raise ConflictError("Combat must use the campaign's active scene")
+    open_encounter = session.scalar(
+        select(CombatEncounter).where(
+            CombatEncounter.campaign_id == campaign_id,
+            CombatEncounter.status.in_(("setup", "tie_pending", "active")),
+        )
+    )
+    if open_encounter is not None:
+        raise ConflictError(f"Campaign already has open combat encounter {open_encounter.id}")
+
+    active_characters = list(
+        session.scalars(
+            select(Character)
+            .where(
+                Character.campaign_id == campaign_id,
+                Character.creation_status == "finalized",
+                Character.party_status == "active",
+            )
+            .order_by(Character.party_position)
+            .with_for_update()
+        )
+    )
+    if not campaign.party_min_active <= len(active_characters) <= campaign.party_max_active:
+        raise ConflictError(
+            f"Combat requires {campaign.party_min_active}-{campaign.party_max_active} "
+            "finalized active party characters"
+        )
+    requested_ids = {item.character_id for item in data.party}
+    active_ids = {item.id for item in active_characters}
+    if requested_ids != active_ids:
+        raise ConflictError(
+            "Combat setup must place every finalized active party character exactly once"
+        )
+
+    loaded, catalog, creation_catalog, state_catalog = _load_combat_catalog(
+        session, campaign, data.combat_catalog_id
+    )
+    monster_by_id = {monster.id: monster for monster in catalog.monsters}
+    unknown_monsters = {
+        enemy.monster_definition_id
+        for enemy in data.enemies
+        if enemy.monster_definition_id not in monster_by_id
+    }
+    if unknown_monsters:
+        raise ConflictError(f"Unsupported monster definitions: {sorted(unknown_monsters)}")
+
+    encounter = CombatEncounter(
+        campaign_id=campaign_id,
+        scene_id=scene.id,
+        ruleset_release_id=campaign.ruleset_release_id,
+        character_state_catalog_id=campaign.ruleset_data_catalog_id,
+        combat_catalog_id=loaded.id,
+        combat_catalog_sha256=loaded.sha256,
+        resolver_version=catalog.resolver_version,
+        status="setup",
+        revision=0,
+        grid_width=data.grid_width,
+        grid_height=data.grid_height,
+        round_number=0,
+        active_turn_index=None,
+    )
+    session.add(encounter)
+    session.flush()
+
+    placement_by_character = {item.character_id: item for item in data.party}
+    for character in active_characters:
+        character_read = _character_read(session, character, creation_catalog, state_catalog)
+        mechanics = character_read.mechanical_state
+        if mechanics is None or character.hp is None or character.max_hp is None:
+            raise ConflictError(f"Character {character.name!r} has no authoritative combat state")
+        placement = placement_by_character[character.id]
+        session.add(
+            Combatant(
+                encounter_id=encounter.id,
+                side="party",
+                character_id=character.id,
+                monster_definition_id=None,
+                instance_name=character.name,
+                source_snapshot={
+                    "character_revision": character.revision,
+                    "state_revision": character.state_revision,
+                    "party_position": character.party_position,
+                    "character_state_resolver_version": mechanics.resolver_version,
+                    "initiative_provenance": mechanics.initiative.provenance.model_dump(
+                        mode="json"
+                    ),
+                },
+                max_hp=character.max_hp,
+                hp=character.hp,
+                temporary_hp=0,
+                armor_class=mechanics.armor_class.value,
+                speed_feet=mechanics.speed_feet.value,
+                position_x=placement.x,
+                position_y=placement.y,
+                initiative_modifier=mechanics.initiative.value,
+                state="active",
+                revision=0,
+            )
+        )
+    for ordinal, enemy in enumerate(data.enemies, start=1):
+        monster = monster_by_id[enemy.monster_definition_id]
+        session.add(
+            Combatant(
+                encounter_id=encounter.id,
+                side="enemy",
+                character_id=None,
+                monster_definition_id=monster.id,
+                instance_name=enemy.instance_name,
+                source_snapshot={
+                    "definition_key": monster.definition_key,
+                    "source_ids": list(monster.source_ids),
+                    "instance_ordinal": ordinal,
+                    "fixed_average_hit_points": True,
+                },
+                max_hp=monster.hit_points,
+                hp=monster.hit_points,
+                temporary_hp=0,
+                armor_class=monster.armor_class,
+                speed_feet=monster.speed_feet,
+                position_x=enemy.x,
+                position_y=enemy.y,
+                initiative_modifier=monster.initiative_modifier,
+                state="active",
+                revision=0,
+            )
+        )
+    session.flush()
+    combatants = list(
+        session.scalars(select(Combatant).where(Combatant.encounter_id == encounter.id))
+    )
+    campaign.world_revision += 1
+    _combat_event(
+        session,
+        encounter.id,
+        "encounter_created",
+        {
+            "command_id": str(data.command_id),
+            "scene_id": str(scene.id),
+            "combat_catalog_id": loaded.id,
+            "combat_catalog_sha256": loaded.sha256,
+            "grid": {"width": data.grid_width, "height": data.grid_height},
+            "combatant_ids": [str(item.id) for item in combatants],
+            "world_revision": campaign.world_revision,
+        },
+    )
+    session.add(
+        CombatCommand(
+            command_id=data.command_id,
+            campaign_id=campaign_id,
+            encounter_id=encounter.id,
+            command_type="create_encounter",
+            expected_encounter_revision=None,
+            payload=payload,
+            result={"encounter_id": str(encounter.id), "encounter_revision": 0},
+        )
+    )
+    _add_event(
+        session,
+        campaign_id,
+        "combat_encounter_created",
+        {
+            "encounter_id": str(encounter.id),
+            "scene_id": str(scene.id),
+            "combatant_count": len(combatants),
+            "combat_catalog_id": loaded.id,
+            "world_revision": campaign.world_revision,
+        },
+    )
+    session.commit()
+    return _combat_encounter_read(session, encounter)
+
+
+def get_combat_encounter(
+    session: Session,
+    campaign_id: uuid.UUID,
+    encounter_id: uuid.UUID,
+) -> CombatEncounterRead:
+    encounter = session.scalar(
+        select(CombatEncounter).where(
+            CombatEncounter.id == encounter_id,
+            CombatEncounter.campaign_id == campaign_id,
+        )
+    )
+    if encounter is None:
+        raise NotFoundError("Combat encounter not found")
+    return _combat_encounter_read(session, encounter)
+
+
+def start_combat_initiative(
+    session: Session,
+    campaign_id: uuid.UUID,
+    encounter_id: uuid.UUID,
+    data: CombatStartCreate,
+    dice_service: DiceService | None = None,
+) -> CombatEncounterRead:
+    campaign = _campaign_for_update(session, campaign_id)
+    payload = data.model_dump(mode="json")
+    existing_command = _existing_combat_command(
+        session, campaign_id, data.command_id, "start_initiative", payload
+    )
+    if existing_command is not None:
+        if existing_command.encounter_id != encounter_id:
+            raise ConflictError("Existing combat command belongs to a different encounter")
+        return get_combat_encounter(session, campaign_id, encounter_id)
+    encounter = session.scalar(
+        select(CombatEncounter)
+        .where(CombatEncounter.id == encounter_id, CombatEncounter.campaign_id == campaign_id)
+        .with_for_update()
+    )
+    if encounter is None:
+        raise NotFoundError("Combat encounter not found")
+    if encounter.status != "setup":
+        raise ConflictError("Initiative can only start from encounter setup")
+    if encounter.revision != data.expected_encounter_revision:
+        raise ConflictError(
+            f"Stale encounter revision: expected {data.expected_encounter_revision}, "
+            f"current {encounter.revision}"
+        )
+    scene_active = session.scalar(
+        select(Scene.id).where(
+            Scene.id == encounter.scene_id,
+            Scene.campaign_id == campaign_id,
+            Scene.status == "active",
+        )
+    )
+    if scene_active is None:
+        raise ConflictError("Encounter scene is no longer active")
+    loaded, catalog, _creation, _state = _load_combat_catalog(
+        session, campaign, encounter.combat_catalog_id
+    )
+    if loaded.sha256 != encounter.combat_catalog_sha256:
+        raise ConflictError("Pinned combat catalog hash is unavailable")
+
+    combatants = list(
+        session.scalars(
+            select(Combatant).where(Combatant.encounter_id == encounter_id).with_for_update()
+        )
+    )
+    for combatant in combatants:
+        if combatant.character_id is None:
+            continue
+        character = session.get(Character, combatant.character_id)
+        if character is None or (
+            character.revision != combatant.source_snapshot["character_revision"]
+            or character.state_revision != combatant.source_snapshot["state_revision"]
+            or character.hp != combatant.hp
+        ):
+            raise ConflictError(
+                f"Character {combatant.instance_name!r} changed after encounter setup; "
+                "create a fresh encounter"
+            )
+    combatants.sort(
+        key=lambda item: (
+            0 if item.side == "party" else 1,
+            int(item.source_snapshot.get("party_position", 1_000)),
+            int(item.source_snapshot.get("instance_ordinal", 1_000)),
+        )
+    )
+    command = CombatCommand(
+        command_id=data.command_id,
+        campaign_id=campaign_id,
+        encounter_id=encounter_id,
+        command_type="start_initiative",
+        expected_encounter_revision=data.expected_encounter_revision,
+        payload=payload,
+        result={"encounter_id": str(encounter_id), "encounter_revision": 1},
+    )
+    session.add(command)
+    session.flush()
+    roller = dice_service or DiceService()
+    roll_payloads: list[dict[str, Any]] = []
+    for roll_index, combatant in enumerate(combatants):
+        rolled = roller.roll("1d20")
+        resolved = resolve_initiative(
+            catalog,
+            modifier=combatant.initiative_modifier,
+            dice_faces=rolled.rolls,
+        )
+        combatant.initiative_dice_faces = resolved.d20.dice_faces
+        combatant.initiative_selected_die = resolved.d20.selected_die
+        combatant.initiative_total = resolved.d20.total
+        roll = DiceRoll(
+            campaign_id=campaign_id,
+            ruleset_release_id=campaign.ruleset_release_id,
+            ruleset_data_catalog_id=encounter.combat_catalog_id,
+            turn_id=None,
+            notation="1d20",
+            rolls=resolved.d20.dice_faces,
+            modifier=combatant.initiative_modifier,
+            total=resolved.d20.total,
+            purpose=f"combat initiative: {combatant.instance_name}",
+            hidden=False,
+            actor_character_id=combatant.character_id,
+            combat_encounter_id=encounter_id,
+            combatant_id=combatant.id,
+            combat_command_id=command.id,
+            roll_index=roll_index,
+        )
+        session.add(roll)
+        session.flush()
+        roll_payloads.append(
+            {
+                "dice_roll_id": str(roll.id),
+                "combatant_id": str(combatant.id),
+                "dice_faces": resolved.d20.dice_faces,
+                "selected_die": resolved.d20.selected_die,
+                "modifier": combatant.initiative_modifier,
+                "total": resolved.d20.total,
+                "rule_definition_keys": resolved.rule_definition_keys,
+                "source_ids": resolved.source_ids,
+            }
+        )
+    by_total: dict[int, list[Combatant]] = {}
+    for combatant in combatants:
+        assert combatant.initiative_total is not None
+        by_total.setdefault(combatant.initiative_total, []).append(combatant)
+    tied_groups = [(total, rows) for total, rows in by_total.items() if len(rows) > 1]
+    if tied_groups:
+        encounter.status = "tie_pending"
+        for total, rows in sorted(tied_groups, reverse=True):
+            session.add(
+                CombatInitiativeTie(
+                    encounter_id=encounter_id,
+                    initiative_total=total,
+                    participant_ids=[str(row.id) for row in rows],
+                    decided_order=None,
+                    status="pending",
+                )
+            )
+    else:
+        ordered = sorted(combatants, key=lambda item: item.initiative_total or 0, reverse=True)
+        for order, combatant in enumerate(ordered):
+            combatant.initiative_order = order
+        encounter.status = "active"
+        encounter.round_number = 1
+        encounter.active_turn_index = 0
+    encounter.revision = 1
+    session.flush()
+    _combat_event(
+        session,
+        encounter_id,
+        "initiative_rolled",
+        {
+            "command_id": str(data.command_id),
+            "rng_version": roller.algorithm_version,
+            "rolls": roll_payloads,
+            "tie_totals": [total for total, _rows in sorted(tied_groups, reverse=True)],
+            "status": encounter.status,
+            "encounter_revision": encounter.revision,
+        },
+    )
+    _add_event(
+        session,
+        campaign_id,
+        "combat_initiative_rolled",
+        {
+            "encounter_id": str(encounter_id),
+            "status": encounter.status,
+            "tie_count": len(tied_groups),
+            "encounter_revision": encounter.revision,
+        },
+    )
+    session.commit()
+    return _combat_encounter_read(session, encounter)
+
+
+def _ordered_initiative(
+    combatants: list[Combatant],
+    ties: list[CombatInitiativeTie],
+) -> list[Combatant]:
+    by_id = {str(combatant.id): combatant for combatant in combatants}
+    tie_order = {
+        tie.initiative_total: list(tie.decided_order or [])
+        for tie in ties
+        if tie.status == "resolved"
+    }
+    ordered: list[Combatant] = []
+    totals = sorted({combatant.initiative_total for combatant in combatants}, reverse=True)
+    for total in totals:
+        rows = [combatant for combatant in combatants if combatant.initiative_total == total]
+        if len(rows) == 1:
+            ordered.extend(rows)
+        else:
+            ids = tie_order.get(total)
+            if ids is None:
+                raise ConflictError(f"Initiative tie at {total} has not been resolved")
+            ordered.extend(by_id[item_id] for item_id in ids)
+    return ordered
+
+
+def resolve_combat_initiative_tie(
+    session: Session,
+    campaign_id: uuid.UUID,
+    encounter_id: uuid.UUID,
+    tie_id: uuid.UUID,
+    data: CombatTieResolutionCreate,
+) -> CombatEncounterRead:
+    _campaign_for_update(session, campaign_id)
+    payload = {**data.model_dump(mode="json"), "tie_id": str(tie_id)}
+    existing_command = _existing_combat_command(
+        session, campaign_id, data.command_id, "resolve_initiative_tie", payload
+    )
+    if existing_command is not None:
+        if existing_command.encounter_id != encounter_id:
+            raise ConflictError("Existing combat command belongs to a different encounter")
+        return get_combat_encounter(session, campaign_id, encounter_id)
+    encounter = session.scalar(
+        select(CombatEncounter)
+        .where(CombatEncounter.id == encounter_id, CombatEncounter.campaign_id == campaign_id)
+        .with_for_update()
+    )
+    if encounter is None:
+        raise NotFoundError("Combat encounter not found")
+    if encounter.status != "tie_pending":
+        raise ConflictError("Encounter has no pending initiative ties")
+    if encounter.revision != data.expected_encounter_revision:
+        raise ConflictError(
+            f"Stale encounter revision: expected {data.expected_encounter_revision}, "
+            f"current {encounter.revision}"
+        )
+    tie = session.scalar(
+        select(CombatInitiativeTie)
+        .where(CombatInitiativeTie.id == tie_id, CombatInitiativeTie.encounter_id == encounter_id)
+        .with_for_update()
+    )
+    if tie is None:
+        raise NotFoundError("Initiative tie not found")
+    if tie.status != "pending":
+        raise ConflictError("Initiative tie has already been resolved")
+    submitted = [str(item) for item in data.ordered_combatant_ids]
+    if set(submitted) != set(tie.participant_ids) or len(submitted) != len(tie.participant_ids):
+        raise ConflictError("Tie decision must order every tied combatant exactly once")
+    tie.decided_order = submitted
+    tie.status = "resolved"
+    encounter.revision += 1
+    session.flush()
+    ties = list(
+        session.scalars(
+            select(CombatInitiativeTie)
+            .where(CombatInitiativeTie.encounter_id == encounter_id)
+            .order_by(CombatInitiativeTie.initiative_total.desc())
+        )
+    )
+    combatants = list(
+        session.scalars(
+            select(Combatant).where(Combatant.encounter_id == encounter_id).with_for_update()
+        )
+    )
+    if all(item.status == "resolved" for item in ties):
+        ordered = _ordered_initiative(combatants, ties)
+        for order, combatant in enumerate(ordered):
+            combatant.initiative_order = order
+        encounter.status = "active"
+        encounter.round_number = 1
+        encounter.active_turn_index = 0
+    session.add(
+        CombatCommand(
+            command_id=data.command_id,
+            campaign_id=campaign_id,
+            encounter_id=encounter_id,
+            command_type="resolve_initiative_tie",
+            expected_encounter_revision=data.expected_encounter_revision,
+            payload=payload,
+            result={
+                "encounter_id": str(encounter_id),
+                "encounter_revision": encounter.revision,
+                "tie_id": str(tie_id),
+            },
+        )
+    )
+    _combat_event(
+        session,
+        encounter_id,
+        "initiative_tie_resolved",
+        {
+            "command_id": str(data.command_id),
+            "tie_id": str(tie_id),
+            "initiative_total": tie.initiative_total,
+            "decided_order": submitted,
+            "status": encounter.status,
+            "encounter_revision": encounter.revision,
+        },
+    )
+    session.commit()
+    return _combat_encounter_read(session, encounter)
+
+
+def replay_combat_encounter(
+    session: Session,
+    campaign_id: uuid.UUID,
+    encounter_id: uuid.UUID,
+) -> CombatReplayRead:
+    encounter_read = get_combat_encounter(session, campaign_id, encounter_id)
+    encounter = session.get(CombatEncounter, encounter_id)
+    assert encounter is not None
+    campaign = session.get(Campaign, campaign_id)
+    assert campaign is not None
+    loaded, catalog, _creation, _state = _load_combat_catalog(
+        session, campaign, encounter.combat_catalog_id
+    )
+    if loaded.sha256 != encounter.combat_catalog_sha256:
+        raise ConflictError("Pinned combat catalog hash is unavailable")
+    combatants = list(
+        session.scalars(select(Combatant).where(Combatant.encounter_id == encounter_id))
+    )
+    equivalent = True
+    for combatant in combatants:
+        if combatant.initiative_dice_faces is None:
+            continue
+        replayed = resolve_initiative(
+            catalog,
+            modifier=combatant.initiative_modifier,
+            dice_faces=list(combatant.initiative_dice_faces),
+        )
+        equivalent = equivalent and (
+            replayed.d20.selected_die == combatant.initiative_selected_die
+            and replayed.d20.total == combatant.initiative_total
+            and replayed.resolver_version == encounter.resolver_version
+        )
+    ties = list(
+        session.scalars(
+            select(CombatInitiativeTie).where(CombatInitiativeTie.encounter_id == encounter_id)
+        )
+    )
+    if combatants and all(item.initiative_total is not None for item in combatants):
+        if all(tie.status == "resolved" for tie in ties):
+            replayed_order = [item.id for item in _ordered_initiative(combatants, ties)]
+        elif not ties:
+            replayed_order = [
+                item.id
+                for item in sorted(
+                    combatants, key=lambda row: row.initiative_total or 0, reverse=True
+                )
+            ]
+        else:
+            replayed_order = []
+    else:
+        replayed_order = []
+    stored_order = [
+        item.id
+        for item in sorted(
+            (row for row in combatants if row.initiative_order is not None),
+            key=lambda row: row.initiative_order or 0,
+        )
+    ]
+    equivalent = equivalent and replayed_order == stored_order
+    return CombatReplayRead(
+        encounter_id=encounter_id,
+        equivalent=equivalent,
+        replayed_initiative_order=replayed_order,
+        stored_initiative_order=stored_order,
+        encounter=encounter_read,
     )
 
 

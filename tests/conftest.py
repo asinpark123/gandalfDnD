@@ -52,7 +52,9 @@ def clean_database(migrated_test_database: None) -> Generator[None, None, None]:
     with get_engine().begin() as connection:
         connection.execute(
             text(
-                "TRUNCATE memory_summary_uses, memory_summary_sources, memory_summaries, "
+                "TRUNCATE combat_events, combat_initiative_ties, combat_commands, combatants, "
+                "combat_encounters, "
+                "memory_summary_uses, memory_summary_sources, memory_summaries, "
                 "memory_retrieval_items, memory_retrievals, memory_index_jobs, "
                 "memory_embeddings, campaign_memory_indexes, memory_documents, "
                 "memory_embedding_profiles, faction_relationships, factions, "

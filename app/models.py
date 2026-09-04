@@ -961,6 +961,233 @@ class DiceRoll(TimestampMixin, Base):
     actor_character_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("characters.id", ondelete="SET NULL"), index=True
     )
+    combat_encounter_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("combat_encounters.id", ondelete="RESTRICT"), index=True
+    )
+    combatant_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("combatants.id", ondelete="RESTRICT"), index=True
+    )
+    combat_command_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("combat_commands.id", ondelete="RESTRICT"), index=True
+    )
+    roll_index: Mapped[int | None] = mapped_column(Integer)
+
+    __table_args__ = (
+        CheckConstraint(
+            "(combat_encounter_id IS NULL AND combatant_id IS NULL AND "
+            "combat_command_id IS NULL AND roll_index IS NULL) OR "
+            "(combat_encounter_id IS NOT NULL AND combatant_id IS NOT NULL "
+            "AND combat_command_id IS NOT NULL AND roll_index >= 0)",
+            name="dice_roll_combat_shape",
+        ),
+        UniqueConstraint(
+            "combat_command_id", "roll_index", name="uq_dice_rolls_combat_command_index"
+        ),
+    )
+
+
+class CombatEncounter(TimestampMixin, Base):
+    __tablename__ = "combat_encounters"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    campaign_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("campaigns.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    scene_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("scenes.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    ruleset_release_id: Mapped[str] = mapped_column(
+        ForeignKey("ruleset_releases.id", ondelete="RESTRICT"), nullable=False
+    )
+    character_state_catalog_id: Mapped[str] = mapped_column(
+        ForeignKey("ruleset_data_catalogs.id", ondelete="RESTRICT"), nullable=False
+    )
+    combat_catalog_id: Mapped[str] = mapped_column(
+        ForeignKey("ruleset_data_catalogs.id", ondelete="RESTRICT"), nullable=False
+    )
+    combat_catalog_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    resolver_version: Mapped[str] = mapped_column(String(60), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="setup")
+    revision: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    grid_width: Mapped[int] = mapped_column(Integer, nullable=False)
+    grid_height: Mapped[int] = mapped_column(Integer, nullable=False)
+    round_number: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    active_turn_index: Mapped[int | None] = mapped_column(Integer)
+
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('setup', 'tie_pending', 'active', 'completed', 'cancelled')",
+            name="combat_encounter_status",
+        ),
+        CheckConstraint("revision >= 0", name="combat_encounter_revision_nonnegative"),
+        CheckConstraint(
+            "grid_width BETWEEN 2 AND 40 AND grid_height BETWEEN 2 AND 40",
+            name="combat_encounter_grid_bounds",
+        ),
+        CheckConstraint("round_number >= 0", name="combat_encounter_round_nonnegative"),
+        CheckConstraint(
+            "active_turn_index IS NULL OR active_turn_index >= 0",
+            name="combat_encounter_turn_index_nonnegative",
+        ),
+        Index(
+            "uq_combat_encounters_one_open_per_campaign",
+            "campaign_id",
+            unique=True,
+            postgresql_where=text("status IN ('setup', 'tie_pending', 'active')"),
+        ),
+    )
+
+
+class Combatant(TimestampMixin, Base):
+    __tablename__ = "combatants"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    encounter_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("combat_encounters.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    side: Mapped[str] = mapped_column(String(20), nullable=False)
+    character_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("characters.id", ondelete="RESTRICT"), index=True
+    )
+    monster_definition_id: Mapped[str | None] = mapped_column(String(80))
+    instance_name: Mapped[str] = mapped_column(String(120), nullable=False)
+    source_snapshot: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    max_hp: Mapped[int] = mapped_column(Integer, nullable=False)
+    hp: Mapped[int] = mapped_column(Integer, nullable=False)
+    temporary_hp: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    armor_class: Mapped[int] = mapped_column(Integer, nullable=False)
+    speed_feet: Mapped[int] = mapped_column(Integer, nullable=False)
+    position_x: Mapped[int] = mapped_column(Integer, nullable=False)
+    position_y: Mapped[int] = mapped_column(Integer, nullable=False)
+    initiative_modifier: Mapped[int] = mapped_column(Integer, nullable=False)
+    initiative_dice_faces: Mapped[list[int] | None] = mapped_column(JSONB(none_as_null=True))
+    initiative_selected_die: Mapped[int | None] = mapped_column(Integer)
+    initiative_total: Mapped[int | None] = mapped_column(Integer)
+    initiative_order: Mapped[int | None] = mapped_column(Integer)
+    state: Mapped[str] = mapped_column(String(20), nullable=False, default="active")
+    revision: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+    __table_args__ = (
+        CheckConstraint("side IN ('party', 'enemy')", name="combatant_side"),
+        CheckConstraint(
+            "(side = 'party' AND character_id IS NOT NULL AND monster_definition_id IS NULL) OR "
+            "(side = 'enemy' AND character_id IS NULL AND monster_definition_id IS NOT NULL)",
+            name="combatant_identity_shape",
+        ),
+        CheckConstraint(
+            "max_hp > 0 AND hp BETWEEN 0 AND max_hp AND temporary_hp >= 0",
+            name="combatant_hit_point_bounds",
+        ),
+        CheckConstraint("armor_class BETWEEN 1 AND 40", name="combatant_armor_class_bounds"),
+        CheckConstraint(
+            "speed_feet BETWEEN 0 AND 200 AND speed_feet % 5 = 0",
+            name="combatant_speed_bounds",
+        ),
+        CheckConstraint(
+            "position_x >= 0 AND position_y >= 0", name="combatant_position_nonnegative"
+        ),
+        CheckConstraint(
+            "initiative_dice_faces IS NULL OR "
+            "(jsonb_typeof(initiative_dice_faces) = 'array' AND "
+            "jsonb_array_length(initiative_dice_faces) BETWEEN 1 AND 2)",
+            name="combatant_initiative_dice_shape",
+        ),
+        CheckConstraint(
+            "(initiative_total IS NULL AND initiative_selected_die IS NULL "
+            "AND initiative_order IS NULL AND initiative_dice_faces IS NULL) OR "
+            "(initiative_total IS NOT NULL AND initiative_selected_die BETWEEN 1 AND 20 "
+            "AND initiative_dice_faces IS NOT NULL)",
+            name="combatant_initiative_shape",
+        ),
+        CheckConstraint(
+            "initiative_order IS NULL OR initiative_order >= 0",
+            name="combatant_initiative_order_nonnegative",
+        ),
+        CheckConstraint(
+            "state IN ('active', 'unconscious', 'stable', 'dead', 'fled', 'surrendered')",
+            name="combatant_state",
+        ),
+        CheckConstraint("revision >= 0", name="combatant_revision_nonnegative"),
+        UniqueConstraint("encounter_id", "character_id", name="uq_combatants_encounter_character"),
+        UniqueConstraint("encounter_id", "position_x", "position_y", name="uq_combatants_position"),
+        UniqueConstraint("encounter_id", "initiative_order", name="uq_combatants_initiative_order"),
+    )
+
+
+class CombatCommand(TimestampMixin, Base):
+    __tablename__ = "combat_commands"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    command_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    campaign_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("campaigns.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    encounter_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("combat_encounters.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    command_type: Mapped[str] = mapped_column(String(40), nullable=False)
+    expected_encounter_revision: Mapped[int | None] = mapped_column(Integer)
+    payload: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    result: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+
+    __table_args__ = (
+        CheckConstraint(
+            "command_type IN ('create_encounter', 'start_initiative', 'resolve_initiative_tie')",
+            name="combat_command_type",
+        ),
+        CheckConstraint(
+            "expected_encounter_revision IS NULL OR expected_encounter_revision >= 0",
+            name="combat_command_expected_revision_nonnegative",
+        ),
+        UniqueConstraint("campaign_id", "command_id", name="uq_combat_commands_command"),
+    )
+
+
+class CombatInitiativeTie(TimestampMixin, Base):
+    __tablename__ = "combat_initiative_ties"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    encounter_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("combat_encounters.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    initiative_total: Mapped[int] = mapped_column(Integer, nullable=False)
+    participant_ids: Mapped[list[str]] = mapped_column(JSONB, nullable=False)
+    decided_order: Mapped[list[str] | None] = mapped_column(JSONB(none_as_null=True))
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending")
+
+    __table_args__ = (
+        CheckConstraint("status IN ('pending', 'resolved')", name="combat_initiative_tie_status"),
+        CheckConstraint(
+            "jsonb_typeof(participant_ids) = 'array' AND jsonb_array_length(participant_ids) >= 2",
+            name="combat_initiative_tie_participants",
+        ),
+        CheckConstraint(
+            "(status = 'pending' AND decided_order IS NULL) OR "
+            "(status = 'resolved' AND jsonb_typeof(decided_order) = 'array' "
+            "AND jsonb_array_length(decided_order) = jsonb_array_length(participant_ids))",
+            name="combat_initiative_tie_resolution_shape",
+        ),
+        UniqueConstraint("encounter_id", "initiative_total", name="uq_combat_initiative_tie_total"),
+    )
+
+
+class CombatEvent(TimestampMixin, Base):
+    __tablename__ = "combat_events"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    encounter_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("combat_encounters.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    sequence: Mapped[int] = mapped_column(Integer, nullable=False)
+    event_type: Mapped[str] = mapped_column(String(60), nullable=False)
+    visibility: Mapped[str] = mapped_column(String(20), nullable=False, default="player")
+    payload: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+
+    __table_args__ = (
+        CheckConstraint("sequence > 0", name="combat_event_sequence_positive"),
+        CheckConstraint("visibility IN ('player', 'dm_only')", name="combat_event_visibility"),
+        UniqueConstraint("encounter_id", "sequence", name="uq_combat_events_encounter_sequence"),
+    )
 
 
 class RuleResolution(TimestampMixin, Base):

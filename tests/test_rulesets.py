@@ -380,6 +380,7 @@ def test_migration_backfills_legacy_mechanical_records() -> None:
             ).scalars().all() == [
                 "srd-5.2.1-character-creation-v1",
                 "srd-5.2.1-check-save-resolution-v1",
+                "srd-5.2.1-combat-v1",
                 "srd-5.2.1-foundation-v1",
                 "srd-5.2.1-party-state-v1",
             ]

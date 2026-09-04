@@ -28,6 +28,11 @@ from app.schemas import (
     CharacterCreate,
     CharacterGrantRead,
     CharacterRead,
+    CombatEncounterCreate,
+    CombatEncounterRead,
+    CombatReplayRead,
+    CombatStartCreate,
+    CombatTieResolutionCreate,
     EventRead,
     HealthRead,
     LoadoutUpdate,
@@ -50,12 +55,14 @@ from app.services import (
     add_character,
     cancel_turn_execution,
     create_campaign,
+    create_combat_encounter,
     create_rule_resolution,
     create_turn_execution,
     finalize_character,
     finalize_turn_execution,
     get_campaign_state,
     get_character_read,
+    get_combat_encounter,
     get_rule_resolution,
     get_turn_execution,
     get_world_state,
@@ -67,8 +74,11 @@ from app.services import (
     list_rule_resolutions,
     list_turn_executions,
     process_turn,
+    replay_combat_encounter,
     replay_rule_resolution,
+    resolve_combat_initiative_tie,
     resume_turn_execution,
+    start_combat_initiative,
     update_character_loadout,
 )
 from app.turn_interpretation import TurnInterpretationError
@@ -541,6 +551,121 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
         except ResolutionError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    combat_errors = {
+        404: {"model": APIErrorRead, "description": "Campaign or combat record not found"},
+        409: {"model": APIErrorRead, "description": "Stale or illegal combat state"},
+        422: {"model": APIErrorRead, "description": "Invalid combat command"},
+    }
+
+    @app.post(
+        "/campaigns/{campaign_id}/combat-encounters",
+        response_model=CombatEncounterRead,
+        status_code=status.HTTP_201_CREATED,
+        responses=combat_errors,
+    )
+    def combat_encounters_create(
+        campaign_id: uuid.UUID,
+        data: CombatEncounterCreate,
+        session: SessionDep,
+    ) -> CombatEncounterRead:
+        try:
+            return create_combat_encounter(session, campaign_id, data)
+        except NotFoundError as exc:
+            session.rollback()
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except ConflictError as exc:
+            session.rollback()
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        except IntegrityError as exc:
+            session.rollback()
+            raise HTTPException(
+                status_code=409, detail="Combat encounter could not be created"
+            ) from exc
+
+    @app.get(
+        "/campaigns/{campaign_id}/combat-encounters/{encounter_id}",
+        response_model=CombatEncounterRead,
+        responses=combat_errors,
+    )
+    def combat_encounters_get(
+        campaign_id: uuid.UUID,
+        encounter_id: uuid.UUID,
+        session: SessionDep,
+    ) -> CombatEncounterRead:
+        try:
+            return get_combat_encounter(session, campaign_id, encounter_id)
+        except NotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    @app.post(
+        "/campaigns/{campaign_id}/combat-encounters/{encounter_id}/start",
+        response_model=CombatEncounterRead,
+        responses=combat_errors,
+    )
+    def combat_encounters_start(
+        campaign_id: uuid.UUID,
+        encounter_id: uuid.UUID,
+        data: CombatStartCreate,
+        session: SessionDep,
+        dice_service: DiceDep,
+    ) -> CombatEncounterRead:
+        try:
+            return start_combat_initiative(session, campaign_id, encounter_id, data, dice_service)
+        except NotFoundError as exc:
+            session.rollback()
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except ConflictError as exc:
+            session.rollback()
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        except IntegrityError as exc:
+            session.rollback()
+            raise HTTPException(
+                status_code=409, detail="Combat initiative could not start"
+            ) from exc
+
+    @app.post(
+        "/campaigns/{campaign_id}/combat-encounters/{encounter_id}/initiative-ties/{tie_id}",
+        response_model=CombatEncounterRead,
+        responses=combat_errors,
+    )
+    def combat_initiative_ties_resolve(
+        campaign_id: uuid.UUID,
+        encounter_id: uuid.UUID,
+        tie_id: uuid.UUID,
+        data: CombatTieResolutionCreate,
+        session: SessionDep,
+    ) -> CombatEncounterRead:
+        try:
+            return resolve_combat_initiative_tie(session, campaign_id, encounter_id, tie_id, data)
+        except NotFoundError as exc:
+            session.rollback()
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except ConflictError as exc:
+            session.rollback()
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        except IntegrityError as exc:
+            session.rollback()
+            raise HTTPException(
+                status_code=409, detail="Initiative tie could not be resolved"
+            ) from exc
+
+    @app.post(
+        "/campaigns/{campaign_id}/combat-encounters/{encounter_id}/replay",
+        response_model=CombatReplayRead,
+        responses=combat_errors,
+    )
+    def combat_encounters_replay(
+        campaign_id: uuid.UUID,
+        encounter_id: uuid.UUID,
+        session: SessionDep,
+    ) -> CombatReplayRead:
+        try:
+            return replay_combat_encounter(session, campaign_id, encounter_id)
+        except NotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except ConflictError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
 
     @app.get("/campaigns/{campaign_id}/events", response_model=list[EventRead])
     def events_list(campaign_id: uuid.UUID, session: SessionDep) -> list[EventRead]:

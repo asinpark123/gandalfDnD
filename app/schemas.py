@@ -721,6 +721,142 @@ class RuleResolutionReplayRead(BaseModel):
     replayed: RuleResolutionRead
 
 
+class CombatCell(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    x: int = Field(ge=0, le=39)
+    y: int = Field(ge=0, le=39)
+
+
+class PartyCombatantCreate(CombatCell):
+    character_id: uuid.UUID
+
+
+class EnemyCombatantCreate(CombatCell):
+    monster_definition_id: StableKey
+    instance_name: NPCName
+
+
+class CombatEncounterCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    command_id: uuid.UUID
+    expected_world_revision: int = Field(ge=0)
+    scene_id: uuid.UUID
+    combat_catalog_id: str = Field(default="srd-5.2.1-combat-v1", max_length=100)
+    grid_width: int = Field(default=12, ge=2, le=40)
+    grid_height: int = Field(default=12, ge=2, le=40)
+    party: list[PartyCombatantCreate] = Field(min_length=2, max_length=4)
+    enemies: list[EnemyCombatantCreate] = Field(min_length=1, max_length=8)
+
+    @model_validator(mode="after")
+    def validate_unique_placements(self) -> "CombatEncounterCreate":
+        character_ids = [item.character_id for item in self.party]
+        if len(character_ids) != len(set(character_ids)):
+            raise ValueError("party character IDs must be unique")
+        cells = [(item.x, item.y) for item in [*self.party, *self.enemies]]
+        if len(cells) != len(set(cells)):
+            raise ValueError("combatant starting cells must be unique")
+        if any(x >= self.grid_width or y >= self.grid_height for x, y in cells):
+            raise ValueError("combatant starting cells must be inside the encounter grid")
+        return self
+
+
+class CombatStartCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    command_id: uuid.UUID
+    expected_encounter_revision: int = Field(ge=0)
+
+
+class CombatTieResolutionCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    command_id: uuid.UUID
+    expected_encounter_revision: int = Field(ge=0)
+    ordered_combatant_ids: list[uuid.UUID] = Field(min_length=2, max_length=12)
+
+    @model_validator(mode="after")
+    def validate_unique_order(self) -> "CombatTieResolutionCreate":
+        if len(self.ordered_combatant_ids) != len(set(self.ordered_combatant_ids)):
+            raise ValueError("ordered combatant IDs must be unique")
+        return self
+
+
+class CombatantRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    side: Literal["party", "enemy"]
+    character_id: uuid.UUID | None
+    monster_definition_id: str | None
+    instance_name: str
+    max_hp: int
+    hp: int
+    temporary_hp: int
+    armor_class: int
+    speed_feet: int
+    position_x: int
+    position_y: int
+    initiative_modifier: int
+    initiative_dice_faces: list[int] | None
+    initiative_selected_die: int | None
+    initiative_total: int | None
+    initiative_order: int | None
+    state: str
+    revision: int
+
+
+class CombatInitiativeTieRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    initiative_total: int
+    participant_ids: list[uuid.UUID]
+    decided_order: list[uuid.UUID] | None
+    status: Literal["pending", "resolved"]
+
+
+class CombatEventRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    sequence: int
+    event_type: str
+    visibility: Literal["player", "dm_only"]
+    payload: dict
+    created_at: datetime
+
+
+class CombatEncounterRead(BaseModel):
+    id: uuid.UUID
+    campaign_id: uuid.UUID
+    scene_id: uuid.UUID
+    ruleset_release_id: str
+    character_state_catalog_id: str
+    combat_catalog_id: str
+    combat_catalog_sha256: str
+    resolver_version: str
+    status: Literal["setup", "tie_pending", "active", "completed", "cancelled"]
+    revision: int
+    grid_width: int
+    grid_height: int
+    round_number: int
+    active_turn_index: int | None
+    combatants: list[CombatantRead]
+    initiative_ties: list[CombatInitiativeTieRead]
+    events: list[CombatEventRead]
+    created_at: datetime
+
+
+class CombatReplayRead(BaseModel):
+    encounter_id: uuid.UUID
+    equivalent: bool
+    replayed_initiative_order: list[uuid.UUID]
+    stored_initiative_order: list[uuid.UUID]
+    encounter: CombatEncounterRead
+
+
 class HealthRead(BaseModel):
     status: Literal["ok"]
     database: Literal["ok"]

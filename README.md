@@ -66,6 +66,8 @@ maintained in the [living development plan](docs/PROJECT_PLAN.md).
   encounters, initiative, action economy, attacks, health, replay, and acceptance gates
 - [M5.1 combat catalog and kernel](docs/M5_1_COMBAT_CATALOG_KERNEL.md) — immutable source-cited
   Fighter/Goblin definitions, pure fixed-dice resolution, and verification evidence
+- [M5.2 encounters and initiative](docs/M5_2_ENCOUNTERS_INITIATIVE.md) — guarded persistence,
+  explicit ties, idempotency, restart, and exact replay evidence
 - [PostgreSQL 18 migration strategy](docs/POSTGRESQL_18_MIGRATION_STRATEGY.md) — parallel-cluster,
   Gandalf-only migration, acceptance, rollback, and longevity gates
 - [PostgreSQL 18 readiness audit](docs/POSTGRESQL_18_READINESS_AUDIT.md) — verified package impact,
@@ -113,7 +115,7 @@ live M4 supplement also passed: the final prompt and retrieval contracts recalle
 Miras correctly, kept hostile quoted prose mechanically inert, excluded a DM-only secret, and left
 exact state unchanged across a database reconnection.
 
-M5.1 is Done and M5.2 encounter/initiative persistence is Ready. The deliberately narrow first
+M5.2 is Done and M5.3 turn economy/movement/reactions is Ready. The deliberately narrow first
 combat slice uses the existing level-one
 Human/Soldier/Fighters, Greatsword/Flail/Javelin mechanics, Graze/Sap/Slow, Second Wind, and SRD
 Goblin Minion/Warrior opponents. Spells, broad content, companion autonomy, and lone-hero balancing

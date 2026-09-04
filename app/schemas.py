@@ -872,7 +872,9 @@ class CombatReactionWindowRead(BaseModel):
     from_y: int
     to_x: int
     to_y: int
-    status: Literal["pending", "passed", "opportunity_attack_pending"]
+    status: Literal[
+        "pending", "passed", "opportunity_attack_pending", "opportunity_attack_resolved"
+    ]
     response: Literal["pass", "opportunity_attack"] | None
     opened_encounter_revision: int
     resolved_encounter_revision: int | None
@@ -954,6 +956,61 @@ class CombatEndTurnCreate(BaseModel):
     actor_combatant_id: uuid.UUID
     expected_encounter_revision: int = Field(ge=0)
     expected_combatant_revision: int = Field(ge=0)
+
+
+class CombatAttackCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    command_id: uuid.UUID
+    actor_combatant_id: uuid.UUID
+    target_combatant_id: uuid.UUID
+    expected_encounter_revision: int = Field(ge=0)
+    expected_actor_revision: int = Field(ge=0)
+    expected_target_revision: int = Field(ge=0)
+    attack_definition_id: StableKey
+    attack_mode: Literal["melee", "ranged"]
+    use_mastery: bool = True
+    reaction_window_id: uuid.UUID | None = None
+
+    @model_validator(mode="after")
+    def validate_distinct_combatants(self) -> "CombatAttackCreate":
+        if self.actor_combatant_id == self.target_combatant_id:
+            raise ValueError("attack target must differ from actor")
+        return self
+
+
+class CombatAttackResolutionRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    encounter_id: uuid.UUID
+    actor_combatant_id: uuid.UUID
+    target_combatant_id: uuid.UUID
+    reaction_window_id: uuid.UUID | None
+    ruleset_release_id: str
+    combat_catalog_id: str
+    resolver_version: str
+    actor_revision_before: int
+    actor_revision_after: int
+    target_revision_before: int
+    target_revision_after: int
+    command: CombatAttackCreate
+    resolution_input: dict
+    attack_result: dict
+    damage_result: dict
+    rng_version: str
+    created_at: datetime
+
+
+class CombatAttackExecutionRead(BaseModel):
+    resolution: CombatAttackResolutionRead
+    encounter: CombatEncounterRead
+
+
+class CombatAttackReplayRead(BaseModel):
+    resolution_id: uuid.UUID
+    equivalent: bool
+    encounter_id: uuid.UUID
 
 
 class HealthRead(BaseModel):

@@ -1,6 +1,6 @@
 # M5 Core Deterministic Combat Implementation Strategy
 
-- **Status:** In progress at M5.4; M5.0-M5.3 Done
+- **Status:** In progress at M5.5; M5.0-M5.4 Done
 - **Prepared:** 2026-09-05
 - **Depends on:** M1 character/rules foundation (Done), M3 persistent world (Done)
 - **Uses:** M2 resumable provider boundary and M4 bounded memory, only after deterministic combat
@@ -297,6 +297,9 @@ restores the exact active turn, remaining movement, action economy, effects, and
 
 ### M5.4 - Attacks, damage, equipment, and masteries
 
+**Status:** Done on 2026-09-05. Evidence:
+[`M5_4_ATTACKS_DAMAGE_MASTERIES.md`](M5_4_ATTACKS_DAMAGE_MASTERIES.md).
+
 - integrate Attack commands and immutable attack/damage resolutions;
 - implement Greatsword, Flail, and melee/thrown Javelin plus the supported Goblin attacks;
 - enforce hands, proficiency, range, close-ranged Disadvantage, Heavy, criticals, Fighting Styles,
@@ -403,12 +406,12 @@ content during M5.
 
 ## 14. Immediate implementation order
 
-1. Add an immutable combat-resolution record for ordinary and Opportunity Attacks, exact attack and
-   damage dice, pre/post state, applied definitions, and semantic replay.
-2. Derive supported character weapon/style/mastery and Goblin attacks from canonical source
-   snapshots; reject client-supplied bonuses, AC, damage, or effects.
-3. Enforce hands, melee/thrown range, long-range and close-ranged Disadvantage, criticals, Great
-   Weapon Fighting, Graze, Sap, Slow, and thrown-item state.
-4. Resolve selected Opportunity Attacks before their triggering movement may continue and prove
-   one Reaction, exact timing, rollback, idempotency, reconnect, and replay.
-5. Record M5.4 evidence before advancing to complete health, recovery, and encounter outcomes.
+1. Add immutable health/resource/outcome resolutions for Second Wind, Temporary HP, death saves,
+   stabilization/first aid, damage while down, massive damage, and explicit melee knockout.
+2. Complete encounter outcomes for victory, defeat, surrender, flight, and agreement while keeping
+   character HP/resources and combat projections atomic.
+3. Preserve recoverable thrown-item state and emit one bounded, cited material encounter summary
+   rather than indexing every atomic combat event.
+4. Add deterministic favorable, Low, Moderate, High, defeat, recovery, knockout, death-save, and
+   reconnect fixtures plus strict-SRD measurements that do not claim guaranteed balance.
+5. Record M5.5 evidence and prepare the required owner backend playtest before provider integration.

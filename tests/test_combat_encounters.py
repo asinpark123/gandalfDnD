@@ -30,7 +30,11 @@ def _fixed_dice(results: list[int]) -> None:
     app.dependency_overrides[get_dice_service] = lambda: DiceService(FixedRandom(results))
 
 
-def _finalize_payload(*, alternate: bool = False) -> dict[str, Any]:
+def _finalize_payload(
+    *,
+    alternate: bool = False,
+    fighting_style: str = "defense",
+) -> dict[str, Any]:
     abilities = {
         "strength": 15,
         "dexterity": 14,
@@ -64,7 +68,7 @@ def _finalize_payload(*, alternate: bool = False) -> dict[str, Any]:
         "origin_feat_definition_key": "srd-5.2.1:feat.origin.alert",
         "skilled_feat_skills": [],
         "gaming_set": "dice",
-        "fighting_style_definition_key": "srd-5.2.1:feat.fighting_style.defense",
+        "fighting_style_definition_key": (f"srd-5.2.1:feat.fighting_style.{fighting_style}"),
         "weapon_mastery_definition_keys": [
             "srd-5.2.1:weapon.javelin",
             "srd-5.2.1:weapon.flail",
@@ -74,7 +78,11 @@ def _finalize_payload(*, alternate: bool = False) -> dict[str, Any]:
     }
 
 
-def _ready_party(client: TestClient) -> tuple[str, str, list[str]]:
+def _ready_party(
+    client: TestClient,
+    *,
+    first_fighting_style: str = "defense",
+) -> tuple[str, str, list[str]]:
     campaign = client.post(
         "/campaigns",
         json={
@@ -92,7 +100,10 @@ def _ready_party(client: TestClient) -> tuple[str, str, list[str]]:
         character_ids.append(character_id)
         finalized = client.post(
             f"/campaigns/{campaign_id}/characters/{character_id}/finalize",
-            json=_finalize_payload(alternate=index == 1),
+            json=_finalize_payload(
+                alternate=index == 1,
+                fighting_style=first_fighting_style if index == 0 else "defense",
+            ),
         )
         assert finalized.status_code == 200, finalized.text
     world = client.get(f"/campaigns/{campaign_id}/world")
@@ -360,8 +371,12 @@ def _started_encounter(
     *,
     enemy_x: int = 7,
     enemy_y: int = 2,
+    first_fighting_style: str = "defense",
 ) -> tuple[str, dict[str, Any]]:
-    campaign_id, scene_id, character_ids = _ready_party(client)
+    campaign_id, scene_id, character_ids = _ready_party(
+        client,
+        first_fighting_style=first_fighting_style,
+    )
     create = _encounter_command(
         scene_id,
         character_ids,
@@ -668,3 +683,455 @@ def test_opportunity_attack_selection_consumes_reaction_and_blocks_movement(
     restored = client.get(f"/campaigns/{campaign_id}/combat-encounters/{encounter_id}").json()
     assert restored["combatants"][0]["position_x"] == 1
     assert restored["current_turn"]["movement_spent_feet"] == 0
+
+
+def test_ranged_attack_persists_damage_mastery_replay_and_idempotency(
+    client: TestClient,
+) -> None:
+    campaign_id, encounter = _started_encounter(client)
+    encounter_id = encounter["id"]
+    actor = encounter["combatants"][0]
+    target = encounter["combatants"][2]
+    command_id = str(uuid.uuid4())
+    payload = {
+        "command_id": command_id,
+        "actor_combatant_id": actor["id"],
+        "target_combatant_id": target["id"],
+        "expected_encounter_revision": 1,
+        "expected_actor_revision": 0,
+        "expected_target_revision": 0,
+        "attack_definition_id": "javelin",
+        "attack_mode": "ranged",
+        "use_mastery": True,
+    }
+    _fixed_dice([15, 4])
+    attacked = client.post(
+        f"/campaigns/{campaign_id}/combat-encounters/{encounter_id}/attacks",
+        json=payload,
+    )
+    assert attacked.status_code == 200, attacked.text
+    execution = attacked.json()
+    resolution = execution["resolution"]
+    state = execution["encounter"]
+    assert resolution["attack_result"]["hit"] is True
+    assert resolution["attack_result"]["critical"] is False
+    assert resolution["attack_result"]["damage_total"] == 7
+    assert resolution["attack_result"]["mastery_id"] == "slow"
+    assert resolution["attack_result"]["mastery_applied"] is True
+    assert resolution["damage_result"]["hit_points_after"] == 3
+    assert state["revision"] == 2
+    assert state["current_turn"]["action_available"] is False
+    assert state["current_turn"]["free_interaction_available"] is False
+    assert state["combatants"][0]["revision"] == 1
+    assert state["combatants"][2]["hp"] == 3
+    assert state["combatants"][2]["revision"] == 1
+    assert state["effects"][0]["effect_id"] == "slow"
+    assert state["effects"][0]["status"] == "active"
+    assert state["events"][-1]["event_type"] == "combat_attack_resolved"
+
+    _fixed_dice([])
+    duplicate = client.post(
+        f"/campaigns/{campaign_id}/combat-encounters/{encounter_id}/attacks",
+        json=payload,
+    )
+    assert duplicate.status_code == 200, duplicate.text
+    assert duplicate.json() == execution
+    replay = client.post(
+        f"/campaigns/{campaign_id}/combat-encounters/{encounter_id}"
+        f"/attacks/{resolution['id']}/replay"
+    )
+    assert replay.status_code == 200, replay.text
+    assert replay.json()["equivalent"] is True
+
+    with get_engine().connect() as connection:
+        rolls = connection.execute(
+            text(
+                "SELECT roll.notation, roll.rolls, roll.modifier, roll.total "
+                "FROM dice_rolls roll JOIN combat_commands command "
+                "ON command.id = roll.combat_command_id "
+                "WHERE command.command_id = CAST(:id AS uuid) ORDER BY roll.roll_index"
+            ),
+            {"id": command_id},
+        ).all()
+        assert rolls == [("1d20", [15], 5, 20), ("1d6", [4], 3, 7)]
+        inventory = connection.execute(
+            text("SELECT inventory FROM characters WHERE id = CAST(:id AS uuid)"),
+            {"id": actor["character_id"]},
+        ).scalar_one()
+        assert inventory["Javelin"] == 7
+    for expected_encounter, actor_id, actor_revision in (
+        (2, actor["id"], 1),
+        (3, state["combatants"][1]["id"], 0),
+    ):
+        ended = client.post(
+            f"/campaigns/{campaign_id}/combat-encounters/{encounter_id}/end-turn",
+            json={
+                "command_id": str(uuid.uuid4()),
+                "actor_combatant_id": actor_id,
+                "expected_encounter_revision": expected_encounter,
+                "expected_combatant_revision": actor_revision,
+            },
+        )
+        assert ended.status_code == 200, ended.text
+    slowed_turn = ended.json()["current_turn"]
+    assert slowed_turn["combatant_id"] == target["id"]
+    assert slowed_turn["movement_allowance_feet"] == 20
+    with (
+        pytest.raises(DBAPIError, match="canonical character HP must match active combatant HP"),
+        get_engine().begin() as connection,
+    ):
+        connection.execute(
+            text("UPDATE characters SET hp = hp - 1 WHERE id = CAST(:id AS uuid)"),
+            {"id": actor["character_id"]},
+        )
+    with (
+        pytest.raises(DBAPIError, match="active combatant HP must match canonical character HP"),
+        get_engine().begin() as connection,
+    ):
+        connection.execute(
+            text("UPDATE combatants SET hp = hp - 1 WHERE id = CAST(:id AS uuid)"),
+            {"id": actor["id"]},
+        )
+    with (
+        pytest.raises(DBAPIError, match="combat_attack_resolutions is immutable"),
+        get_engine().begin() as connection,
+    ):
+        connection.execute(
+            text(
+                "UPDATE combat_attack_resolutions SET attack_result = '{}'::jsonb "
+                "WHERE id = CAST(:id AS uuid)"
+            ),
+            {"id": resolution["id"]},
+        )
+
+    with get_engine().connect() as connection:
+        expected_revision = connection.execute(
+            text("SELECT version_num FROM alembic_version")
+        ).scalar_one()
+    get_engine().dispose()
+    config = Config(str(Path(__file__).parents[1] / "alembic.ini"))
+    with pytest.raises(DBAPIError, match="Cannot downgrade after combat attacks"):
+        command.downgrade(config, "0017_combat_turns_movement")
+    with get_engine().connect() as connection:
+        assert (
+            connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
+            == expected_revision
+        )
+
+
+def test_long_range_disadvantage_and_graze_are_deterministic(client: TestClient) -> None:
+    campaign_id, encounter = _started_encounter(client, enemy_x=9)
+    encounter_id = encounter["id"]
+    actor = encounter["combatants"][0]
+    target = encounter["combatants"][2]
+    _fixed_dice([])
+    same_side = client.post(
+        f"/campaigns/{campaign_id}/combat-encounters/{encounter_id}/attacks",
+        json={
+            "command_id": str(uuid.uuid4()),
+            "actor_combatant_id": actor["id"],
+            "target_combatant_id": encounter["combatants"][1]["id"],
+            "expected_encounter_revision": 1,
+            "expected_actor_revision": 0,
+            "expected_target_revision": 0,
+            "attack_definition_id": "greatsword",
+            "attack_mode": "melee",
+        },
+    )
+    assert same_side.status_code == 409
+    assert same_side.json()["detail"] == "Combat attacks require an opposing-side target"
+    out_of_reach = client.post(
+        f"/campaigns/{campaign_id}/combat-encounters/{encounter_id}/attacks",
+        json={
+            "command_id": str(uuid.uuid4()),
+            "actor_combatant_id": actor["id"],
+            "target_combatant_id": target["id"],
+            "expected_encounter_revision": 1,
+            "expected_actor_revision": 0,
+            "expected_target_revision": 0,
+            "attack_definition_id": "greatsword",
+            "attack_mode": "melee",
+        },
+    )
+    assert out_of_reach.status_code == 409
+    assert out_of_reach.json()["detail"] == "Melee target is outside weapon reach"
+    unchanged = client.get(f"/campaigns/{campaign_id}/combat-encounters/{encounter_id}").json()
+    assert unchanged["revision"] == 1
+    assert unchanged["current_turn"]["action_available"] is True
+    with get_engine().connect() as connection:
+        assert (
+            connection.execute(
+                text(
+                    "SELECT count(*) FROM dice_rolls "
+                    "WHERE combat_encounter_id = CAST(:id AS uuid) "
+                    "AND purpose LIKE 'combat attack:%'"
+                ),
+                {"id": encounter_id},
+            ).scalar_one()
+            == 0
+        )
+    _fixed_dice([18, 4])
+    long_range = client.post(
+        f"/campaigns/{campaign_id}/combat-encounters/{encounter_id}/attacks",
+        json={
+            "command_id": str(uuid.uuid4()),
+            "actor_combatant_id": actor["id"],
+            "target_combatant_id": target["id"],
+            "expected_encounter_revision": 1,
+            "expected_actor_revision": 0,
+            "expected_target_revision": 0,
+            "attack_definition_id": "javelin",
+            "attack_mode": "ranged",
+        },
+    )
+    assert long_range.status_code == 200, long_range.text
+    result = long_range.json()["resolution"]
+    assert result["attack_result"]["d20"]["advantage_state"] == "disadvantage"
+    assert result["attack_result"]["d20"]["dice_faces"] == [18, 4]
+    assert result["attack_result"]["d20"]["selected_die"] == 4
+    assert result["attack_result"]["hit"] is False
+    assert result["attack_result"]["damage_total"] == 0
+    assert result["damage_result"]["hit_points_after"] == 10
+
+    campaign_id, encounter = _started_encounter(client)
+    encounter_id = encounter["id"]
+    actor = encounter["combatants"][0]
+    target = encounter["combatants"][2]
+    moved = client.post(
+        f"/campaigns/{campaign_id}/combat-encounters/{encounter_id}/move",
+        json={
+            "command_id": str(uuid.uuid4()),
+            "actor_combatant_id": actor["id"],
+            "expected_encounter_revision": 1,
+            "expected_combatant_revision": 0,
+            "path": [{"x": x, "y": 2} for x in range(2, 7)],
+        },
+    )
+    assert moved.status_code == 200, moved.text
+    _fixed_dice([1])
+    grazed = client.post(
+        f"/campaigns/{campaign_id}/combat-encounters/{encounter_id}/attacks",
+        json={
+            "command_id": str(uuid.uuid4()),
+            "actor_combatant_id": actor["id"],
+            "target_combatant_id": target["id"],
+            "expected_encounter_revision": 2,
+            "expected_actor_revision": 1,
+            "expected_target_revision": 0,
+            "attack_definition_id": "greatsword",
+            "attack_mode": "melee",
+        },
+    )
+    assert grazed.status_code == 200, grazed.text
+    result = grazed.json()["resolution"]
+    assert result["attack_result"]["hit"] is False
+    assert result["attack_result"]["miss_reason"] == "natural_one"
+    assert result["attack_result"]["mastery_id"] == "graze"
+    assert result["attack_result"]["mastery_applied"] is True
+    assert result["attack_result"]["weapon_damage"] is None
+    assert result["attack_result"]["damage_total"] == 3
+    assert result["damage_result"]["hit_points_after"] == 7
+
+
+def test_adjacent_hostile_imposes_ranged_attack_disadvantage(client: TestClient) -> None:
+    campaign_id, encounter = _started_encounter(client, enemy_x=2, enemy_y=2)
+    encounter_id = encounter["id"]
+    actor = encounter["combatants"][0]
+    target = encounter["combatants"][2]
+    _fixed_dice([18, 4])
+    attacked = client.post(
+        f"/campaigns/{campaign_id}/combat-encounters/{encounter_id}/attacks",
+        json={
+            "command_id": str(uuid.uuid4()),
+            "actor_combatant_id": actor["id"],
+            "target_combatant_id": target["id"],
+            "expected_encounter_revision": 1,
+            "expected_actor_revision": 0,
+            "expected_target_revision": 0,
+            "attack_definition_id": "javelin",
+            "attack_mode": "ranged",
+        },
+    )
+    assert attacked.status_code == 200, attacked.text
+    result = attacked.json()["resolution"]["attack_result"]
+    assert result["d20"]["advantage_state"] == "disadvantage"
+    assert result["d20"]["disadvantage_sources"] == ["hostile_within_5_feet"]
+    assert result["d20"]["selected_die"] == 4
+    assert result["hit"] is False
+
+
+def test_critical_great_weapon_fighting_and_restart_are_exact(client: TestClient) -> None:
+    campaign_id, encounter = _started_encounter(
+        client,
+        enemy_x=2,
+        enemy_y=2,
+        first_fighting_style="great_weapon_fighting",
+    )
+    encounter_id = encounter["id"]
+    actor = encounter["combatants"][0]
+    target = encounter["combatants"][2]
+    _fixed_dice([20, 1, 2, 5, 6])
+    attacked = client.post(
+        f"/campaigns/{campaign_id}/combat-encounters/{encounter_id}/attacks",
+        json={
+            "command_id": str(uuid.uuid4()),
+            "actor_combatant_id": actor["id"],
+            "target_combatant_id": target["id"],
+            "expected_encounter_revision": 1,
+            "expected_actor_revision": 0,
+            "expected_target_revision": 0,
+            "attack_definition_id": "greatsword",
+            "attack_mode": "melee",
+        },
+    )
+    assert attacked.status_code == 200, attacked.text
+    state = attacked.json()["encounter"]
+    result = attacked.json()["resolution"]["attack_result"]
+    assert result["hit"] is True
+    assert result["critical"] is True
+    assert result["weapon_damage"]["notation"] == "4d6"
+    assert result["weapon_damage"]["original_faces"] == [1, 2, 5, 6]
+    assert result["weapon_damage"]["adjusted_faces"] == [3, 3, 5, 6]
+    assert result["weapon_damage"]["adjustment"] == "great_weapon_fighting"
+    assert result["damage_modifier"] == 3
+    assert result["damage_total"] == 20
+    assert state["combatants"][2]["hp"] == 0
+    assert state["combatants"][2]["state"] == "dead"
+    get_engine().dispose()
+    restored = client.get(f"/campaigns/{campaign_id}/combat-encounters/{encounter_id}")
+    assert restored.status_code == 200, restored.text
+    assert restored.json() == state
+
+
+def test_sap_applies_to_exactly_the_targets_next_attack(client: TestClient) -> None:
+    campaign_id, encounter = _started_encounter(client, enemy_x=2, enemy_y=2)
+    encounter_id = encounter["id"]
+    first, second, enemy = encounter["combatants"]
+    _fixed_dice([10, 4])
+    flail = client.post(
+        f"/campaigns/{campaign_id}/combat-encounters/{encounter_id}/attacks",
+        json={
+            "command_id": str(uuid.uuid4()),
+            "actor_combatant_id": first["id"],
+            "target_combatant_id": enemy["id"],
+            "expected_encounter_revision": 1,
+            "expected_actor_revision": 0,
+            "expected_target_revision": 0,
+            "attack_definition_id": "flail",
+            "attack_mode": "melee",
+        },
+    )
+    assert flail.status_code == 200, flail.text
+    state = flail.json()["encounter"]
+    assert flail.json()["resolution"]["attack_result"]["d20"]["total"] == 15
+    assert flail.json()["resolution"]["attack_result"]["hit"] is True
+    assert state["effects"][0]["effect_id"] == "sap"
+    assert state["effects"][0]["status"] == "active"
+
+    for expected_encounter, actor_id, actor_revision in (
+        (2, first["id"], 1),
+        (3, second["id"], 0),
+    ):
+        ended = client.post(
+            f"/campaigns/{campaign_id}/combat-encounters/{encounter_id}/end-turn",
+            json={
+                "command_id": str(uuid.uuid4()),
+                "actor_combatant_id": actor_id,
+                "expected_encounter_revision": expected_encounter,
+                "expected_combatant_revision": actor_revision,
+            },
+        )
+        assert ended.status_code == 200, ended.text
+    _fixed_dice([18, 4])
+    goblin_attack = client.post(
+        f"/campaigns/{campaign_id}/combat-encounters/{encounter_id}/attacks",
+        json={
+            "command_id": str(uuid.uuid4()),
+            "actor_combatant_id": enemy["id"],
+            "target_combatant_id": second["id"],
+            "expected_encounter_revision": 4,
+            "expected_actor_revision": 1,
+            "expected_target_revision": 0,
+            "attack_definition_id": "scimitar",
+            "attack_mode": "melee",
+        },
+    )
+    assert goblin_attack.status_code == 200, goblin_attack.text
+    result = goblin_attack.json()["resolution"]["attack_result"]
+    state = goblin_attack.json()["encounter"]
+    assert result["d20"]["advantage_state"] == "disadvantage"
+    assert result["d20"]["disadvantage_sources"] == ["sap"]
+    assert result["d20"]["selected_die"] == 4
+    assert result["hit"] is False
+    assert (
+        next(effect for effect in state["effects"] if effect["effect_id"] == "sap")["status"]
+        == "expired"
+    )
+
+
+def test_opportunity_attack_resolves_then_original_movement_can_continue(
+    client: TestClient,
+) -> None:
+    campaign_id, encounter = _started_encounter(client, enemy_x=2, enemy_y=2)
+    encounter_id = encounter["id"]
+    mover = encounter["combatants"][0]
+    reactor = encounter["combatants"][2]
+    path = [{"x": 0, "y": 2}]
+    pending = client.post(
+        f"/campaigns/{campaign_id}/combat-encounters/{encounter_id}/move",
+        json={
+            "command_id": str(uuid.uuid4()),
+            "actor_combatant_id": mover["id"],
+            "expected_encounter_revision": 1,
+            "expected_combatant_revision": 0,
+            "path": path,
+        },
+    ).json()
+    window = pending["reaction_windows"][0]
+    selected = client.post(
+        f"/campaigns/{campaign_id}/combat-encounters/{encounter_id}"
+        f"/reaction-windows/{window['id']}",
+        json={
+            "command_id": str(uuid.uuid4()),
+            "reactor_combatant_id": reactor["id"],
+            "expected_encounter_revision": 2,
+            "expected_combatant_revision": 0,
+            "response": "opportunity_attack",
+        },
+    )
+    assert selected.status_code == 200, selected.text
+    _fixed_dice([15, 5])
+    attacked = client.post(
+        f"/campaigns/{campaign_id}/combat-encounters/{encounter_id}/attacks",
+        json={
+            "command_id": str(uuid.uuid4()),
+            "actor_combatant_id": reactor["id"],
+            "target_combatant_id": mover["id"],
+            "expected_encounter_revision": 3,
+            "expected_actor_revision": 1,
+            "expected_target_revision": 0,
+            "attack_definition_id": "scimitar",
+            "attack_mode": "melee",
+            "reaction_window_id": window["id"],
+        },
+    )
+    assert attacked.status_code == 200, attacked.text
+    state = attacked.json()["encounter"]
+    assert attacked.json()["resolution"]["attack_result"]["damage_total"] == 7
+    assert state["reaction_windows"][0]["status"] == "opportunity_attack_resolved"
+    assert state["combatants"][0]["hp"] == 5
+    assert state["current_turn"]["action_available"] is True
+
+    continued = client.post(
+        f"/campaigns/{campaign_id}/combat-encounters/{encounter_id}/move",
+        json={
+            "command_id": str(uuid.uuid4()),
+            "actor_combatant_id": mover["id"],
+            "expected_encounter_revision": 4,
+            "expected_combatant_revision": 1,
+            "path": path,
+        },
+    )
+    assert continued.status_code == 200, continued.text
+    assert continued.json()["combatants"][0]["position_x"] == 0
+    assert continued.json()["current_turn"]["movement_spent_feet"] == 5

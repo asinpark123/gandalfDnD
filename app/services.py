@@ -3209,13 +3209,21 @@ def _create_active_combat_turn(
     ):
         effect.status = "expired"
         effect.ended_round = encounter.round_number
+    slowed = session.scalar(
+        select(CombatEffect.id).where(
+            CombatEffect.encounter_id == encounter.id,
+            CombatEffect.target_combatant_id == actor.id,
+            CombatEffect.effect_id == "slow",
+            CombatEffect.status == "active",
+        )
+    )
     turn = CombatTurn(
         encounter_id=encounter.id,
         combatant_id=actor.id,
         round_number=encounter.round_number,
         turn_index=encounter.active_turn_index,
         status="active",
-        movement_allowance_feet=actor.speed_feet,
+        movement_allowance_feet=max(0, actor.speed_feet - (10 if slowed else 0)),
         movement_spent_feet=0,
         action_available=True,
         bonus_action_available=True,

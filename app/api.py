@@ -12,6 +12,7 @@ from app.character_creation import (
     CharacterFinalizeRequest,
 )
 from app.character_state import CharacterCreationOptions, CharacterStateError
+from app.combat_attacks import execute_combat_attack, replay_combat_attack
 from app.combat_turns import (
     end_combat_turn,
     execute_combat_action,
@@ -35,6 +36,9 @@ from app.schemas import (
     CharacterGrantRead,
     CharacterRead,
     CombatActionCreate,
+    CombatAttackCreate,
+    CombatAttackExecutionRead,
+    CombatAttackReplayRead,
     CombatEncounterCreate,
     CombatEncounterRead,
     CombatEndTurnCreate,
@@ -775,6 +779,50 @@ def create_app() -> FastAPI:
         except IntegrityError as exc:
             session.rollback()
             raise HTTPException(status_code=409, detail="Combat turn could not end") from exc
+
+    @app.post(
+        "/campaigns/{campaign_id}/combat-encounters/{encounter_id}/attacks",
+        response_model=CombatAttackExecutionRead,
+        responses=combat_errors,
+    )
+    def combat_attacks_create(
+        campaign_id: uuid.UUID,
+        encounter_id: uuid.UUID,
+        data: CombatAttackCreate,
+        session: SessionDep,
+        dice_service: DiceDep,
+    ) -> CombatAttackExecutionRead:
+        try:
+            return execute_combat_attack(session, campaign_id, encounter_id, data, dice_service)
+        except NotFoundError as exc:
+            session.rollback()
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except ConflictError as exc:
+            session.rollback()
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        except IntegrityError as exc:
+            session.rollback()
+            raise HTTPException(
+                status_code=409, detail="Combat attack could not be applied"
+            ) from exc
+
+    @app.post(
+        "/campaigns/{campaign_id}/combat-encounters/{encounter_id}/attacks/{resolution_id}/replay",
+        response_model=CombatAttackReplayRead,
+        responses=combat_errors,
+    )
+    def combat_attacks_replay(
+        campaign_id: uuid.UUID,
+        encounter_id: uuid.UUID,
+        resolution_id: uuid.UUID,
+        session: SessionDep,
+    ) -> CombatAttackReplayRead:
+        try:
+            return replay_combat_attack(session, campaign_id, encounter_id, resolution_id)
+        except NotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except ConflictError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
 
     @app.get("/campaigns/{campaign_id}/events", response_model=list[EventRead])
     def events_list(campaign_id: uuid.UUID, session: SessionDep) -> list[EventRead]:

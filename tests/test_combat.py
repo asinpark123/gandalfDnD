@@ -285,7 +285,7 @@ def test_attack_natural_boundaries_equality_and_critical_dice(
     assert natural_twenty.hit
     assert natural_twenty.critical
     assert natural_twenty.weapon_damage is not None
-    assert natural_twenty.weapon_damage.notation == "2d6"
+    assert natural_twenty.weapon_damage.notation == "4d6"
     assert natural_twenty.weapon_damage.original_faces == [6, 5, 4, 3]
     assert natural_twenty.damage_total == 21
 
@@ -446,6 +446,9 @@ def test_goblin_attack_uses_catalog_modifiers_and_advantage_damage(
     assert critical.damage_total == 15
     assert critical.bonus_damage is not None
     assert critical.bonus_damage.critical
+    assert critical.weapon_damage is not None
+    assert critical.weapon_damage.notation == "2d6"
+    assert critical.bonus_damage.notation == "2d4"
 
 
 def test_attack_rejects_impossible_modes_and_inconsistent_dice(

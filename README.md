@@ -70,6 +70,8 @@ maintained in the [living development plan](docs/PROJECT_PLAN.md).
   explicit ties, idempotency, restart, and exact replay evidence
 - [M5.3 turns, movement, and reactions](docs/M5_3_TURNS_MOVEMENT_REACTIONS.md) — exact turn budgets,
   grid paths, Dodge/Disengage/Dash, reaction windows, restart, and regression evidence
+- [M5.4 attacks, damage, equipment, and masteries](docs/M5_4_ATTACKS_DAMAGE_MASTERIES.md) —
+  canonical attacks, exact dice/damage, range, equipment, styles, masteries, reactions, and replay
 - [PostgreSQL 18 migration strategy](docs/POSTGRESQL_18_MIGRATION_STRATEGY.md) — parallel-cluster,
   Gandalf-only migration, acceptance, rollback, and longevity gates
 - [PostgreSQL 18 readiness audit](docs/POSTGRESQL_18_READINESS_AUDIT.md) — verified package impact,
@@ -117,7 +119,7 @@ live M4 supplement also passed: the final prompt and retrieval contracts recalle
 Miras correctly, kept hostile quoted prose mechanically inert, excluded a DM-only secret, and left
 exact state unchanged across a database reconnection.
 
-M5.3 is Done and M5.4 attacks/damage/equipment/masteries is Ready. The deliberately narrow first
+M5.4 is Done and M5.5 health/recovery/encounter completion is Ready. The deliberately narrow first
 combat slice uses the existing level-one
 Human/Soldier/Fighters, Greatsword/Flail/Javelin mechanics, Graze/Sap/Slow, Second Wind, and SRD
 Goblin Minion/Warrior opponents. Spells, broad content, companion autonomy, and lone-hero balancing

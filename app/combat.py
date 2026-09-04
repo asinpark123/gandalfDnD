@@ -469,7 +469,7 @@ def _damage_dice(
         raise CombatError(f"{expression.notation} faces must be within the die range")
     adjusted = [3 if great_weapon_fighting and face in (1, 2) else face for face in faces]
     return ResolvedDamageDice(
-        notation=expression.notation,
+        notation=f"{expected_count}d{expression.sides}",
         original_faces=list(faces),
         adjusted_faces=adjusted,
         subtotal=sum(adjusted),

@@ -1135,7 +1135,7 @@ class CombatCommand(TimestampMixin, Base):
         CheckConstraint(
             "command_type IN ('create_encounter', 'start_initiative', "
             "'resolve_initiative_tie', 'combat_move', 'combat_action', "
-            "'combat_reaction', 'end_combat_turn')",
+            "'combat_reaction', 'end_combat_turn', 'combat_attack')",
             name="combat_command_type",
         ),
         CheckConstraint(
@@ -1324,13 +1324,15 @@ class CombatReactionWindow(TimestampMixin, Base):
 
     __table_args__ = (
         CheckConstraint(
-            "status IN ('pending', 'passed', 'opportunity_attack_pending')",
+            "status IN ('pending', 'passed', 'opportunity_attack_pending', "
+            "'opportunity_attack_resolved')",
             name="combat_reaction_window_status",
         ),
         CheckConstraint(
             "(status = 'pending' AND response IS NULL AND responded_by_command_id IS NULL "
             "AND resolved_encounter_revision IS NULL) OR "
-            "(status IN ('passed', 'opportunity_attack_pending') AND response IS NOT NULL "
+            "(status IN ('passed', 'opportunity_attack_pending', "
+            "'opportunity_attack_resolved') AND response IS NOT NULL "
             "AND responded_by_command_id IS NOT NULL AND resolved_encounter_revision IS NOT NULL)",
             name="combat_reaction_window_response_shape",
         ),
@@ -1359,6 +1361,55 @@ class CombatReactionWindow(TimestampMixin, Base):
             "to_x",
             "to_y",
             name="uq_combat_reaction_transition",
+        ),
+    )
+
+
+class CombatAttackResolution(TimestampMixin, Base):
+    __tablename__ = "combat_attack_resolutions"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    encounter_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("combat_encounters.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    command_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("combat_commands.id", ondelete="RESTRICT"), nullable=False, unique=True
+    )
+    actor_combatant_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("combatants.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    target_combatant_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("combatants.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    reaction_window_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("combat_reaction_windows.id", ondelete="RESTRICT"), index=True
+    )
+    ruleset_release_id: Mapped[str] = mapped_column(
+        ForeignKey("ruleset_releases.id", ondelete="RESTRICT"), nullable=False
+    )
+    combat_catalog_id: Mapped[str] = mapped_column(
+        ForeignKey("ruleset_data_catalogs.id", ondelete="RESTRICT"), nullable=False
+    )
+    resolver_version: Mapped[str] = mapped_column(String(60), nullable=False)
+    actor_revision_before: Mapped[int] = mapped_column(Integer, nullable=False)
+    actor_revision_after: Mapped[int] = mapped_column(Integer, nullable=False)
+    target_revision_before: Mapped[int] = mapped_column(Integer, nullable=False)
+    target_revision_after: Mapped[int] = mapped_column(Integer, nullable=False)
+    command: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    resolution_input: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    attack_result: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    damage_result: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    rng_version: Mapped[str] = mapped_column(String(60), nullable=False)
+
+    __table_args__ = (
+        CheckConstraint(
+            "actor_combatant_id <> target_combatant_id",
+            name="combat_attack_distinct_target",
+        ),
+        CheckConstraint(
+            "actor_revision_after > actor_revision_before AND "
+            "target_revision_after > target_revision_before",
+            name="combat_attack_revision_progress",
         ),
     )
 

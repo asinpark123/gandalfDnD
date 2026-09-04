@@ -2,14 +2,15 @@
 
 - **State:** Accepted; M4 closed
 - **Date:** 2026-09-05
-- **External model calls:** 0
-- **Live OpenClaw evaluation:** Not run; still requires separate authorization and a call cap
+- **External model calls during the required technical/owner gates:** 0
+- **Supplemental live OpenClaw evaluation:** Passed 2026-09-05; 6 of 8 authorized calls used
 - **Automated scenario:** `tests/test_m4_memory_acceptance.py`
 - **Owner fixture:** `scripts/run_m4_5_owner_fixture.py`
 - **Owner checklist:** [`player/M4_5_ACCEPTANCE_CHECKLIST.md`](player/M4_5_ACCEPTANCE_CHECKLIST.md)
 - **Targeted retest:** [`player/M4_5_TARGETED_RETEST.md`](player/M4_5_TARGETED_RETEST.md)
 - **Accepted owner results:**
   [`testM4_5_TARGETED_RETEST_RESULTS.md`](testM4_5_TARGETED_RETEST_RESULTS.md)
+- **Supplemental live evidence:** [`M4_OPENCLAW_EVALUATION.md`](M4_OPENCLAW_EVALUATION.md)
 
 ## Outcome
 
@@ -177,6 +178,9 @@ The targeted owner retest passed on 2026-09-05:
 - `primary plus only qualifying support` was accepted, with direct player presentation deferred to
   M7.
 
-No further deterministic, database, restart, security, or owner test is required for M4. A live
-OpenClaw memory-coherence run remains an optional supplement, not an M4 closure requirement, and
-still requires separate authorization with an explicit maximum call count.
+No further deterministic, database, restart, security, or owner test is required for M4. The owner
+subsequently authorized the optional OpenClaw memory-coherence supplement with an eight-call cap.
+It passed after six real calls: both provider stages received the correct cited source for two
+role-specific Miras, a player-visible hostile quotation stayed inert, a DM-only secret remained
+absent, and exact HP, inventory, and location were unchanged across reconnection. This remains
+supplemental evidence rather than a retroactive M4 closure requirement.

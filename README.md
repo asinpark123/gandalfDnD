@@ -60,6 +60,8 @@ maintained in the [living development plan](docs/PROJECT_PLAN.md).
   supporting-result suppression and two distinct NPCs named Mira
 - [M4.5 targeted results](docs/testM4_5_TARGETED_RETEST_RESULTS.md) — accepted owner evidence and
   the M7 supporting-memory presentation requirement
+- [M4 live OpenClaw evaluation](docs/M4_OPENCLAW_EVALUATION.md) — capped same-name recall,
+  injection isolation, reconnect, state-safety, usage, and latency evidence
 - [PostgreSQL 18 migration strategy](docs/POSTGRESQL_18_MIGRATION_STRATEGY.md) — parallel-cluster,
   Gandalf-only migration, acceptance, rollback, and longevity gates
 - [PostgreSQL 18 readiness audit](docs/POSTGRESQL_18_READINESS_AUDIT.md) — verified package impact,
@@ -83,9 +85,10 @@ branch decisions, typed factions, bounded narrative time, and audience-safe worl
 is Done after its corrected deterministic and owner-guided branching, NPC continuity, restart,
 causal replay, and recoverable-error gates passed. Its separately authorized capped live OpenClaw
 supplement also passed both persistent branches after exposing and resolving an exact duplicate
-decision-fact edge case. M4 is now in Verification after the staged PostgreSQL 18 migration and M4.1
-memory foundation passed. The database foundation and restore rehearsals installed PostgreSQL 18.6 and
-pgvector 0.8.6 without changing PostgreSQL 15 server/client; `18/gandalf` is checksum-enabled and
+decision-fact edge case. M4 is Done after the staged PostgreSQL 18 migration, memory implementation,
+technical gate, relevance rework, owner acceptance, and supplemental live evaluation. The database
+foundation and restore rehearsals installed PostgreSQL 18.6 and pgvector 0.8.6 without changing
+PostgreSQL 15 server/client; `18/gandalf` is checksum-enabled and
 loopback-only; PG15 role isolation is hardened; and exact test/development copies passed the full
 suite plus two complete dual-runtime comparisons while PostgreSQL 15 and Bluebuild remained
 healthy. The rollback-protected active cutover then passed: Gandalf development and tests now use
@@ -101,7 +104,10 @@ gate passes, including a 500-document local-model fixture and atomic different-d
 Its first owner review accepted every primary memory but triggered a focused correction for generic
 supporting results and inconclusive same-name evidence. Versioned policy `1.1.0`, fixture v2, the
 revised automated/local gate, and the targeted owner retest now pass. M4 is Done; M7 must present
-genuinely qualifying cited supporting memories when they are available.
+genuinely qualifying cited supporting memories when they are available. The separately authorized
+live M4 supplement also passed: the final prompt and retrieval contracts recalled two role-specific
+Miras correctly, kept hostile quoted prose mechanically inert, excluded a DM-only secret, and left
+exact state unchanged across a database reconnection.
 
 ## Versioned rulesets
 

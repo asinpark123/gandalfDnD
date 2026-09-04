@@ -6,7 +6,7 @@
 - **Depends on:** M4.3 filter-first hybrid retrieval
 - **External model calls:** None
 - **Infrastructure changes:** None beyond the Gandalf development/test schema migration
-- **Next gate:** M4.5 adversarial, restart, re-index, owner-relevance, and optional live evaluation
+- **Later gates:** M4.5 and its separately authorized live supplement both passed
 
 ## Outcome
 
@@ -110,6 +110,7 @@ Final gates:
 - Development indexes remain inactive, so no existing campaign has silently changed behavior.
 - Summary/version records are rebuildable derived evidence, but intentionally append-only; replacing
   output creates lineage instead of mutation.
-- M4.5 must complete adversarial visibility/injection, restart, stale-index, replacement-profile,
-  and owner relevance/repetition/continuity checks before M4 closes.
-- A live OpenClaw memory-coherence run still requires separate authorization and a maximum-call cap.
+- M4.5 later completed adversarial visibility/injection, restart, stale-index,
+  replacement-profile, and owner relevance/repetition/continuity checks before M4 closed.
+- The later live OpenClaw memory-coherence supplement used six of eight authorized calls and passed;
+  see [`M4_OPENCLAW_EVALUATION.md`](M4_OPENCLAW_EVALUATION.md).

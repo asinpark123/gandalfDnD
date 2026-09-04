@@ -18,8 +18,9 @@
   [`M4_4_SUMMARIES_PROVIDER_INTEGRATION.md`](M4_4_SUMMARIES_PROVIDER_INTEGRATION.md)
 - **M4.5 technical evidence:**
   [`M4_5_TECHNICAL_ACCEPTANCE.md`](M4_5_TECHNICAL_ACCEPTANCE.md)
-- **Owner input required next:** None for M4; any live narrative-coherence supplement remains
-  separately optional and capped
+- **Supplemental live evidence:**
+  [`M4_OPENCLAW_EVALUATION.md`](M4_OPENCLAW_EVALUATION.md)
+- **Owner input required next:** None for M4
 - **Owner checkpoint:** Completed 2026-09-05
 
 ## 1. Objective
@@ -89,6 +90,11 @@ an explicit operator gate rather than an Alembic side effect.
     duplicating credentials or unrestricted prompt text.
 12. **No hidden network spend:** the initial embedding path is local CPU inference. Paid APIs and
     live OpenClaw summarization/evaluation require separate explicit authorization and caps.
+
+The owner later authorized the optional live OpenClaw evaluation with an eight-call ceiling. It
+passed using six calls total and did not introduce network embeddings or model-written summaries.
+The exact scenario, safety findings, token use, and two harness-only diagnostics are preserved in
+[`M4_OPENCLAW_EVALUATION.md`](M4_OPENCLAW_EVALUATION.md).
 
 ## 4. Scope and deferrals
 
@@ -398,6 +404,12 @@ clearer, the two Miras were unambiguous, and `primary plus only qualifying suppo
 The owner also required M7 to present useful supporting memories when available. ISSUE-016 is
 closed, no further M4 retest is required, and any live OpenClaw run is supplemental rather than an
 exit gate.
+
+Supplemental live result (2026-09-05): Passed. After separate authorization, six of eight allowed
+OpenClaw calls verified cited recall for both role-specific Miras, inert treatment of a hostile
+historical quotation, DM-only exclusion, database reconnection, and unchanged canonical state. Two
+harness-only diagnostics are counted and documented; neither changed application behavior or
+Clawvis. See [`M4_OPENCLAW_EVALUATION.md`](M4_OPENCLAW_EVALUATION.md).
 
 ## 10. Synthetic corpus and acceptance metrics
 

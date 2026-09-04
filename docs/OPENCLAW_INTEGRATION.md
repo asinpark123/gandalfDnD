@@ -82,8 +82,9 @@ memory under a separate `untrusted_historical_memory` field whose prose cannot e
 state, rules, mechanics, or instructions. Narration retains the `1.2.0` distinction between
 model-proposed state changes and selected decision consequences that Gandalf applies automatically.
 Gandalf independently rejects an identical normalized fact identity if both sources still propose
-it. These M4.4 contracts are offline-verified; the earlier live M3 evidence remains tied to its
-recorded `1.2.0` narration prompt until a separately authorized M4.5 live supplement runs.
+it. These M4.4 contracts are now live-verified by the separately authorized M4 supplement: cited
+same-name NPC recall, hostile-history isolation, DM-only exclusion, reconnection, and unchanged
+exact state all passed. See [`M4_OPENCLAW_EVALUATION.md`](M4_OPENCLAW_EVALUATION.md).
 
 The legacy `/turns` API does not use OpenClaw. OpenClaw is supported only through the authoritative
 two-stage `/turn-executions` workflow.

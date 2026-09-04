@@ -1,6 +1,6 @@
 # M4.5 Targeted Memory-Relevance Retest
 
-- **Milestone state:** Rework verification
+- **Milestone state:** Accepted 2026-09-05
 - **External model use:** None
 - **Required action:** Read six short retrieval results and record four judgments
 - **Estimated review time:** 5 minutes
@@ -8,6 +8,8 @@
   [`../testM4_5_TARGETED_RETEST_RESULTS.md`](../testM4_5_TARGETED_RETEST_RESULTS.md)
 - **Why this retest exists:** The first review accepted every rank-1 result but found ranks 2–3
   repetitive and could not assess the two distinct NPCs named Mira
+- **Outcome:** All four judgments and the final owner decision passed; no further M4 retest is
+  required
 
 ## What changed
 

@@ -4,13 +4,11 @@
 - **Last updated:** 2026-09-05
 - **Rules baseline:** SRD 5.2.1 (pinned; character-state and check/save-resolution catalogs pass
   integrity and schema verification)
-- **Current delivery stage:** M4 Rework verification. The first owner review accepted all five
-  primary memories but rejected generic/repetitive supporting results and found the same-name NPC
-  sample inconclusive. Ranking policy `hybrid-rrf-entity-recency-1.1.0` now treats count as a ceiling
-  and gates supporting context by score, query evidence, and diversity. The revised 500-memory local
-  fixture retained perfect recall/MRR, passed at 214 ms p95, excluded unsafe sources, reproduced six
-  results after reconnection, and clearly exercises both NPCs named Mira. Targeted owner review is
-  the remaining M4 gate
+- **Current delivery stage:** M4 Done (accepted 2026-09-05). The focused owner retest accepted
+  accurate primary recall, relevant-only supporting selection, and distinct same-name NPC
+  attribution. Ranking policy `hybrid-rrf-entity-recency-1.1.0`, the revised 500-memory local gate,
+  all 27 focused tests, and all 154 repository tests pass. M5 strategy preparation is next; an
+  optional capped live OpenClaw memory-coherence supplement requires separate authorization
 - **Canonical repository:** `~/Git/gandalfDnD`
 
 ## 1. Purpose of this document
@@ -114,9 +112,9 @@ Current documentation index:
 | M4.4 source-cited summary and provider-integration evidence | [`M4_4_SUMMARIES_PROVIDER_INTEGRATION.md`](M4_4_SUMMARIES_PROVIDER_INTEGRATION.md) |
 | M4.5 technical acceptance and local owner-fixture evidence | [`M4_5_TECHNICAL_ACCEPTANCE.md`](M4_5_TECHNICAL_ACCEPTANCE.md) |
 | M4.5 owner relevance and continuity checklist | [`player/M4_5_ACCEPTANCE_CHECKLIST.md`](player/M4_5_ACCEPTANCE_CHECKLIST.md) |
-| M4.5 owner results form and eventual raw feedback | [`testM4_5_ACCEPTANCE_CHECKLIST_RESULTS.md`](testM4_5_ACCEPTANCE_CHECKLIST_RESULTS.md) |
+| M4.5 initial owner results and rework finding | [`testM4_5_ACCEPTANCE_CHECKLIST_RESULTS.md`](testM4_5_ACCEPTANCE_CHECKLIST_RESULTS.md) |
 | M4.5 focused relevance retest | [`player/M4_5_TARGETED_RETEST.md`](player/M4_5_TARGETED_RETEST.md) |
-| M4.5 focused retest results | [`testM4_5_TARGETED_RETEST_RESULTS.md`](testM4_5_TARGETED_RETEST_RESULTS.md) |
+| M4.5 accepted focused retest results | [`testM4_5_TARGETED_RETEST_RESULTS.md`](testM4_5_TARGETED_RETEST_RESULTS.md) |
 | PostgreSQL 18 Gandalf-only parallel migration and rollback strategy | [`POSTGRESQL_18_MIGRATION_STRATEGY.md`](POSTGRESQL_18_MIGRATION_STRATEGY.md) |
 | PostgreSQL 18 verified readiness, package impact, compatibility, and authorization gate | [`POSTGRESQL_18_READINESS_AUDIT.md`](POSTGRESQL_18_READINESS_AUDIT.md) |
 | PostgreSQL 18 package/cluster/HBA/test-restore execution evidence | [`POSTGRESQL_18_FOUNDATION_EXECUTION.md`](POSTGRESQL_18_FOUNDATION_EXECUTION.md) |
@@ -311,7 +309,7 @@ results, known limitations, and where observations will be recorded.
 | M1.4 deterministic resolution | Completed 2026-09-02; no further input required | All nine owner actions passed, including canonical modifiers, modifier rejection, Advantage/Disadvantage, actor attribution, and confirmed post-restart replay |
 | M2 model-authored feasibility | Completed 2026-09-02; no further input required. Any optional direct paid-provider test still needs separate authorization and a cap | The private OpenClaw activation, smoke checks, and three ten-scenario live Lantern runs passed; manual fallback and direct paid transport remain separately classified evidence |
 | M3 persistent world | Completed 2026-09-04; authorized live OpenClaw supplement also complete | Owner-guided retest passed NPC continuity, distinct decisions and branches, restart persistence, and corrective error guidance; the live two-branch supplement passed after resolving ISSUE-011 |
-| M4 long-term memory | Complete the prepared focused M4.5 retest | Confirm that relevant-only support selection and the two role-specific Miras resolve ISSUE-016; live OpenClaw evaluation remains separately authorized and capped |
+| M4 long-term memory | Completed 2026-09-05; no further input required | Owner accepted relevant-only support selection and the two role-specific Miras; optional live OpenClaw evaluation requires separate authorization and a cap |
 | M1.5 content expansion | Prioritize desired species, backgrounds, classes, feats, equipment routes, spellcasting, and play styles | Create contrasting supported characters and confirm their choices produce understandable, distinct state and later gameplay |
 | M5 party combat | Provide difficulty/lethality feedback for standard party play; companion autonomy and lone-hero compensation remain later decisions | Repeated Party Commander combat tests across favorable, difficult, defeat, recovery, and restart scenarios |
 | Protagonist with Companions | Choose desired companion autonomy, instruction granularity, personality influence, and player override behavior after Party Commander is proven | Compare delegated companion proposals with direct Party Commander control and verify the same deterministic rules constrain both |
@@ -349,7 +347,7 @@ Use these values consistently:
 | M1 | Party character creation and deterministic mechanics | Done | The selected acting character's choices drive calculated outcomes |
 | M2 | Two-stage AI turn and model-authored feasibility | Done | Real DM-authored output uses recorded dice results safely through a private provider boundary |
 | M3 | Persistent world model | Done | NPCs, quests, scenes, clues, time, decisions, and visibility |
-| M4 | Long-term memory and retrieval | In progress | Coherent recall without full history in context |
+| M4 | Long-term memory and retrieval | Done | Coherent recall without full history in context |
 | PG18 | PostgreSQL 18 migration | Done/Monitoring | Active cutover passed; PG15 rollback retained during stabilization |
 | M5 | Basic deterministic combat | Proposed | Reproducible initiative, actions, attacks, and damage |
 | M6 | Spoiler-safe Guide | Proposed | Beginner help with enforceable knowledge boundaries |
@@ -1092,7 +1090,7 @@ while DM-only facts remain absent from player-visible APIs.
 
 ### M4 — Long-term memory and retrieval
 
-- **Status:** Rework verification; ISSUE-016 corrected, targeted owner review next
+- **Status:** Done (accepted 2026-09-05)
 - **Depends on:** M3
 - **Detailed strategy:** [`M4_IMPLEMENTATION_STRATEGY.md`](M4_IMPLEMENTATION_STRATEGY.md)
 - **Infrastructure audit:** [`M4_POSTGRES_PGVECTOR_AUDIT.md`](M4_POSTGRES_PGVECTOR_AUDIT.md)
@@ -1234,9 +1232,12 @@ query-evidence, and content-diversity checks. Existing `1.0.0` audits remain rep
 local-BGE fixture again passed 500 documents/20 queries at 1.00 critical/overall Recall@8 and 1.00
 MRR, with 214 ms p95, zero adversarial leakage, and six identical post-reconnection selections.
 Each owner query returned one relevant memory rather than quota-filling noise, and both distinct
-Miras now have active role-specific interactions. Targeted owner acceptance remains required.
+Miras now have active role-specific interactions. The targeted owner retest accepted all four
+judgments on 2026-09-05: primary recall remained correct, suppression was clearer, identity was
+unambiguous, and `primary plus only qualifying support` was approved. M4 is closed with no further
+required test. Useful supporting memories must be presented clearly in the future M7 interface.
 
-Exit gate: in a synthetic campaign of at least 500 events, a relevant early clue is retrieved late
+Exit gate: Passed. In a synthetic campaign of at least 500 events, a relevant early clue is retrieved late
 without placing full history in the prompt, while irrelevant/hidden/cross-campaign records remain
 excluded. Critical Recall@8 must be 100%, overall Recall@8 at least 0.90, mean reciprocal rank at
 least 0.65, memory context at most 8 items/6,000 characters, and re-index activation atomic. Exact
@@ -1279,6 +1280,12 @@ calculated values, provenance explanations, loadout changes, and per-character i
 player-oriented language; and translate typed API errors into contextual instructions that tell a
 player what happened and how to correct it. Raw backend detail may remain available for diagnostics
 without being the primary player message.
+
+The memory view must display the primary cited memory and every genuinely qualifying supporting
+memory returned by the backend. It must not assume a fixed three-result layout, fabricate empty
+ranks, or hide useful support merely because only the primary result is needed in other cases.
+Owner acceptance must cover primary-only, primary-plus-support, citation visibility, and clear
+distinction between similarly named people or places.
 
 ### M8 — Deployment and operations
 
@@ -1335,9 +1342,9 @@ agent direct database or unvalidated state-mutation access.
 | ISSUE-013 | Database trigger | Resolved | M4.1 used one identity trigger function for campaign indexes and jobs with different record shapes | Legitimate campaign-index progress updates failed because PostgreSQL resolved a job-only `OLD.document_id` field | Migration `0013_memory_lifecycle` and the corrected fresh `0012` definition use table-specific functions; lifecycle, downgrade, and full regression gates pass |
 | ISSUE-014 | Local embedding lifecycle | Resolved | The M4.3 local BGE gate passed its assertions but one run exited 134 when ONNX Runtime destroyed a native recursive mutex during interpreter teardown | An otherwise successful quality gate could be reported as a failed process and make CI nondeterministic | `LocalFastEmbedProvider.close()` explicitly releases the native session before interpreter teardown; the deterministic/local gate reran with all four cases passing and exit zero |
 | ISSUE-015 | Retrieval quality fixture | Resolved | The first full M4.4 regression exposed that random document UUIDs were the final tie-break in the deterministic 500-record gate | An equivalent reconstructed fixture could occasionally cross the MRR threshold solely because generated identities changed | Assign stable UUIDv5 identities to the synthetic corpus; rerun the unchanged quality thresholds and full regression gate |
-| ISSUE-016 | Retrieval usefulness / acceptance fixture | Resolved; owner verification pending | M4.5 policy `1.0.0` filled the requested result count with low-value same-location/same-quest chronicles, and fixture v1 did not display an active interaction for its second NPC named Mira | Correct rank-1 recall was diluted by repetitive internal GM context, while the owner could not fairly assess identity ambiguity | Policy `1.1.0` makes count a ceiling and gates supporting results by relative score, query evidence, and content diversity; fixture v2 adds two active role-specific Mira interactions; automated/local-model gates pass and targeted owner review remains |
+| ISSUE-016 | Retrieval usefulness / acceptance fixture | Resolved | M4.5 policy `1.0.0` filled the requested result count with low-value same-location/same-quest chronicles, and fixture v1 did not display an active interaction for its second NPC named Mira | Correct rank-1 recall was diluted by repetitive internal GM context, while the owner could not fairly assess identity ambiguity | Policy `1.1.0` makes count a ceiling and gates supporting results by relative score, query evidence, and content diversity; fixture v2 adds two active role-specific Mira interactions; automated/local-model gates and the 2026-09-05 targeted owner acceptance pass |
 | ISSUE-004 | Character-state provenance | Resolved | The first M1.3 owner run showed empty projected source/acquisition provenance for Dice Set and GP; ordinary package items were unaffected | The visible equipment projection did not meet GF-004 even though canonical grants remained intact | The corrected projection and exhaustive regression passed 39 automated tests; the 2026-09-01 owner retest confirmed complete Dice Set/GP definition, source, and acquisition-event provenance for both existing characters |
-| UX-001 | Player interface | Deferred/partially prepared | M3 absent/inactive/hidden-target conflicts now provide stable codes and safe recovery text, but JSON cannot validate visual actor/state clarity and other endpoints still need error normalization | Ordinary players may not know what happened or how to correct every invalid action when the frontend is introduced | In M7, map stable typed API errors to actionable messages, normalize remaining error contracts, and test actor visibility, calculated-value explanations, and isolated character changes through the full player journey |
+| UX-001 | Player interface | Deferred/partially prepared | M3 absent/inactive/hidden-target conflicts now provide stable codes and safe recovery text, but JSON cannot validate visual actor/state clarity and other endpoints still need error normalization; M4 owner acceptance also requires qualifying supporting memories to be visible without quota-filling noise | Ordinary players may not know what happened, how to correct an invalid action, or which cited earlier details support current play | In M7, map stable typed API errors to actionable messages, normalize remaining error contracts, test actor/state explanations, and present the primary memory plus any genuinely qualifying cited support without fixed empty/noisy rank slots |
 
 New entries must include reproduction steps or evidence when applicable. Do not close an issue only
 because a workaround exists; record both the workaround and the permanent resolution.
@@ -1516,11 +1523,13 @@ Destination milestone:
 1. Monitor the active PG18 connection, application/database errors, startup behavior, connections,
    disk, extension compatibility, and migration behavior while retaining all recovery bundles and
    both PG15 Gandalf copies/roles unchanged.
-2. Complete and preserve the focused M4.5 owner retest for policy `1.1.0` and the two active Miras;
-   close M4 if accepted or rework only the remaining evidenced concern.
-3. Keep the 11 pre-existing development indexes inactive until their own campaign-specific activation evidence passes;
-   request separate authorization and a call cap before any live OpenClaw memory evaluation.
-4. Request a later explicit destructive-action decision before disabling old PG15 logins, deleting
+2. Decide whether to authorize the optional capped live OpenClaw M4 memory-coherence supplement;
+   it is not required for the accepted M4 exit gate.
+3. Prepare M5's narrow deterministic Party Commander combat strategy, acceptance fixtures, and
+   owner decision points without expanding into full class/spell breadth.
+4. Keep the 11 pre-existing development indexes inactive until their own campaign-specific
+   activation evidence passes.
+5. Request a later explicit destructive-action decision before disabling old PG15 logins, deleting
    rollback copies, changing unrelated services, or considering PostgreSQL 15 retirement.
 
 ## 18. Documentation change log
@@ -1574,3 +1583,4 @@ Destination milestone:
 | 2026-09-04 | DOC-045 | Passed M4.5's deterministic technical gate and advanced M4 to Verification with a reproducible owner fixture/checklist | The composed lifecycle covers injection visibility, restart, stale indexing, and atomic different-dimension replacement; the fresh local-BGE 500-document corpus achieved 1.00 critical/overall Recall@8, 1.00 MRR, 116 ms p95, zero adversarial leakage, and identical restart results. All 26 focused M4 and 153 complete-suite tests pass with two opt-in live skips and no external calls; only the isolated gated review campaign was activated | Record and analyse owner relevance/repetition/continuity feedback; close or rework M4, and keep any live OpenClaw supplement separately authorized/capped |
 | 2026-09-05 | DOC-046 | Reworked the M4.5 owner gate into a standalone, accurately worded review and added a ready-to-fill results form | The initial checklist asked the owner to judge ranks 2–3 without displaying them, described an application connection-pool recreation too broadly as a database restart, and ambiguously called three total items three supporting memories. The corrected checklist includes all 15 exact outputs, separates required review from optional reproduction, defines the frontend decision boundary, and explains technical metrics in plain language | Owner completes the five-question results form; analyse the feedback and close or rework M4 |
 | 2026-09-05 | DOC-047 | Analysed the first M4.5 owner review, recorded focused Rework, resolved ISSUE-016 in ranking policy `1.1.0`, added a fair same-name fixture and concise targeted retest | The owner accepted all primary memories but found supporting chronicles repetitive/unintelligible and could not judge the second Mira because no active interaction was shown. The revised 500-memory local gate preserved 1.00 recall/MRR, passed at 214 ms p95, excluded unsafe records, and returned six stable relevant-only results; 27 focused and all 154 repository tests pass | Complete the four-question targeted owner retest; if accepted, close M4 and then separately decide whether a capped live OpenClaw supplement is worthwhile |
+| 2026-09-05 | DOC-048 | Preserved the successful targeted owner retest, closed ISSUE-016 and M4, and promoted useful supporting-memory presentation into M7 acceptance | The owner confirmed unchanged primary accuracy, clearer noise suppression, unambiguous same-name NPCs, and acceptance of primary-plus-qualifying-support; all M4 technical/security/restart/quality gates already pass | Decide on the optional capped live OpenClaw supplement, then prepare the narrow M5 deterministic-combat strategy |

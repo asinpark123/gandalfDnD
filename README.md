@@ -58,6 +58,8 @@ maintained in the [living development plan](docs/PROJECT_PLAN.md).
   attribution, restart continuity, and player-facing result-count review
 - [M4.5 targeted retest](docs/player/M4_5_TARGETED_RETEST.md) — focused verification of
   supporting-result suppression and two distinct NPCs named Mira
+- [M4.5 targeted results](docs/testM4_5_TARGETED_RETEST_RESULTS.md) — accepted owner evidence and
+  the M7 supporting-memory presentation requirement
 - [PostgreSQL 18 migration strategy](docs/POSTGRESQL_18_MIGRATION_STRATEGY.md) — parallel-cluster,
   Gandalf-only migration, acceptance, rollback, and longevity gates
 - [PostgreSQL 18 readiness audit](docs/POSTGRESQL_18_READINESS_AUDIT.md) — verified package impact,
@@ -97,8 +99,9 @@ lexical retrieval, strict source/context bounds, replayable raw-query-free audit
 context to both provider stages while keeping exact state separate. M4.5's deterministic technical
 gate passes, including a 500-document local-model fixture and atomic different-dimension re-indexing.
 Its first owner review accepted every primary memory but triggered a focused correction for generic
-supporting results and inconclusive same-name evidence. Versioned policy `1.1.0` and fixture v2 now
-pass the revised automated/local gate; the concise targeted owner retest is the remaining M4 gate.
+supporting results and inconclusive same-name evidence. Versioned policy `1.1.0`, fixture v2, the
+revised automated/local gate, and the targeted owner retest now pass. M4 is Done; M7 must present
+genuinely qualifying cited supporting memories when they are available.
 
 ## Versioned rulesets
 

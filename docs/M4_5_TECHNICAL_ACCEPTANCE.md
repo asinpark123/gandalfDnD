@@ -1,6 +1,6 @@
 # M4.5 Technical Acceptance Evidence
 
-- **State:** Rework verification — corrected technical gate passed; targeted owner review pending
+- **State:** Accepted; M4 closed
 - **Date:** 2026-09-05
 - **External model calls:** 0
 - **Live OpenClaw evaluation:** Not run; still requires separate authorization and a call cap
@@ -8,6 +8,8 @@
 - **Owner fixture:** `scripts/run_m4_5_owner_fixture.py`
 - **Owner checklist:** [`player/M4_5_ACCEPTANCE_CHECKLIST.md`](player/M4_5_ACCEPTANCE_CHECKLIST.md)
 - **Targeted retest:** [`player/M4_5_TARGETED_RETEST.md`](player/M4_5_TARGETED_RETEST.md)
+- **Accepted owner results:**
+  [`testM4_5_TARGETED_RETEST_RESULTS.md`](testM4_5_TARGETED_RETEST_RESULTS.md)
 
 ## Outcome
 
@@ -40,7 +42,7 @@ Glasswood interaction for the other Mira. The pinned local model returned only t
 memory for each of six owner questions because no lower candidate cleared every support check. It
 still placed all 20 golden sources first, passed the 500-memory quality gate, excluded every unsafe
 source, and reproduced the same six selections after reconnecting. Targeted owner review is the
-remaining gate.
+final gate; the owner completed it on 2026-09-05 and accepted every judgment.
 
 The deterministic fixture independently verifies the complementary behavior: at least one
 meaningful support item survives the new gates, while no generic `Chronicle` item enters any owner
@@ -164,9 +166,17 @@ The targeted retest contains those five primary facts without filler plus an act
 identified Glasswood glassblower interaction. It asks only whether the correction resolves the two
 owner findings; it does not repeat already established continuity or security work.
 
-## Remaining gate
+## Owner acceptance and closure
 
-M4 stays in **Rework verification** until the targeted owner results are preserved and analysed. If
-the owner accepts the six samples and support-selection policy, M4 can close without an external
-model call. A live OpenClaw memory-coherence run remains optional supplemental evidence and must be
-separately authorized with an explicit maximum call count.
+The targeted owner retest passed on 2026-09-05:
+
+- the original five primary memories remained accurate and sufficient;
+- omitting non-useful ranks 2–3 was clearer than quota-filling generic chronicles;
+- the lantern keeper and Glasswood glassblower named Mira were unambiguous through role and
+  narrative;
+- `primary plus only qualifying support` was accepted, with direct player presentation deferred to
+  M7.
+
+No further deterministic, database, restart, security, or owner test is required for M4. A live
+OpenClaw memory-coherence run remains an optional supplement, not an M4 closure requirement, and
+still requires separate authorization with an explicit maximum call count.

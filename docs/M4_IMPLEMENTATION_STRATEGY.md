@@ -1,6 +1,6 @@
 # M4 Long-Term Memory and Retrieval Implementation Strategy
 
-- **Status:** In progress; M4.4 passed and M4.5 acceptance is next
+- **Status:** Verification; M4.5 technical gate passed and owner relevance review is next
 - **Prepared:** 2026-09-04
 - **Depends on:** M3 persistent world (Done, including live OpenClaw supplement)
 - **Infrastructure audit:** [`M4_POSTGRES_PGVECTOR_AUDIT.md`](M4_POSTGRES_PGVECTOR_AUDIT.md)
@@ -16,8 +16,10 @@
 - **M4.3 evidence:** [`M4_3_HYBRID_RETRIEVAL.md`](M4_3_HYBRID_RETRIEVAL.md)
 - **M4.4 evidence:**
   [`M4_4_SUMMARIES_PROVIDER_INTEGRATION.md`](M4_4_SUMMARIES_PROVIDER_INTEGRATION.md)
-- **Owner input required next:** None before the M4.5 relevance/continuity acceptance gate
-- **Owner checkpoint:** M4.5 retrieval/re-index acceptance, followed by any separately authorized
+- **M4.5 technical evidence:**
+  [`M4_5_TECHNICAL_ACCEPTANCE.md`](M4_5_TECHNICAL_ACCEPTANCE.md)
+- **Owner input required next:** Complete the prepared M4.5 relevance/continuity checklist
+- **Owner checkpoint:** M4.5 relevance/repetition/continuity acceptance, followed by any separately authorized
   live narrative-coherence supplement
 
 ## 1. Objective
@@ -370,6 +372,17 @@ OpenClaw evaluations remained separately opt-in.
 Exit: all M4 technical thresholds pass, owner feedback is recorded, and any authorized live
 supplement is classified separately from deterministic correctness.
 
+Result (2026-09-04): Technical gate passed; owner review pending. The composed lifecycle fixture
+proves hidden and player-visible injection boundaries, restart replay, stale-index behavior, and
+atomic side-by-side replacement across different vector dimensions. A fresh pinned-local-BGE
+development corpus passed 20/20 golden queries with 1.00 critical and overall Recall@8, 1.00 MRR,
+116 ms end-to-end retrieval p95, zero hidden/cross-campaign/superseded leakage, and identical five-query results
+after restart. The focused M4 suite reports 26 passed and the complete suite reports 153 passed plus
+two intentionally skipped live OpenClaw tests, without an external model call. The isolated
+review campaign is the only active development memory index; the 11 pre-existing indexes remain
+ready and inactive. See [`M4_5_TECHNICAL_ACCEPTANCE.md`](M4_5_TECHNICAL_ACCEPTANCE.md) and
+[`player/M4_5_ACCEPTANCE_CHECKLIST.md`](player/M4_5_ACCEPTANCE_CHECKLIST.md).
+
 ## 10. Synthetic corpus and acceptance metrics
 
 The acceptance fixture must contain at least 500 chronologically ordered player-visible events or
@@ -441,6 +454,6 @@ quality/latency results, defects, workarounds, and next actions. M4 moves to Rew
 shows hidden/cross-campaign retrieval, uncited memory, mixed profiles, canonical-state substitution,
 unbounded context, or a completed turn depending on index availability.
 
-M4.4 is complete. Proceed with M4.5 adversarial/restart/re-index evidence and prepare the owner
-relevance checklist. Paid or network embeddings, live OpenClaw evaluation, PostgreSQL 15
+M4.5's technical gate is complete. Preserve and analyse the owner relevance/repetition/continuity
+review, then close or rework M4 from that evidence. Paid or network embeddings, live OpenClaw evaluation, PostgreSQL 15
 retirement, and unrelated-service changes remain outside the current authority boundary.

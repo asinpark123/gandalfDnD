@@ -4,12 +4,12 @@
 - **Last updated:** 2026-09-04
 - **Rules baseline:** SRD 5.2.1 (pinned; character-state and check/save-resolution catalogs pass
   integrity and schema verification)
-- **Current delivery stage:** M4 In progress. M4.4 adds immutable source-cited summaries and
-  fail-soft bounded memory context to interpretation and narration while exact state remains
-  separate. The focused 15-test contract gate passed with a measured 959-character/approximately
-  240-token fixture increase per stage and no external calls; all 151 normal regression tests pass.
-  Eleven development builds covering 115 documents remain ready but intentionally inactive. M4.5
-  adversarial/restart/re-index and owner acceptance is next
+- **Current delivery stage:** M4 Verification. M4.5's composed adversarial, restart, stale-index,
+  different-dimension re-index, citation, and audit tests pass. A fresh pinned-local-BGE 500-document
+  development fixture achieved 1.00 critical/overall Recall@8, 1.00 MRR, 116 ms retrieval p95, and
+  identical results after restart with no external calls. Its isolated review index activated only
+  after passing; the 11 earlier indexes remain ready and inactive. Owner relevance/repetition/
+  continuity review is next
 - **Canonical repository:** `~/Git/gandalfDnD`
 
 ## 1. Purpose of this document
@@ -108,7 +108,11 @@ Current documentation index:
 | M4 long-term-memory architecture, slices, and acceptance strategy | [`M4_IMPLEMENTATION_STRATEGY.md`](M4_IMPLEMENTATION_STRATEGY.md) |
 | M4 PostgreSQL/pgvector read-only readiness and provisioning gate | [`M4_POSTGRES_PGVECTOR_AUDIT.md`](M4_POSTGRES_PGVECTOR_AUDIT.md) |
 | M4.1 pgvector and guarded memory-foundation execution evidence | [`M4_1_MEMORY_FOUNDATION.md`](M4_1_MEMORY_FOUNDATION.md) |
+| M4.2 player-safe source projection and local indexing evidence | [`M4_2_SOURCE_INDEXING.md`](M4_2_SOURCE_INDEXING.md) |
+| M4.3 hybrid retrieval and quality-gate evidence | [`M4_3_HYBRID_RETRIEVAL.md`](M4_3_HYBRID_RETRIEVAL.md) |
 | M4.4 source-cited summary and provider-integration evidence | [`M4_4_SUMMARIES_PROVIDER_INTEGRATION.md`](M4_4_SUMMARIES_PROVIDER_INTEGRATION.md) |
+| M4.5 technical acceptance and local owner-fixture evidence | [`M4_5_TECHNICAL_ACCEPTANCE.md`](M4_5_TECHNICAL_ACCEPTANCE.md) |
+| M4.5 owner relevance and continuity checklist | [`player/M4_5_ACCEPTANCE_CHECKLIST.md`](player/M4_5_ACCEPTANCE_CHECKLIST.md) |
 | PostgreSQL 18 Gandalf-only parallel migration and rollback strategy | [`POSTGRESQL_18_MIGRATION_STRATEGY.md`](POSTGRESQL_18_MIGRATION_STRATEGY.md) |
 | PostgreSQL 18 verified readiness, package impact, compatibility, and authorization gate | [`POSTGRESQL_18_READINESS_AUDIT.md`](POSTGRESQL_18_READINESS_AUDIT.md) |
 | PostgreSQL 18 package/cluster/HBA/test-restore execution evidence | [`POSTGRESQL_18_FOUNDATION_EXECUTION.md`](POSTGRESQL_18_FOUNDATION_EXECUTION.md) |
@@ -1084,7 +1088,7 @@ while DM-only facts remain absent from player-visible APIs.
 
 ### M4 — Long-term memory and retrieval
 
-- **Status:** In progress; M4.4 Done (2026-09-04), M4.5 next
+- **Status:** Verification; M4.5 technical gate passed (2026-09-04), owner review next
 - **Depends on:** M3
 - **Detailed strategy:** [`M4_IMPLEMENTATION_STRATEGY.md`](M4_IMPLEMENTATION_STRATEGY.md)
 - **Infrastructure audit:** [`M4_POSTGRES_PGVECTOR_AUDIT.md`](M4_POSTGRES_PGVECTOR_AUDIT.md)
@@ -1098,6 +1102,8 @@ while DM-only facts remain absent from player-visible APIs.
 - **M4.3 execution:** [`M4_3_HYBRID_RETRIEVAL.md`](M4_3_HYBRID_RETRIEVAL.md)
 - **M4.4 execution:**
   [`M4_4_SUMMARIES_PROVIDER_INTEGRATION.md`](M4_4_SUMMARIES_PROVIDER_INTEGRATION.md)
+- **M4.5 technical acceptance:**
+  [`M4_5_TECHNICAL_ACCEPTANCE.md`](M4_5_TECHNICAL_ACCEPTANCE.md)
 
 Add player-visible, source-cited narrative memory for completed turns/events, a local embedding
 provider, versioned profiles, durable idempotent indexing, exact-vector plus lexical hybrid search,
@@ -1200,6 +1206,18 @@ Focused tests passed without external calls; development's 11 indexes remain ina
 regression exposed and resolved stale schema-inventory expectations and nondeterministic random-UUID
 tie evidence without lowering retrieval thresholds. See
 [`M4_4_SUMMARIES_PROVIDER_INTEGRATION.md`](M4_4_SUMMARIES_PROVIDER_INTEGRATION.md).
+
+M4.5 technical acceptance (2026-09-04): the new composed lifecycle gate proves safe handling of
+player-visible instruction-like prose and DM-only injection text, immutable replay after restart,
+stale-index cutoff, old-profile availability during rebuild, rejection of early replacement
+activation, different-dimension isolation, atomic activation, and complete citation/audit scope.
+The fresh 500-active-document pinned-local-BGE owner fixture passed 20 queries and five early clues
+at 1.00 critical/overall Recall@8, 1.00 MRR, and 116 ms end-to-end retrieval p95; all security checks and five
+post-restart ID comparisons passed. The 26-test focused M4 gate is green without an external model
+call; the complete repository gate reports 153 passed and two opt-in live tests skipped. One
+isolated development review campaign is active after its own passing gate, while all 11
+earlier indexes remain ready/inactive. Owner relevance/repetition/continuity feedback is still
+required before M4 closes.
 
 Exit gate: in a synthetic campaign of at least 500 events, a relevant early clue is retrieved late
 without placing full history in the prompt, while irrelevant/hidden/cross-campaign records remain
@@ -1479,9 +1497,9 @@ Destination milestone:
 1. Monitor the active PG18 connection, application/database errors, startup behavior, connections,
    disk, extension compatibility, and migration behavior while retaining all recovery bundles and
    both PG15 Gandalf copies/roles unchanged.
-2. Complete M4.5 adversarial visibility/injection, restart, stale-index, and side-by-side re-index
-   gates; prepare the owner relevance/repetition/continuity checklist.
-3. Keep all development indexes inactive until their campaign-specific activation evidence passes;
+2. Complete and preserve the prepared M4.5 owner relevance/repetition/continuity checklist; close
+   or rework M4 from that feedback.
+3. Keep the 11 pre-existing development indexes inactive until their own campaign-specific activation evidence passes;
    request separate authorization and a call cap before any live OpenClaw memory evaluation.
 4. Request a later explicit destructive-action decision before disabling old PG15 logins, deleting
    rollback copies, changing unrelated services, or considering PostgreSQL 15 retirement.
@@ -1534,3 +1552,4 @@ Destination milestone:
 | 2026-09-04 | DOC-042 | Completed M4.2, resolved ISSUE-013, selected and pinned local BGE/ONNX embeddings, and advanced M4 to M4.3 | Player-safe source projection, exact hashes/tags/citations, fail-soft post-commit hooks, durable lease/retry/restart, side-by-side activation guards, 64 MiB verified model, 16.613 ms query p95, 115/115 development embeddings across 11 ready inactive indexes, 17 focused and all 143 regression tests pass | Implement filter-before-rank hybrid retrieval and audit; do not activate profiles or send memory to providers before their later gates |
 | 2026-09-04 | DOC-043 | Completed M4.3, resolved ISSUE-014, and advanced M4 to M4.4 with migration `0014`, versioned filter-first hybrid retrieval, bounded cited selections, immutable replayable audits, and quality-gated activation | Both deterministic and pinned local BGE 500-record/20-paraphrase gates passed; local BGE reached 1.00 critical/overall Recall@8, 1.00 MRR, and 168 ms p95. Cross-campaign/future/superseded/wrong-profile/overlap exclusions, 8-item/6,000-character bounds, explicit ONNX cleanup, 21 focused and all 147 regression tests, lint/format/compilation, migration isolation, and dual-database zero drift pass | Implement M4.4 source-cited summaries and fail-soft bounded provider context; keep all 11 development indexes inactive until campaign-specific evidence and keep live OpenClaw separately gated |
 | 2026-09-04 | DOC-044 | Completed M4.4, resolved ISSUE-015, and advanced M4 to M4.5 with migration `0015`, immutable source-complete summaries, stage-use provenance, fail-soft provider integration, and explicit exact-state/untrusted-history separation | A relevant early source reaches both stages with citations; reuse/replacement, malformed-output fallback, append-only enforcement, token/context measurement, and OpenClaw injection boundaries pass. The focused 15-test gate, all 151 normal regressions, and static/integrity/dual-drift checks pass without external calls; the stable-UUID 500-event gate retains its original thresholds | Complete M4.5 adversarial/restart/re-index automation and prepare the owner relevance checklist; keep development profiles inactive and live OpenClaw separately authorized/capped |
+| 2026-09-04 | DOC-045 | Passed M4.5's deterministic technical gate and advanced M4 to Verification with a reproducible owner fixture/checklist | The composed lifecycle covers injection visibility, restart, stale indexing, and atomic different-dimension replacement; the fresh local-BGE 500-document corpus achieved 1.00 critical/overall Recall@8, 1.00 MRR, 116 ms p95, zero adversarial leakage, and identical restart results. All 26 focused M4 and 153 complete-suite tests pass with two opt-in live skips and no external calls; only the isolated gated review campaign was activated | Record and analyse owner relevance/repetition/continuity feedback; close or rework M4, and keep any live OpenClaw supplement separately authorized/capped |

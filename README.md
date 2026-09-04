@@ -46,8 +46,16 @@ maintained in the [living development plan](docs/PROJECT_PLAN.md).
   least privilege, package-impact boundary, and conditional provisioning plan
 - [M4.1 memory foundation](docs/M4_1_MEMORY_FOUNDATION.md) — scoped extension enablement,
   migration `0012`, schema invariants, recovery, and acceptance evidence
+- [M4.2 source indexing](docs/M4_2_SOURCE_INDEXING.md) — player-safe projection, local embeddings,
+  durable recovery, and side-by-side profile lifecycle
+- [M4.3 hybrid retrieval](docs/M4_3_HYBRID_RETRIEVAL.md) — filter-first exact/lexical ranking,
+  bounded cited context, audit replay, and 500-document quality evidence
 - [M4.4 summaries/provider integration](docs/M4_4_SUMMARIES_PROVIDER_INTEGRATION.md) — immutable
   source coverage, bounded untrusted context, prompt separation, and failure-safety evidence
+- [M4.5 technical acceptance](docs/M4_5_TECHNICAL_ACCEPTANCE.md) — composed adversarial, restart,
+  stale-index, re-index, 500-document quality, and owner-fixture evidence
+- [M4.5 owner checklist](docs/player/M4_5_ACCEPTANCE_CHECKLIST.md) — relevance, repetition,
+  attribution, restart continuity, and player-facing result-count review
 - [PostgreSQL 18 migration strategy](docs/POSTGRESQL_18_MIGRATION_STRATEGY.md) — parallel-cluster,
   Gandalf-only migration, acceptance, rollback, and longevity gates
 - [PostgreSQL 18 readiness audit](docs/POSTGRESQL_18_READINESS_AUDIT.md) — verified package impact,
@@ -71,7 +79,7 @@ branch decisions, typed factions, bounded narrative time, and audience-safe worl
 is Done after its corrected deterministic and owner-guided branching, NPC continuity, restart,
 causal replay, and recoverable-error gates passed. Its separately authorized capped live OpenClaw
 supplement also passed both persistent branches after exposing and resolving an exact duplicate
-decision-fact edge case. M4 is now In progress after the staged PostgreSQL 18 migration and M4.1
+decision-fact edge case. M4 is now in Verification after the staged PostgreSQL 18 migration and M4.1
 memory foundation passed. The database foundation and restore rehearsals installed PostgreSQL 18.6 and
 pgvector 0.8.6 without changing PostgreSQL 15 server/client; `18/gandalf` is checksum-enabled and
 loopback-only; PG15 role isolation is hardened; and exact test/development copies passed the full
@@ -84,8 +92,10 @@ all migration, drift, isolation, vector, API, and shared-service gates pass. M4.
 player-safe indexing with the pinned local BGE model. M4.3 now adds versioned exact-vector plus
 lexical retrieval, strict source/context bounds, replayable raw-query-free audits, and a passing
 500-record local-model gate. M4.4 adds immutable source-cited summaries and fail-soft historical
-context to both provider stages while keeping exact state separate. The 11 development indexes
-remain intentionally inactive; M4.5 acceptance is next.
+context to both provider stages while keeping exact state separate. M4.5's deterministic technical
+gate now passes, including a fresh 500-document local-model fixture and atomic different-dimension
+re-indexing. Only its isolated review campaign is active; the 11 earlier development indexes remain
+inactive. Owner relevance and continuity feedback is the remaining M4 gate.
 
 ## Versioned rulesets
 

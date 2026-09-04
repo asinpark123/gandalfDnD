@@ -1,0 +1,849 @@
+{
+  "$defs": {
+    "CombatRuleDefinition": {
+      "additionalProperties": false,
+      "properties": {
+        "beginner_description": {
+          "title": "Beginner Description",
+          "type": "string"
+        },
+        "definition_key": {
+          "pattern": "^srd-5\\.2\\.1:[a-z0-9][a-z0-9._-]+$",
+          "title": "Definition Key",
+          "type": "string"
+        },
+        "id": {
+          "pattern": "^[a-z0-9][a-z0-9_-]{0,79}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "source_ids": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Source Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "definition_key",
+        "name",
+        "beginner_description",
+        "source_ids"
+      ],
+      "title": "CombatRuleDefinition",
+      "type": "object"
+    },
+    "CombatRuleSource": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "pattern": "^[a-z0-9][a-z0-9.-]{2,79}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "printed_pages": {
+          "items": {
+            "type": "integer"
+          },
+          "minItems": 1,
+          "title": "Printed Pages",
+          "type": "array"
+        },
+        "section": {
+          "title": "Section",
+          "type": "string"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        },
+        "url": {
+          "format": "uri",
+          "minLength": 1,
+          "title": "Url",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "section",
+        "printed_pages",
+        "url"
+      ],
+      "title": "CombatRuleSource",
+      "type": "object"
+    },
+    "DiceExpression": {
+      "additionalProperties": false,
+      "properties": {
+        "count": {
+          "maximum": 20,
+          "minimum": 1,
+          "title": "Count",
+          "type": "integer"
+        },
+        "sides": {
+          "maximum": 100,
+          "minimum": 2,
+          "title": "Sides",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "count",
+        "sides"
+      ],
+      "title": "DiceExpression",
+      "type": "object"
+    },
+    "EncounterBudgetDefinition": {
+      "additionalProperties": false,
+      "properties": {
+        "beginner_description": {
+          "title": "Beginner Description",
+          "type": "string"
+        },
+        "character_level": {
+          "const": 1,
+          "title": "Character Level",
+          "type": "integer"
+        },
+        "definition_key": {
+          "pattern": "^srd-5\\.2\\.1:[a-z0-9][a-z0-9._-]+$",
+          "title": "Definition Key",
+          "type": "string"
+        },
+        "high_xp_per_character": {
+          "const": 100,
+          "title": "High Xp Per Character",
+          "type": "integer"
+        },
+        "id": {
+          "pattern": "^[a-z0-9][a-z0-9_-]{0,79}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "low_xp_per_character": {
+          "const": 50,
+          "title": "Low Xp Per Character",
+          "type": "integer"
+        },
+        "moderate_xp_per_character": {
+          "const": 75,
+          "title": "Moderate Xp Per Character",
+          "type": "integer"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "source_ids": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Source Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "definition_key",
+        "name",
+        "beginner_description",
+        "source_ids",
+        "character_level",
+        "low_xp_per_character",
+        "moderate_xp_per_character",
+        "high_xp_per_character"
+      ],
+      "title": "EncounterBudgetDefinition",
+      "type": "object"
+    },
+    "FightingStyleCombatDefinition": {
+      "additionalProperties": false,
+      "properties": {
+        "beginner_description": {
+          "title": "Beginner Description",
+          "type": "string"
+        },
+        "definition_key": {
+          "pattern": "^srd-5\\.2\\.1:[a-z0-9][a-z0-9._-]+$",
+          "title": "Definition Key",
+          "type": "string"
+        },
+        "id": {
+          "pattern": "^[a-z0-9][a-z0-9_-]{0,79}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "mechanic": {
+          "enum": [
+            "ranged_weapon_attack_bonus",
+            "armored_ac_bonus",
+            "two_handed_melee_damage_floor",
+            "light_extra_attack_damage_modifier"
+          ],
+          "title": "Mechanic",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "source_ids": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Source Ids",
+          "type": "array"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "maximum": 3,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Value"
+        }
+      },
+      "required": [
+        "id",
+        "definition_key",
+        "name",
+        "beginner_description",
+        "source_ids",
+        "mechanic"
+      ],
+      "title": "FightingStyleCombatDefinition",
+      "type": "object"
+    },
+    "MonsterAttackDefinition": {
+      "additionalProperties": false,
+      "properties": {
+        "advantage_bonus_damage_dice": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DiceExpression"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "attack_modifier": {
+          "maximum": 30,
+          "minimum": -10,
+          "title": "Attack Modifier",
+          "type": "integer"
+        },
+        "damage_modifier": {
+          "maximum": 30,
+          "minimum": -10,
+          "title": "Damage Modifier",
+          "type": "integer"
+        },
+        "definition_key": {
+          "pattern": "^srd-5\\.2\\.1:[a-z0-9][a-z0-9._-]+$",
+          "title": "Definition Key",
+          "type": "string"
+        },
+        "id": {
+          "pattern": "^[a-z0-9][a-z0-9_]{0,79}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "source_ids": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Source Ids",
+          "type": "array"
+        },
+        "weapon_id": {
+          "title": "Weapon Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "definition_key",
+        "name",
+        "weapon_id",
+        "attack_modifier",
+        "damage_modifier",
+        "source_ids"
+      ],
+      "title": "MonsterAttackDefinition",
+      "type": "object"
+    },
+    "MonsterCombatDefinition": {
+      "additionalProperties": false,
+      "properties": {
+        "armor_class": {
+          "maximum": 40,
+          "minimum": 1,
+          "title": "Armor Class",
+          "type": "integer"
+        },
+        "attacks": {
+          "items": {
+            "$ref": "#/$defs/MonsterAttackDefinition"
+          },
+          "minItems": 1,
+          "title": "Attacks",
+          "type": "array"
+        },
+        "beginner_description": {
+          "title": "Beginner Description",
+          "type": "string"
+        },
+        "challenge_rating": {
+          "title": "Challenge Rating",
+          "type": "string"
+        },
+        "creature_type": {
+          "const": "fey",
+          "title": "Creature Type",
+          "type": "string"
+        },
+        "definition_key": {
+          "pattern": "^srd-5\\.2\\.1:[a-z0-9][a-z0-9._-]+$",
+          "title": "Definition Key",
+          "type": "string"
+        },
+        "experience_points": {
+          "exclusiveMinimum": 0,
+          "title": "Experience Points",
+          "type": "integer"
+        },
+        "hit_points": {
+          "exclusiveMinimum": 0,
+          "maximum": 1000,
+          "title": "Hit Points",
+          "type": "integer"
+        },
+        "id": {
+          "pattern": "^[a-z0-9][a-z0-9_-]{0,79}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "initiative_modifier": {
+          "maximum": 30,
+          "minimum": -10,
+          "title": "Initiative Modifier",
+          "type": "integer"
+        },
+        "initiative_score": {
+          "maximum": 50,
+          "minimum": 1,
+          "title": "Initiative Score",
+          "type": "integer"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "passive_perception": {
+          "maximum": 40,
+          "minimum": 1,
+          "title": "Passive Perception",
+          "type": "integer"
+        },
+        "size": {
+          "const": "small",
+          "title": "Size",
+          "type": "string"
+        },
+        "source_ids": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Source Ids",
+          "type": "array"
+        },
+        "speed_feet": {
+          "maximum": 200,
+          "minimum": 5,
+          "multipleOf": 5,
+          "title": "Speed Feet",
+          "type": "integer"
+        },
+        "supported_bonus_actions": {
+          "items": {
+            "const": "disengage",
+            "type": "string"
+          },
+          "title": "Supported Bonus Actions",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "definition_key",
+        "name",
+        "beginner_description",
+        "source_ids",
+        "size",
+        "creature_type",
+        "armor_class",
+        "hit_points",
+        "initiative_modifier",
+        "initiative_score",
+        "speed_feet",
+        "passive_perception",
+        "challenge_rating",
+        "experience_points",
+        "attacks",
+        "supported_bonus_actions"
+      ],
+      "title": "MonsterCombatDefinition",
+      "type": "object"
+    },
+    "TimedEffectDefinition": {
+      "additionalProperties": false,
+      "properties": {
+        "beginner_description": {
+          "title": "Beginner Description",
+          "type": "string"
+        },
+        "consumed_on_target_attack_roll": {
+          "title": "Consumed On Target Attack Roll",
+          "type": "boolean"
+        },
+        "definition_key": {
+          "pattern": "^srd-5\\.2\\.1:[a-z0-9][a-z0-9._-]+$",
+          "title": "Definition Key",
+          "type": "string"
+        },
+        "expires_on_source_turn_start": {
+          "title": "Expires On Source Turn Start",
+          "type": "boolean"
+        },
+        "id": {
+          "pattern": "^[a-z0-9][a-z0-9_-]{0,79}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "maximum_stacks": {
+          "const": 1,
+          "title": "Maximum Stacks",
+          "type": "integer"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "source_ids": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Source Ids",
+          "type": "array"
+        },
+        "stacking_key": {
+          "title": "Stacking Key",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "definition_key",
+        "name",
+        "beginner_description",
+        "source_ids",
+        "stacking_key",
+        "maximum_stacks",
+        "expires_on_source_turn_start",
+        "consumed_on_target_attack_roll"
+      ],
+      "title": "TimedEffectDefinition",
+      "type": "object"
+    },
+    "WeaponAttackDefinition": {
+      "additionalProperties": false,
+      "properties": {
+        "beginner_description": {
+          "title": "Beginner Description",
+          "type": "string"
+        },
+        "category": {
+          "enum": [
+            "simple",
+            "martial"
+          ],
+          "title": "Category",
+          "type": "string"
+        },
+        "damage_dice": {
+          "$ref": "#/$defs/DiceExpression"
+        },
+        "damage_type": {
+          "enum": [
+            "bludgeoning",
+            "piercing",
+            "slashing"
+          ],
+          "title": "Damage Type",
+          "type": "string"
+        },
+        "definition_key": {
+          "pattern": "^srd-5\\.2\\.1:[a-z0-9][a-z0-9._-]+$",
+          "title": "Definition Key",
+          "type": "string"
+        },
+        "id": {
+          "pattern": "^[a-z0-9][a-z0-9_-]{0,79}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "item_id": {
+          "title": "Item Id",
+          "type": "string"
+        },
+        "long_range_feet": {
+          "anyOf": [
+            {
+              "maximum": 2000,
+              "minimum": 5,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Long Range Feet"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "normal_range_feet": {
+          "anyOf": [
+            {
+              "maximum": 1000,
+              "minimum": 5,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Normal Range Feet"
+        },
+        "player_character_supported": {
+          "title": "Player Character Supported",
+          "type": "boolean"
+        },
+        "printed_mastery_id": {
+          "enum": [
+            "graze",
+            "nick",
+            "sap",
+            "slow",
+            "vex"
+          ],
+          "title": "Printed Mastery Id",
+          "type": "string"
+        },
+        "properties": {
+          "items": {
+            "enum": [
+              "ammunition",
+              "finesse",
+              "heavy",
+              "light",
+              "thrown",
+              "two_handed"
+            ],
+            "type": "string"
+          },
+          "title": "Properties",
+          "type": "array"
+        },
+        "reach_feet": {
+          "maximum": 20,
+          "minimum": 5,
+          "multipleOf": 5,
+          "title": "Reach Feet",
+          "type": "integer"
+        },
+        "source_ids": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Source Ids",
+          "type": "array"
+        },
+        "supported_mastery_id": {
+          "anyOf": [
+            {
+              "enum": [
+                "graze",
+                "sap",
+                "slow"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Supported Mastery Id"
+        },
+        "weapon_kind": {
+          "enum": [
+            "melee",
+            "ranged"
+          ],
+          "title": "Weapon Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "definition_key",
+        "name",
+        "beginner_description",
+        "source_ids",
+        "item_id",
+        "player_character_supported",
+        "category",
+        "weapon_kind",
+        "damage_dice",
+        "damage_type",
+        "properties",
+        "printed_mastery_id",
+        "supported_mastery_id",
+        "reach_feet"
+      ],
+      "title": "WeaponAttackDefinition",
+      "type": "object"
+    },
+    "WeaponMasteryDefinition": {
+      "additionalProperties": false,
+      "properties": {
+        "beginner_description": {
+          "title": "Beginner Description",
+          "type": "string"
+        },
+        "definition_key": {
+          "pattern": "^srd-5\\.2\\.1:[a-z0-9][a-z0-9._-]+$",
+          "title": "Definition Key",
+          "type": "string"
+        },
+        "effect_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Effect Id"
+        },
+        "id": {
+          "pattern": "^[a-z0-9][a-z0-9_-]{0,79}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "mechanic": {
+          "enum": [
+            "miss_ability_damage",
+            "next_attack_disadvantage",
+            "speed_reduction"
+          ],
+          "title": "Mechanic",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "source_ids": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Source Ids",
+          "type": "array"
+        },
+        "speed_reduction_feet": {
+          "anyOf": [
+            {
+              "maximum": 30,
+              "minimum": 5,
+              "multipleOf": 5,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Speed Reduction Feet"
+        }
+      },
+      "required": [
+        "id",
+        "definition_key",
+        "name",
+        "beginner_description",
+        "source_ids",
+        "mechanic"
+      ],
+      "title": "WeaponMasteryDefinition",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "$Schema"
+    },
+    "base_character_state_catalog_id": {
+      "const": "srd-5.2.1-party-state-v1",
+      "title": "Base Character State Catalog Id",
+      "type": "string"
+    },
+    "base_character_state_catalog_sha256": {
+      "const": "aba4fcdbffb037eece88c862c76be988ffc60808b46361cc9a9dda0730fe763b",
+      "title": "Base Character State Catalog Sha256",
+      "type": "string"
+    },
+    "effects": {
+      "items": {
+        "$ref": "#/$defs/TimedEffectDefinition"
+      },
+      "minItems": 1,
+      "title": "Effects",
+      "type": "array"
+    },
+    "encounter_budget": {
+      "$ref": "#/$defs/EncounterBudgetDefinition"
+    },
+    "fighting_styles": {
+      "items": {
+        "$ref": "#/$defs/FightingStyleCombatDefinition"
+      },
+      "minItems": 1,
+      "title": "Fighting Styles",
+      "type": "array"
+    },
+    "id": {
+      "const": "srd-5.2.1-combat-v1",
+      "title": "Id",
+      "type": "string"
+    },
+    "masteries": {
+      "items": {
+        "$ref": "#/$defs/WeaponMasteryDefinition"
+      },
+      "minItems": 1,
+      "title": "Masteries",
+      "type": "array"
+    },
+    "monsters": {
+      "items": {
+        "$ref": "#/$defs/MonsterCombatDefinition"
+      },
+      "minItems": 1,
+      "title": "Monsters",
+      "type": "array"
+    },
+    "resolver_version": {
+      "const": "combat-resolution-1.0.0",
+      "title": "Resolver Version",
+      "type": "string"
+    },
+    "rules": {
+      "items": {
+        "$ref": "#/$defs/CombatRuleDefinition"
+      },
+      "minItems": 1,
+      "title": "Rules",
+      "type": "array"
+    },
+    "ruleset_release_id": {
+      "const": "srd-5.2.1",
+      "title": "Ruleset Release Id",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "1.0.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "sources": {
+      "items": {
+        "$ref": "#/$defs/CombatRuleSource"
+      },
+      "minItems": 1,
+      "title": "Sources",
+      "type": "array"
+    },
+    "weapons": {
+      "items": {
+        "$ref": "#/$defs/WeaponAttackDefinition"
+      },
+      "minItems": 1,
+      "title": "Weapons",
+      "type": "array"
+    }
+  },
+  "required": [
+    "schema_version",
+    "id",
+    "ruleset_release_id",
+    "base_character_state_catalog_id",
+    "base_character_state_catalog_sha256",
+    "resolver_version",
+    "sources",
+    "rules",
+    "weapons",
+    "fighting_styles",
+    "masteries",
+    "effects",
+    "monsters",
+    "encounter_budget"
+  ],
+  "title": "CombatRulesCatalog",
+  "type": "object"
+}

@@ -1,0 +1,412 @@
+{
+  "$schema": "../schema/combat.schema.json",
+  "schema_version": "1.0.0",
+  "id": "srd-5.2.1-combat-v1",
+  "ruleset_release_id": "srd-5.2.1",
+  "base_character_state_catalog_id": "srd-5.2.1-party-state-v1",
+  "base_character_state_catalog_sha256": "aba4fcdbffb037eece88c862c76be988ffc60808b46361cc9a9dda0730fe763b",
+  "resolver_version": "combat-resolution-1.0.0",
+  "sources": [
+    {
+      "id": "srd-combat-core",
+      "title": "System Reference Document 5.2.1",
+      "section": "Playing the Game: Actions, Combat, Damage, and Healing",
+      "printed_pages": [9, 10, 13, 14, 15, 16, 17, 18],
+      "url": "https://www.dndbeyond.com/srd"
+    },
+    {
+      "id": "srd-fighter-combat",
+      "title": "System Reference Document 5.2.1",
+      "section": "Fighter: Level 1 Features",
+      "printed_pages": [47, 48],
+      "url": "https://www.dndbeyond.com/srd"
+    },
+    {
+      "id": "srd-combat-styles",
+      "title": "System Reference Document 5.2.1",
+      "section": "Feats: Fighting Style Feats",
+      "printed_pages": [87, 88],
+      "url": "https://www.dndbeyond.com/srd"
+    },
+    {
+      "id": "srd-combat-weapons",
+      "title": "System Reference Document 5.2.1",
+      "section": "Equipment: Weapon Properties, Mastery Properties, and Weapons",
+      "printed_pages": [89, 90, 91],
+      "url": "https://www.dndbeyond.com/srd"
+    },
+    {
+      "id": "srd-combat-monsters",
+      "title": "System Reference Document 5.2.1",
+      "section": "Monsters: Stat Blocks and Goblins",
+      "printed_pages": [254, 255, 256, 290],
+      "url": "https://www.dndbeyond.com/srd"
+    },
+    {
+      "id": "srd-combat-encounters",
+      "title": "System Reference Document 5.2.1",
+      "section": "Running the Game: Combat Encounters",
+      "printed_pages": [202, 203],
+      "url": "https://www.dndbeyond.com/srd"
+    }
+  ],
+  "rules": [
+    {
+      "id": "initiative",
+      "definition_key": "srd-5.2.1:rule.combat.initiative",
+      "name": "Initiative",
+      "beginner_description": "Roll a Dexterity check for each combatant and order turns from highest total to lowest.",
+      "source_ids": ["srd-combat-core"]
+    },
+    {
+      "id": "attack_roll",
+      "definition_key": "srd-5.2.1:rule.combat.attack_roll",
+      "name": "Attack Roll",
+      "beginner_description": "An attack hits when its d20 total equals or exceeds the target's Armor Class, subject to natural-roll rules.",
+      "source_ids": ["srd-combat-core"]
+    },
+    {
+      "id": "natural_one_twenty",
+      "definition_key": "srd-5.2.1:rule.combat.natural_one_twenty",
+      "name": "Natural 1 and Natural 20",
+      "beginner_description": "A natural 1 always misses and a natural 20 always hits and is a Critical Hit.",
+      "source_ids": ["srd-combat-core"]
+    },
+    {
+      "id": "critical_hit",
+      "definition_key": "srd-5.2.1:rule.combat.critical_hit",
+      "name": "Critical Hit",
+      "beginner_description": "Roll every damage die of the attack twice and add fixed modifiers only once.",
+      "source_ids": ["srd-combat-core"]
+    },
+    {
+      "id": "damage",
+      "definition_key": "srd-5.2.1:rule.combat.damage",
+      "name": "Damage",
+      "beginner_description": "Roll the attack's damage dice, add the applicable modifier, and reduce Hit Points after other defenses.",
+      "source_ids": ["srd-combat-core"]
+    },
+    {
+      "id": "resistance",
+      "definition_key": "srd-5.2.1:rule.combat.resistance",
+      "name": "Resistance",
+      "beginner_description": "Resistance halves matching damage, rounding down, before Vulnerability is applied.",
+      "source_ids": ["srd-combat-core"]
+    },
+    {
+      "id": "vulnerability",
+      "definition_key": "srd-5.2.1:rule.combat.vulnerability",
+      "name": "Vulnerability",
+      "beginner_description": "Vulnerability doubles matching damage after Resistance is applied.",
+      "source_ids": ["srd-combat-core"]
+    },
+    {
+      "id": "healing",
+      "definition_key": "srd-5.2.1:rule.combat.healing",
+      "name": "Healing",
+      "beginner_description": "Healing restores Hit Points up to the creature's Hit Point maximum and does not add Temporary Hit Points.",
+      "source_ids": ["srd-combat-core"]
+    },
+    {
+      "id": "temporary_hit_points",
+      "definition_key": "srd-5.2.1:rule.combat.temporary_hit_points",
+      "name": "Temporary Hit Points",
+      "beginner_description": "Temporary Hit Points absorb damage first, never add together, and are not healing.",
+      "source_ids": ["srd-combat-core"]
+    }
+  ],
+  "weapons": [
+    {
+      "id": "javelin",
+      "definition_key": "srd-5.2.1:weapon.javelin",
+      "name": "Javelin",
+      "beginner_description": "A Simple melee weapon that can be thrown at normal range 30 feet and long range 120 feet.",
+      "source_ids": ["srd-combat-weapons"],
+      "item_id": "javelin",
+      "player_character_supported": true,
+      "category": "simple",
+      "weapon_kind": "melee",
+      "damage_dice": {"count": 1, "sides": 6},
+      "damage_type": "piercing",
+      "properties": ["thrown"],
+      "printed_mastery_id": "slow",
+      "supported_mastery_id": "slow",
+      "reach_feet": 5,
+      "normal_range_feet": 30,
+      "long_range_feet": 120
+    },
+    {
+      "id": "flail",
+      "definition_key": "srd-5.2.1:weapon.flail",
+      "name": "Flail",
+      "beginner_description": "A one-handed Martial melee weapon dealing 1d8 Bludgeoning damage.",
+      "source_ids": ["srd-combat-weapons"],
+      "item_id": "flail",
+      "player_character_supported": true,
+      "category": "martial",
+      "weapon_kind": "melee",
+      "damage_dice": {"count": 1, "sides": 8},
+      "damage_type": "bludgeoning",
+      "properties": [],
+      "printed_mastery_id": "sap",
+      "supported_mastery_id": "sap",
+      "reach_feet": 5
+    },
+    {
+      "id": "greatsword",
+      "definition_key": "srd-5.2.1:weapon.greatsword",
+      "name": "Greatsword",
+      "beginner_description": "A Heavy, Two-Handed Martial melee weapon dealing 2d6 Slashing damage.",
+      "source_ids": ["srd-combat-weapons"],
+      "item_id": "greatsword",
+      "player_character_supported": true,
+      "category": "martial",
+      "weapon_kind": "melee",
+      "damage_dice": {"count": 2, "sides": 6},
+      "damage_type": "slashing",
+      "properties": ["heavy", "two_handed"],
+      "printed_mastery_id": "graze",
+      "supported_mastery_id": "graze",
+      "reach_feet": 5
+    },
+    {
+      "id": "dagger",
+      "definition_key": "srd-5.2.1:weapon.dagger",
+      "name": "Dagger",
+      "beginner_description": "A Simple melee weapon with Finesse, Light, and Thrown properties used by the Goblin Minion.",
+      "source_ids": ["srd-combat-weapons", "srd-combat-monsters"],
+      "item_id": "dagger",
+      "player_character_supported": false,
+      "category": "simple",
+      "weapon_kind": "melee",
+      "damage_dice": {"count": 1, "sides": 4},
+      "damage_type": "piercing",
+      "properties": ["finesse", "light", "thrown"],
+      "printed_mastery_id": "nick",
+      "supported_mastery_id": null,
+      "reach_feet": 5,
+      "normal_range_feet": 20,
+      "long_range_feet": 60
+    },
+    {
+      "id": "scimitar",
+      "definition_key": "srd-5.2.1:weapon.scimitar",
+      "name": "Scimitar",
+      "beginner_description": "A Finesse, Light Martial melee weapon used by the Goblin Warrior.",
+      "source_ids": ["srd-combat-weapons", "srd-combat-monsters"],
+      "item_id": "scimitar",
+      "player_character_supported": false,
+      "category": "martial",
+      "weapon_kind": "melee",
+      "damage_dice": {"count": 1, "sides": 6},
+      "damage_type": "slashing",
+      "properties": ["finesse", "light"],
+      "printed_mastery_id": "nick",
+      "supported_mastery_id": null,
+      "reach_feet": 5
+    },
+    {
+      "id": "shortbow",
+      "definition_key": "srd-5.2.1:weapon.shortbow",
+      "name": "Shortbow",
+      "beginner_description": "A Two-Handed Simple ranged weapon used by the Goblin Warrior.",
+      "source_ids": ["srd-combat-weapons", "srd-combat-monsters"],
+      "item_id": "shortbow",
+      "player_character_supported": false,
+      "category": "simple",
+      "weapon_kind": "ranged",
+      "damage_dice": {"count": 1, "sides": 6},
+      "damage_type": "piercing",
+      "properties": ["ammunition", "two_handed"],
+      "printed_mastery_id": "vex",
+      "supported_mastery_id": null,
+      "reach_feet": 5,
+      "normal_range_feet": 80,
+      "long_range_feet": 320
+    }
+  ],
+  "fighting_styles": [
+    {
+      "id": "archery",
+      "definition_key": "srd-5.2.1:feat.fighting_style.archery",
+      "name": "Archery",
+      "beginner_description": "Add 2 to attack rolls made with Ranged weapons; throwing a Melee weapon does not qualify.",
+      "source_ids": ["srd-combat-styles", "srd-combat-weapons"],
+      "mechanic": "ranged_weapon_attack_bonus",
+      "value": 2
+    },
+    {
+      "id": "defense",
+      "definition_key": "srd-5.2.1:feat.fighting_style.defense",
+      "name": "Defense",
+      "beginner_description": "Add 1 to Armor Class while wearing Light, Medium, or Heavy armor.",
+      "source_ids": ["srd-combat-styles"],
+      "mechanic": "armored_ac_bonus",
+      "value": 1
+    },
+    {
+      "id": "great_weapon_fighting",
+      "definition_key": "srd-5.2.1:feat.fighting_style.great_weapon_fighting",
+      "name": "Great Weapon Fighting",
+      "beginner_description": "Treat a 1 or 2 on eligible two-handed Melee-weapon damage dice as 3.",
+      "source_ids": ["srd-combat-styles"],
+      "mechanic": "two_handed_melee_damage_floor",
+      "value": 3
+    },
+    {
+      "id": "two_weapon_fighting",
+      "definition_key": "srd-5.2.1:feat.fighting_style.two_weapon_fighting",
+      "name": "Two-Weapon Fighting",
+      "beginner_description": "Add the ability modifier to eligible extra Light-weapon attack damage when it is not already added.",
+      "source_ids": ["srd-combat-styles"],
+      "mechanic": "light_extra_attack_damage_modifier",
+      "value": null
+    }
+  ],
+  "masteries": [
+    {
+      "id": "graze",
+      "definition_key": "srd-5.2.1:weapon_mastery.graze",
+      "name": "Graze",
+      "beginner_description": "On a miss, deal damage equal to the ability modifier used for the attack without turning the miss into a hit.",
+      "source_ids": ["srd-combat-weapons"],
+      "mechanic": "miss_ability_damage"
+    },
+    {
+      "id": "sap",
+      "definition_key": "srd-5.2.1:weapon_mastery.sap",
+      "name": "Sap",
+      "beginner_description": "On a hit, impose Disadvantage on the target's next attack roll before the start of the attacker's next turn.",
+      "source_ids": ["srd-combat-weapons"],
+      "mechanic": "next_attack_disadvantage",
+      "effect_id": "sap"
+    },
+    {
+      "id": "slow",
+      "definition_key": "srd-5.2.1:weapon_mastery.slow",
+      "name": "Slow",
+      "beginner_description": "On a damaging hit, reduce the target's Speed by 10 feet until the start of the attacker's next turn; multiple Slow hits do not exceed 10 feet.",
+      "source_ids": ["srd-combat-weapons"],
+      "mechanic": "speed_reduction",
+      "effect_id": "slow",
+      "speed_reduction_feet": 10
+    }
+  ],
+  "effects": [
+    {
+      "id": "sap",
+      "definition_key": "srd-5.2.1:effect.weapon_mastery.sap",
+      "name": "Sapped",
+      "beginner_description": "Applies Disadvantage to the target's next attack roll, then ends, or expires at the start of the source's next turn.",
+      "source_ids": ["srd-combat-weapons"],
+      "stacking_key": "sap",
+      "maximum_stacks": 1,
+      "expires_on_source_turn_start": true,
+      "consumed_on_target_attack_roll": true
+    },
+    {
+      "id": "slow",
+      "definition_key": "srd-5.2.1:effect.weapon_mastery.slow",
+      "name": "Slowed by Weapon Mastery",
+      "beginner_description": "Reduces Speed by 10 feet without stacking and expires at the start of the source's next turn.",
+      "source_ids": ["srd-combat-weapons"],
+      "stacking_key": "weapon_mastery_slow",
+      "maximum_stacks": 1,
+      "expires_on_source_turn_start": true,
+      "consumed_on_target_attack_roll": false
+    },
+    {
+      "id": "dodge",
+      "definition_key": "srd-5.2.1:effect.action.dodge",
+      "name": "Dodging",
+      "beginner_description": "Attack rolls against the dodging creature have Disadvantage until the start of that creature's next turn while it can act and has Speed above 0.",
+      "source_ids": ["srd-combat-core"],
+      "stacking_key": "dodge",
+      "maximum_stacks": 1,
+      "expires_on_source_turn_start": true,
+      "consumed_on_target_attack_roll": false
+    }
+  ],
+  "monsters": [
+    {
+      "id": "goblin_minion",
+      "definition_key": "srd-5.2.1:monster.goblin_minion",
+      "name": "Goblin Minion",
+      "beginner_description": "A fast, lightly protected Goblin with three Daggers and Nimble Escape.",
+      "source_ids": ["srd-combat-monsters"],
+      "size": "small",
+      "creature_type": "fey",
+      "armor_class": 12,
+      "hit_points": 7,
+      "initiative_modifier": 2,
+      "initiative_score": 12,
+      "speed_feet": 30,
+      "passive_perception": 9,
+      "challenge_rating": "1/8",
+      "experience_points": 25,
+      "attacks": [
+        {
+          "id": "dagger",
+          "definition_key": "srd-5.2.1:monster.goblin_minion.attack.dagger",
+          "name": "Dagger",
+          "weapon_id": "dagger",
+          "attack_modifier": 4,
+          "damage_modifier": 2,
+          "source_ids": ["srd-combat-monsters"]
+        }
+      ],
+      "supported_bonus_actions": ["disengage"]
+    },
+    {
+      "id": "goblin_warrior",
+      "definition_key": "srd-5.2.1:monster.goblin_warrior",
+      "name": "Goblin Warrior",
+      "beginner_description": "An armored Goblin with Scimitar, Shortbow, and Nimble Escape whose attacks deal extra damage when made with Advantage.",
+      "source_ids": ["srd-combat-monsters"],
+      "size": "small",
+      "creature_type": "fey",
+      "armor_class": 15,
+      "hit_points": 10,
+      "initiative_modifier": 2,
+      "initiative_score": 12,
+      "speed_feet": 30,
+      "passive_perception": 9,
+      "challenge_rating": "1/4",
+      "experience_points": 50,
+      "attacks": [
+        {
+          "id": "scimitar",
+          "definition_key": "srd-5.2.1:monster.goblin_warrior.attack.scimitar",
+          "name": "Scimitar",
+          "weapon_id": "scimitar",
+          "attack_modifier": 4,
+          "damage_modifier": 2,
+          "advantage_bonus_damage_dice": {"count": 1, "sides": 4},
+          "source_ids": ["srd-combat-monsters"]
+        },
+        {
+          "id": "shortbow",
+          "definition_key": "srd-5.2.1:monster.goblin_warrior.attack.shortbow",
+          "name": "Shortbow",
+          "weapon_id": "shortbow",
+          "attack_modifier": 4,
+          "damage_modifier": 2,
+          "advantage_bonus_damage_dice": {"count": 1, "sides": 4},
+          "source_ids": ["srd-combat-monsters"]
+        }
+      ],
+      "supported_bonus_actions": ["disengage"]
+    }
+  ],
+  "encounter_budget": {
+    "id": "level_one_xp_budget",
+    "definition_key": "srd-5.2.1:rule.encounter_budget.level_one",
+    "name": "Level-One Encounter XP Budget",
+    "beginner_description": "Per-character XP inputs classify encounters as Low, Moderate, or High without guaranteeing an outcome.",
+    "source_ids": ["srd-combat-encounters"],
+    "character_level": 1,
+    "low_xp_per_character": 50,
+    "moderate_xp_per_character": 75,
+    "high_xp_per_character": 100
+  }
+}

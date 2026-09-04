@@ -5,6 +5,7 @@ from pathlib import Path
 
 from app.character_creation import CharacterCreationCatalog
 from app.character_state import CharacterStateCatalog
+from app.combat import CombatRulesCatalog
 from app.resolution import ResolutionRulesCatalog
 from app.rulesets import NormalizedDataIndex, RegistryDocument, RulesetManifest
 
@@ -19,6 +20,7 @@ SCHEMAS = {
     / "rulesets/srd-5.2.1/schema/character-state.schema.json": CharacterStateCatalog,
     REPOSITORY_ROOT
     / "rulesets/srd-5.2.1/schema/check-save-resolution.schema.json": ResolutionRulesCatalog,
+    REPOSITORY_ROOT / "rulesets/srd-5.2.1/schema/combat.schema.json": CombatRulesCatalog,
 }
 
 

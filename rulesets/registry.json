@@ -1,6 +1,6 @@
 {
   "$schema": "./schema/registry.schema.json",
-  "schema_version": "1.2.0",
+  "schema_version": "1.3.0",
   "default_release_id": "srd-5.2.1",
   "releases": [
     {
@@ -31,6 +31,12 @@
           "kind": "rules_resolution",
           "path": "data/check-save-resolution-v1.json",
           "sha256": "09d2b0a963a5fba5c28a0a018b8114bcad25dd65717efcf5e1b791cc4f751448"
+        },
+        {
+          "id": "srd-5.2.1-combat-v1",
+          "kind": "combat",
+          "path": "data/combat-v1.json",
+          "sha256": "423b80e84593738d4cadc5537278d208a51fbebacbb074a2d79531f0ee023204"
         }
       ]
     }

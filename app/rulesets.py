@@ -17,6 +17,7 @@ from pydantic import AnyHttpUrl, BaseModel, ConfigDict, Field, field_validator, 
 
 from app.character_creation import CharacterCreationCatalog
 from app.character_state import CharacterStateCatalog
+from app.combat import CombatRulesCatalog
 from app.config import get_settings
 from app.resolution import ResolutionRulesCatalog
 
@@ -46,7 +47,9 @@ class StrictModel(BaseModel):
 
 class DataCatalogEntry(StrictModel):
     id: str = Field(pattern=r"^[a-z0-9][a-z0-9.-]{2,99}$")
-    kind: Literal["foundation", "character_creation", "character_state", "rules_resolution"]
+    kind: Literal[
+        "foundation", "character_creation", "character_state", "rules_resolution", "combat"
+    ]
     path: str = Field(pattern=r"^[a-z0-9][a-z0-9./_-]*\.json$")
     sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
 
@@ -69,7 +72,7 @@ class RegistryEntry(StrictModel):
 
 class RegistryDocument(StrictModel):
     schema_uri: str | None = Field(default=None, alias="$schema")
-    schema_version: Literal["1.2.0"]
+    schema_version: Literal["1.3.0"]
     default_release_id: str
     releases: list[RegistryEntry] = Field(min_length=1)
 
@@ -152,7 +155,9 @@ class NormalizedDataIndex(StrictModel):
 @dataclass(frozen=True)
 class LoadedRulesetDataCatalog:
     id: str
-    kind: Literal["foundation", "character_creation", "character_state", "rules_resolution"]
+    kind: Literal[
+        "foundation", "character_creation", "character_state", "rules_resolution", "combat"
+    ]
     path: Path
     sha256: Sha256
     document: (
@@ -160,6 +165,7 @@ class LoadedRulesetDataCatalog:
         | CharacterCreationCatalog
         | CharacterStateCatalog
         | ResolutionRulesCatalog
+        | CombatRulesCatalog
     )
 
 
@@ -175,6 +181,13 @@ class LoadedResolutionCatalogs:
     character_creation: CharacterCreationCatalog
     character_state: CharacterStateCatalog
     resolution: LoadedRulesetDataCatalog
+
+
+@dataclass(frozen=True)
+class LoadedCombatCatalogs:
+    character_creation: CharacterCreationCatalog
+    character_state: CharacterStateCatalog
+    combat: LoadedRulesetDataCatalog
 
 
 @dataclass(frozen=True)
@@ -264,13 +277,16 @@ class RulesetRegistry:
                             | CharacterCreationCatalog
                             | CharacterStateCatalog
                             | ResolutionRulesCatalog
+                            | CombatRulesCatalog
                         ) = NormalizedDataIndex.model_validate(catalog_data)
                     elif catalog_entry.kind == "character_creation":
                         catalog_document = CharacterCreationCatalog.model_validate(catalog_data)
                     elif catalog_entry.kind == "character_state":
                         catalog_document = CharacterStateCatalog.model_validate(catalog_data)
-                    else:
+                    elif catalog_entry.kind == "rules_resolution":
                         catalog_document = ResolutionRulesCatalog.model_validate(catalog_data)
+                    else:
+                        catalog_document = CombatRulesCatalog.model_validate(catalog_data)
                 except ValueError as exc:
                     raise RulesetRegistryError(
                         f"Invalid ruleset data catalog: {catalog_path}"
@@ -316,6 +332,19 @@ class RulesetRegistry:
                 if base.sha256 != catalog.document.base_character_state_catalog_sha256:
                     raise RulesetRegistryError(
                         f"Resolution catalog {catalog.id!r} base checksum does not match"
+                    )
+
+            for catalog in data_catalogs.values():
+                if not isinstance(catalog.document, CombatRulesCatalog):
+                    continue
+                base = data_catalogs.get(catalog.document.base_character_state_catalog_id)
+                if base is None or not isinstance(base.document, CharacterStateCatalog):
+                    raise RulesetRegistryError(
+                        f"Combat catalog {catalog.id!r} has no character-state base"
+                    )
+                if base.sha256 != catalog.document.base_character_state_catalog_sha256:
+                    raise RulesetRegistryError(
+                        f"Combat catalog {catalog.id!r} base checksum does not match"
                     )
 
             releases[entry.id] = LoadedRulesetRelease(
@@ -407,6 +436,33 @@ class RulesetRegistry:
             character_creation=character_catalogs.character_creation,
             character_state=character_catalogs.character_state,
             resolution=resolution,
+        )
+
+    def get_combat_catalogs(
+        self,
+        release_id: str,
+        character_state_catalog_id: str,
+        combat_catalog_id: str,
+    ) -> LoadedCombatCatalogs:
+        character_catalogs = self.get_character_catalogs(release_id, character_state_catalog_id)
+        if character_catalogs.character_state is None:
+            raise UnknownRulesetDataCatalogError(
+                f"Data catalog {character_state_catalog_id!r} does not support character state"
+            )
+        combat = self.get_data_catalog(release_id, combat_catalog_id)
+        if not isinstance(combat.document, CombatRulesCatalog):
+            raise UnknownRulesetDataCatalogError(
+                f"Data catalog {combat_catalog_id!r} does not support combat"
+            )
+        if combat.document.base_character_state_catalog_id != character_state_catalog_id:
+            raise UnknownRulesetDataCatalogError(
+                f"Combat catalog {combat_catalog_id!r} does not extend "
+                f"{character_state_catalog_id!r}"
+            )
+        return LoadedCombatCatalogs(
+            character_creation=character_catalogs.character_creation,
+            character_state=character_catalogs.character_state,
+            combat=combat,
         )
 
 

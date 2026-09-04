@@ -58,6 +58,19 @@ def test_checked_in_registry_and_generated_schemas_are_valid() -> None:
     assert resolution_catalog.sha256 == (
         "09d2b0a963a5fba5c28a0a018b8114bcad25dd65717efcf5e1b791cc4f751448"
     )
+    combat_catalog = registry.get_data_catalog("srd-5.2.1", "srd-5.2.1-combat-v1")
+    assert combat_catalog.kind == "combat"
+    assert combat_catalog.sha256 == (
+        "423b80e84593738d4cadc5537278d208a51fbebacbb074a2d79531f0ee023204"
+    )
+    composed = registry.get_combat_catalogs(
+        "srd-5.2.1",
+        "srd-5.2.1-party-state-v1",
+        "srd-5.2.1-combat-v1",
+    )
+    assert composed.character_creation.id == "srd-5.2.1-character-creation-v1"
+    assert composed.character_state.id == "srd-5.2.1-party-state-v1"
+    assert composed.combat.id == "srd-5.2.1-combat-v1"
 
     result = subprocess.run(
         [sys.executable, "-m", "scripts.export_ruleset_schemas", "--check"],

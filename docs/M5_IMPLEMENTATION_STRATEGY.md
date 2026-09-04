@@ -1,6 +1,6 @@
 # M5 Core Deterministic Combat Implementation Strategy
 
-- **Status:** Ready at M5.1
+- **Status:** In progress at M5.2; M5.0-M5.1 Done
 - **Prepared:** 2026-09-05
 - **Depends on:** M1 character/rules foundation (Done), M3 persistent world (Done)
 - **Uses:** M2 resumable provider boundary and M4 bounded memory, only after deterministic combat
@@ -253,7 +253,8 @@ Any unresolved interpretation discovered during implementation must be added to
 
 ### M5.1 - Combat catalog and pure kernel
 
-**Status:** Ready.
+**Status:** Done on 2026-09-05. Evidence:
+[`M5_1_COMBAT_CATALOG_KERNEL.md`](M5_1_COMBAT_CATALOG_KERNEL.md).
 
 - add immutable `srd-5.2.1-combat-v1` definitions and generated schema;
 - extend catalog composition without mutating existing campaign/character catalog identities;
@@ -265,6 +266,8 @@ Any unresolved interpretation discovered during implementation must be added to
 Exit: catalog/hash/schema/source checks pass and every pure resolver fixture replays identically.
 
 ### M5.2 - Encounter persistence and initiative
+
+**Status:** Ready.
 
 - add guarded encounter/combatant/initiative/command/event schema;
 - instantiate finalized party members and supported monster definitions with stable IDs;
@@ -396,9 +399,10 @@ content during M5.
 
 ## 14. Immediate implementation order
 
-1. Define and validate `srd-5.2.1-combat-v1` and its source map.
-2. Implement fixed-dice pure initiative/attack/damage/healing/effect functions.
-3. Add M5.1 golden tests, schema export, catalog hash/integrity checks, and traceability updates.
-4. Run focused and complete regression gates and inspect the diff.
-5. Commit/push M5.1 as one coherent milestone, then begin the separately migrated M5.2 persistence
-   slice.
+1. Design the guarded M5.2 schema against the state/persistence boundaries in section 6.
+2. Add encounter, combatant, initiative, idempotent command, roll, and event persistence through one
+   Alembic migration with downgrade refusal after material combat records exist.
+3. Add create/read/start/tie/replay APIs with exact campaign, scene, party, catalog, and revision
+   validation before dice.
+4. Prove campaign isolation, exact ties, retries, rollback, reconnect, and migration safety.
+5. Record M5.2 evidence and update this strategy before advancing to M5.3.

@@ -184,3 +184,8 @@ class LocalFastEmbedProvider:
         if len(values) != 1:
             raise InvalidEmbeddingError("local embedding provider returned the wrong batch size")
         return validate_embedding(values[0].tolist(), dimensions=self.dimensions)
+
+    def close(self) -> None:
+        """Release the native ONNX session before interpreter teardown."""
+
+        self._model = None

@@ -1224,6 +1224,11 @@ class MemoryDocument(TimestampMixin, Base):
             "event_sequence_end",
             postgresql_where=text("status = 'active'"),
         ),
+        Index(
+            "ix_memory_documents_content_english",
+            text("to_tsvector('english'::regconfig, content)"),
+            postgresql_using="gin",
+        ),
     )
 
 

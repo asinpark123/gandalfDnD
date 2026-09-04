@@ -78,8 +78,11 @@ healthy. The rollback-protected active cutover then passed: Gandalf development 
 PostgreSQL 18, its startup policy is automatic, and the post-cutover isolated suite passed again.
 PostgreSQL 15 rollback copies/roles remain intact. M4.1 then enabled pgvector 0.8.6 only in the two
 PostgreSQL 18 Gandalf databases and added the guarded `0012_memory_foundation` schema; 135 tests and
-all migration, drift, isolation, vector, API, and shared-service gates pass. M4 is In progress at
-M4.2's local embedding-model selection boundary; memory is not connected to gameplay yet.
+all migration, drift, isolation, vector, API, and shared-service gates pass. M4.2 added durable,
+player-safe indexing with the pinned local BGE model. M4.3 now adds versioned exact-vector plus
+lexical retrieval, strict source/context bounds, replayable raw-query-free audits, and a passing
+500-record local-model gate. All 147 tests pass; the 11 development indexes remain intentionally
+inactive, and memory is not connected to gameplay or providers yet. M4.4 is next.
 
 ## Versioned rulesets
 

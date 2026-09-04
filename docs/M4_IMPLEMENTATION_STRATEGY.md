@@ -1,6 +1,6 @@
 # M4 Long-Term Memory and Retrieval Implementation Strategy
 
-- **Status:** In progress; M4.2 passed and M4.3 hybrid retrieval/audit is next
+- **Status:** In progress; M4.3 passed and M4.4 summaries/provider integration is next
 - **Prepared:** 2026-09-04
 - **Depends on:** M3 persistent world (Done, including live OpenClaw supplement)
 - **Infrastructure audit:** [`M4_POSTGRES_PGVECTOR_AUDIT.md`](M4_POSTGRES_PGVECTOR_AUDIT.md)
@@ -13,6 +13,7 @@
 - **PG18 cutover evidence:** [`POSTGRESQL_18_CUTOVER_EXECUTION.md`](POSTGRESQL_18_CUTOVER_EXECUTION.md)
 - **M4.1 evidence:** [`M4_1_MEMORY_FOUNDATION.md`](M4_1_MEMORY_FOUNDATION.md)
 - **M4.2 evidence:** [`M4_2_SOURCE_INDEXING.md`](M4_2_SOURCE_INDEXING.md)
+- **M4.3 evidence:** [`M4_3_HYBRID_RETRIEVAL.md`](M4_3_HYBRID_RETRIEVAL.md)
 - **Owner input required next:** None before the M4.5 relevance/continuity acceptance gate
 - **Owner checkpoint:** M4.5 retrieval/re-index acceptance, followed by any separately authorized
   live narrative-coherence supplement
@@ -323,6 +324,15 @@ record-shape defect. Memory remains outside provider context.
 Exit: golden queries meet quality/security/latency thresholds on a 500-event corpus, and retrieval
 audits replay to the same candidate policy for a fixed profile.
 
+Result (2026-09-04): Passed. Migration `0014_memory_retrieval` adds the English GIN lexical index;
+the internal `hybrid-rrf-entity-recency-1.0.0` service filters campaign, audience, active status,
+profile, current hash, and indexed event cutoff before exact cosine and lexical ranking. It enforces
+8-item/6,000-character and overlapping-source bounds, stores raw-query-free immutable score audits,
+and replays IDs and scores. Both deterministic and pinned local BGE gates passed a 500-record,
+20-paraphrase corpus with five early critical clues. Local BGE achieved 1.00 critical/overall
+Recall@8, 1.00 MRR, and 168 ms p95. Development's 11 ready indexes remain inactive; no memory
+reaches a provider.
+
 ### M4.4 — Summaries and provider integration
 
 - create source-cited player-visible summary windows with immutable prompt/provider versions;
@@ -401,7 +411,8 @@ Owner input is required at three bounded points:
    services remained excluded.
 2. **M4.2 model selection (resolved):** BGE small English v1.5 clearly met the recorded size,
    license, input, maintenance, CPU, and no-cost bounds. The exact model/runtime revision and every
-   artifact checksum are committed; corpus retrieval quality remains an M4.3/M4.5 gate.
+   artifact checksum are committed. The M4.3 synthetic corpus gate passed; M4.5 retains the broader
+   adversarial/re-index and owner relevance gate.
 3. **M4.5 acceptance:** test whether recalled details feel relevant, correctly attributed,
    non-repetitive, and consistent after restart. Live OpenClaw testing remains a separate opt-in
    decision with a maximum-call budget.
@@ -416,6 +427,6 @@ quality/latency results, defects, workarounds, and next actions. M4 moves to Rew
 shows hidden/cross-campaign retrieval, uncited memory, mixed profiles, canonical-state substitution,
 unbounded context, or a completed turn depending on index availability.
 
-M4.2 is complete. Proceed with M4.3 hybrid retrieval and immutable audit work. Paid/network
-embeddings, provider-memory context, PostgreSQL 15 retirement, and unrelated-service changes remain
-outside the current authority boundary.
+M4.3 is complete. Proceed with M4.4 source-cited summaries and bounded provider integration. Paid
+or network embeddings, live OpenClaw evaluation, PostgreSQL 15 retirement, and unrelated-service
+changes remain outside the current authority boundary.

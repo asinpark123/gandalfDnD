@@ -1,4 +1,4 @@
-# M5 Basic Deterministic Combat Implementation Strategy
+# M5 Core Deterministic Combat Implementation Strategy
 
 - **Status:** Ready at M5.1
 - **Prepared:** 2026-09-05
@@ -17,7 +17,8 @@ start an encounter, roll initiative, act with each party member in order, move, 
 Wind, suffer damage and defeat, finish the encounter, reconnect, and replay the exact mechanics.
 
 M5 does not attempt to implement all D&D combat. It proves the shared Party Commander engine that
-later classes, spells, companions, and lone-hero balancing must reuse.
+later classes, spells, companions, and lone-hero balancing must reuse. Broader combat rules and
+content are tracked explicitly in M10 rather than being left as an unnamed backlog.
 
 ```text
 player or bounded GM intent
@@ -103,6 +104,10 @@ Temporary HP and Resistance/Vulnerability are kernel and health-boundary coverag
 initial supported Fighter/Goblin content does not invent a feature that grants either one.
 
 ### 4.2 Deferred from M5
+
+Most broader combat and rules content below has a durable destination in M10. Companion and
+lone-hero behavior follows the separately recorded party-mode sequence, while presentation remains
+in M7.
 
 - spellcasting, concentration, magical damage, areas of effect, and spell-slot rules;
 - classes/species/backgrounds or equipment routes not already supported by M1;

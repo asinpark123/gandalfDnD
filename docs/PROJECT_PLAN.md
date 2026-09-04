@@ -350,11 +350,12 @@ Use these values consistently:
 | M3 | Persistent world model | Done | NPCs, quests, scenes, clues, time, decisions, and visibility |
 | M4 | Long-term memory and retrieval | Done | Coherent recall without full history in context |
 | PG18 | PostgreSQL 18 migration | Done/Monitoring | Active cutover passed; PG15 rollback retained during stabilization |
-| M5 | Basic deterministic combat | Ready at M5.1 | Reproducible initiative, actions, attacks, health, and encounter outcomes |
+| M5 | Core deterministic combat | Ready at M5.1 | Reproducible initiative, actions, attacks, health, and encounter outcomes |
 | M6 | Spoiler-safe Guide | Proposed | Beginner help with enforceable knowledge boundaries |
 | M7 | Play interface and campaign administration | Proposed | Usable play, recap, correction, and export workflows |
 | M8 | Deployment and operations | Deferred | Dedicated reliable service with backups and monitoring |
 | M9 | Optional Clawvis integration | Deferred | Clawvis acts only as an API client/interface |
+| M10 | Advanced combat and rules expansion | Proposed | Source-cited vertical slices extending the proven M5 engine |
 
 ### 9.1 Party-mode delivery sequence
 
@@ -1258,7 +1259,7 @@ excluded. Critical Recall@8 must be 100%, overall Recall@8 at least 0.90, mean r
 least 0.65, memory context at most 8 items/6,000 characters, and re-index activation atomic. Exact
 search database p95 must remain at most 250 ms on the audited VM.
 
-### M5 — Basic deterministic combat
+### M5 — Core deterministic combat
 
 - **Status:** Ready at M5.1; M5.0 strategy complete 2026-09-05
 - **Depends on:** M1 and M3
@@ -1345,6 +1346,31 @@ Clawvis may become a player-facing client for Gandalf's public API. This is dist
 optional use of an OpenClaw gateway as a model-provider transport. Gandalf must remain independently
 playable and deployable if the client integration is offline, and neither relationship grants an
 agent direct database or unvalidated state-mutation access.
+
+### M10 — Advanced combat and rules expansion
+
+- **Status:** Proposed
+- **Depends on:** M5 Done and its owner/balance evidence
+
+Expand the same deterministic combat engine through finite, source-cited vertical slices rather
+than a one-time attempt to implement every D&D rule. Candidate slices include spellcasting and
+concentration, broader actions and conditions, cover and terrain, flight and unusual movement,
+additional classes/equipment/masteries, richer monsters, and multi-stage encounter mechanics.
+
+At M5 closure, use observed play needs, unresolved rules risks, and player priorities to select and
+scope M10.1. Every accepted slice must define its supported content and exclusions, immutable rules
+data, deterministic fixtures, persistence/restart behavior, provider boundaries, player guidance,
+and compatibility with campaigns pinned to earlier rules catalogs. New content must not fork the
+M5 state, dice, command, event, or replay foundations.
+
+M10 does not silently alter Party Commander balance and does not absorb companion or Lone Hero
+automation. Those modes reuse the expanded engine but retain their separately recorded sequencing
+and any visible, versioned house-rule decisions.
+
+Exit gate for each M10.x slice: its complete player-facing rules interaction passes source,
+catalog/schema, legality, replay, restart, isolation, provider, regression, and owner-acceptance
+gates before another slice becomes the supported default. The overall M10 scope is locked only
+after M5 evidence identifies the first finite expansion set.
 
 ## 11. Issue and technical-debt register
 
@@ -1630,3 +1656,4 @@ Destination milestone:
 | 2026-09-05 | DOC-048 | Preserved the successful targeted owner retest, closed ISSUE-016 and M4, and promoted useful supporting-memory presentation into M7 acceptance | The owner confirmed unchanged primary accuracy, clearer noise suppression, unambiguous same-name NPCs, and acceptance of primary-plus-qualifying-support; all M4 technical/security/restart/quality gates already pass | Decide on the optional capped live OpenClaw supplement, then prepare the narrow M5 deterministic-combat strategy |
 | 2026-09-05 | DOC-049 | Completed the authorized capped live M4 OpenClaw supplement and preserved its credential-free evidence and opt-in harness | Six of eight allowed calls verified cited two-Mira recall, inert hostile quoted prose, DM-only exclusion, provider-stage audits, reconnection, and unchanged HP/inventory/location; two harness-only diagnostics caused no application change, Clawvis remained unchanged, and the tunnel was closed | Prepare M5's narrow deterministic Party Commander combat strategy and continue measuring provider context growth |
 | 2026-09-05 | DOC-050 | Completed M5.0 and advanced M5 to Ready at M5.1 with a source-mapped deterministic Party Commander combat strategy | The pinned SRD supports a narrow existing-Fighter/Goblin slice covering initiative, grid/action economy, Greatsword/Flail/Javelin attacks, Graze/Sap/Slow, Second Wind, health/0 HP, replay, strict XP-budget measurements, provider isolation, and owner gates; spells, broad content, companions, and lone-hero changes remain deferred | Implement repository-only M5.1 combat catalog and pure fixed-dice kernel, then run integrity and regression gates |
+| 2026-09-05 | DOC-051 | Renamed M5 to Core Deterministic Combat and added M10 Advanced Combat and Rules Expansion | “Basic” described the intentionally narrow first implementation but could imply a separate official D&D combat tier or a permanent product limit; M10 now preserves broader spells, conditions, terrain, movement, class/equipment, monster, and encounter work as finite source-cited vertical slices | Complete M5, use its owner/balance evidence to scope M10.1, and keep companion/Lone Hero modes and M7 presentation in their existing destinations |

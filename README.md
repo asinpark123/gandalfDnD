@@ -114,7 +114,8 @@ exact state unchanged across a database reconnection.
 M5 is Ready at M5.1. Its deliberately narrow first combat slice uses the existing level-one
 Human/Soldier/Fighters, Greatsword/Flail/Javelin mechanics, Graze/Sap/Slow, Second Wind, and SRD
 Goblin Minion/Warrior opponents. Spells, broad content, companion autonomy, and lone-hero balancing
-remain deferred until deterministic Party Commander combat passes.
+remain deferred until deterministic Party Commander combat passes. M5 is the core combat
+foundation, not a permanent simplified mode; broader combat rules and content are tracked in M10.
 
 ## Versioned rulesets
 

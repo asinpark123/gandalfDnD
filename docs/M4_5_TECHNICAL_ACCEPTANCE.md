@@ -12,9 +12,10 @@
 
 M4.5's deterministic technical gate passed. The composed lifecycle test now proves that memory
 retrieval remains safe when a player-visible source contains instruction-like hostile prose, a
-DM-only event contains a stronger prompt injection, the database pool restarts, the active index is
-temporarily stale, and a replacement profile with a different vector dimension builds beside it.
-The old profile stays usable until the replacement is complete, early activation is rejected, and
+DM-only event contains a stronger prompt injection, the application recreates its database
+connection pool, the active index is temporarily stale, and a replacement profile with a different
+vector dimension builds beside it. The old profile stays usable until the replacement is complete,
+early activation is rejected, and
 the final switch retires the old profile and activates the replacement atomically.
 
 The pinned local BGE model also passed a fresh, isolated development fixture containing 500 active
@@ -41,6 +42,15 @@ after restart. Those judgments deliberately remain separate from vector metrics.
 | Context bound | at most 8 items / 6,000 source characters | enforced; owner samples used 3 items and 291–346 characters |
 | Restart stability | identical selected IDs | passed for all 5 owner queries |
 
+Plain-language definitions:
+
+- **Recall@8:** whether the expected memory appeared anywhere in the first eight results.
+- **Mean reciprocal rank (MRR):** how close expected memories were to rank 1; `1.00` means every
+  expected memory was first.
+- **p95 latency:** 95% of measured retrievals completed within this time; a small number may take
+  longer.
+- **Active corpus:** the number of eligible memories actually available to the tested index.
+
 The owner fixture's quality activation used the same
 `hybrid-rrf-entity-recency-1.0.0` policy and fixed thresholds as M4.3. No threshold was weakened.
 The recorded retrieval timer includes local query embedding, database ranking, bounded selection,
@@ -52,12 +62,12 @@ portion below the 250 ms database requirement.
 | Risk | Evidence | Result |
 | --- | --- | --- |
 | DM-only prompt injection | Hidden event has no memory document and never appears in selected text | Passed |
-| Player-visible instruction-like prose | Remains quoted, cited `untrusted_historical_prose`; OpenClaw boundary test keeps it separate from exact state | Passed |
+| Player-visible instruction-like prose | Remains quoted, cited `untrusted_historical_prose`; the offline OpenClaw-adapter boundary test keeps it separate from exact state | Passed |
 | Cross-campaign near-copy | Candidate is excluded in SQL before ranking | Passed |
 | Superseded source | Old same-name-Mira record is excluded; its active correction remains eligible | Passed |
 | Repeated names / different identities | Two `Mira` NPCs have distinct UUIDs and canonical tags | Passed |
 | Future/stale source | A newly projected source stays unavailable until the active profile catches up | Passed |
-| Restart | Stored retrieval IDs and component scores replay identically after engine disposal | Passed |
+| Application reconnection | Stored retrieval IDs and component scores replay identically after engine disposal and fresh connections | Passed |
 | Failed embedding batch | Existing retry test preserves the completed turn and records a safe category | Passed |
 | Expired lease | Existing recovery test completes once without a duplicate embedding | Passed |
 | Early replacement activation | Rejected while any replacement job is incomplete | Passed |
@@ -101,10 +111,11 @@ The fixture is additive and refuses non-development databases. It creates no pai
 call. Re-running it with `--confirm-create` deliberately creates another isolated pair rather than
 changing or deleting prior campaigns.
 
-## Reviewable first-ranked memories
+## Owner-review samples
 
-Each natural-language owner query returned the intended early clue at rank 1 after roughly 500 later
-records:
+The complete questions and all rank 1–3 results are reproduced in the standalone
+[`player/M4_5_ACCEPTANCE_CHECKLIST.md`](player/M4_5_ACCEPTANCE_CHECKLIST.md). Each natural-language
+query returned its intended early clue at rank 1 after roughly 500 later records:
 
 1. Mira's promise: meet at the Old Tower with the brass astrolabe after three moon bells.
 2. Blue door: hum the Rainward Verse beneath the Lantern Archive.
@@ -112,8 +123,8 @@ records:
 4. Peaceful passage: place a silver feather on the Glasswood north cairn.
 5. Western gate: ring the Old Tower bell twice before admitting the rescued patrol.
 
-Ranks 2–3 were generally recent quest/location chronicles. Whether those supporting results are
-usefully contextual or feel like repetitive noise is intentionally left for the owner review.
+Ranks 2–3 were generally recent quest/location chronicles. Their exact text is included in the
+checklist so the owner can decide whether it is useful context or repetitive noise.
 
 ## Remaining gate
 

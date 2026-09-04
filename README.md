@@ -56,6 +56,8 @@ maintained in the [living development plan](docs/PROJECT_PLAN.md).
   stale-index, re-index, 500-document quality, and owner-fixture evidence
 - [M4.5 owner checklist](docs/player/M4_5_ACCEPTANCE_CHECKLIST.md) — relevance, repetition,
   attribution, restart continuity, and player-facing result-count review
+- [M4.5 targeted retest](docs/player/M4_5_TARGETED_RETEST.md) — focused verification of
+  supporting-result suppression and two distinct NPCs named Mira
 - [PostgreSQL 18 migration strategy](docs/POSTGRESQL_18_MIGRATION_STRATEGY.md) — parallel-cluster,
   Gandalf-only migration, acceptance, rollback, and longevity gates
 - [PostgreSQL 18 readiness audit](docs/POSTGRESQL_18_READINESS_AUDIT.md) — verified package impact,
@@ -93,9 +95,10 @@ player-safe indexing with the pinned local BGE model. M4.3 now adds versioned ex
 lexical retrieval, strict source/context bounds, replayable raw-query-free audits, and a passing
 500-record local-model gate. M4.4 adds immutable source-cited summaries and fail-soft historical
 context to both provider stages while keeping exact state separate. M4.5's deterministic technical
-gate now passes, including a fresh 500-document local-model fixture and atomic different-dimension
-re-indexing. Only its isolated review campaign is active; the 11 earlier development indexes remain
-inactive. Owner relevance and continuity feedback is the remaining M4 gate.
+gate passes, including a 500-document local-model fixture and atomic different-dimension re-indexing.
+Its first owner review accepted every primary memory but triggered a focused correction for generic
+supporting results and inconclusive same-name evidence. Versioned policy `1.1.0` and fixture v2 now
+pass the revised automated/local gate; the concise targeted owner retest is the remaining M4 gate.
 
 ## Versioned rulesets
 

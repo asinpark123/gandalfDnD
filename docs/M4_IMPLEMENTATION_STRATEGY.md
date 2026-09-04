@@ -1,6 +1,6 @@
 # M4 Long-Term Memory and Retrieval Implementation Strategy
 
-- **Status:** Verification; M4.5 technical gate passed and owner relevance review is next
+- **Status:** Rework verification; ISSUE-016 correction passed and targeted owner review is next
 - **Prepared:** 2026-09-04
 - **Depends on:** M3 persistent world (Done, including live OpenClaw supplement)
 - **Infrastructure audit:** [`M4_POSTGRES_PGVECTOR_AUDIT.md`](M4_POSTGRES_PGVECTOR_AUDIT.md)
@@ -18,7 +18,7 @@
   [`M4_4_SUMMARIES_PROVIDER_INTEGRATION.md`](M4_4_SUMMARIES_PROVIDER_INTEGRATION.md)
 - **M4.5 technical evidence:**
   [`M4_5_TECHNICAL_ACCEPTANCE.md`](M4_5_TECHNICAL_ACCEPTANCE.md)
-- **Owner input required next:** Complete the prepared M4.5 relevance/continuity checklist
+- **Owner input required next:** Complete the focused M4.5 relevance retest
 - **Owner checkpoint:** M4.5 relevance/repetition/continuity acceptance, followed by any separately authorized
   live narrative-coherence supplement
 
@@ -383,6 +383,16 @@ review campaign is the only active development memory index; the 11 pre-existing
 ready and inactive. See [`M4_5_TECHNICAL_ACCEPTANCE.md`](M4_5_TECHNICAL_ACCEPTANCE.md) and
 [`player/M4_5_ACCEPTANCE_CHECKLIST.md`](player/M4_5_ACCEPTANCE_CHECKLIST.md).
 
+Rework result (2026-09-05): the owner accepted all primary memories but rejected repetitive,
+unclear supporting chronicles and could not assess the second same-name NPC from fixture v1.
+Ranking policy `hybrid-rrf-entity-recency-1.1.0` makes requested count a ceiling and requires every
+supporting candidate to clear relative-score, query-term-evidence, and content-diversity checks.
+Existing `1.0.0` audits remain replayable. Fixture v2 adds a separate active Glasswood interaction
+for the second Mira. Its pinned-local-BGE run kept 1.00 critical/overall Recall@8 and 1.00 MRR,
+passed at 214 ms p95, excluded all unsafe sources, and returned six identical relevant-only results
+after reconnection. Complete
+[`player/M4_5_TARGETED_RETEST.md`](player/M4_5_TARGETED_RETEST.md) before closing M4.
+
 ## 10. Synthetic corpus and acceptance metrics
 
 The acceptance fixture must contain at least 500 chronologically ordered player-visible events or
@@ -454,6 +464,7 @@ quality/latency results, defects, workarounds, and next actions. M4 moves to Rew
 shows hidden/cross-campaign retrieval, uncited memory, mixed profiles, canonical-state substitution,
 unbounded context, or a completed turn depending on index availability.
 
-M4.5's technical gate is complete. Preserve and analyse the owner relevance/repetition/continuity
-review, then close or rework M4 from that evidence. Paid or network embeddings, live OpenClaw evaluation, PostgreSQL 15
-retirement, and unrelated-service changes remain outside the current authority boundary.
+M4.5's corrected technical gate is complete. Preserve and analyse the focused owner retest, then
+close or rework M4 from that evidence. Paid or network embeddings, live OpenClaw evaluation,
+PostgreSQL 15 retirement, and unrelated-service changes remain outside the current authority
+boundary.

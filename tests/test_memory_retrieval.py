@@ -27,11 +27,14 @@ from app.models import (
     MemoryRetrievalItem,
 )
 from app.retrieval import (
+    LEGACY_RANKING_POLICY,
     GoldenMemoryQuery,
     MemoryQuery,
     MemoryRetrievalError,
     MemoryRetrievalReplayError,
     MemoryRetrievalUnavailableError,
+    _Candidate,
+    _select_bounded,
     evaluate_and_activate_memory_index,
     replay_memory_retrieval,
     retrieve_memories,
@@ -130,6 +133,70 @@ def _add_embedding(
             embedding=provider.embed_documents([document.content])[0],
         )
     )
+
+
+def _selection_candidate(content: str, *, sequence: int, score: float) -> _Candidate:
+    document = MemoryDocument(
+        id=uuid.uuid5(uuid.NAMESPACE_URL, f"selection:{sequence}:{content}"),
+        campaign_id=uuid.uuid4(),
+        source_kind="event",
+        source_event_id=uuid.uuid4(),
+        source_version=1,
+        chunk_index=0,
+        event_sequence_start=sequence,
+        event_sequence_end=sequence,
+        visibility="player",
+        content=content,
+        content_sha256=hashlib.sha256(content.encode()).hexdigest(),
+        chunker_version="selection-test-1.0.0",
+        status="active",
+    )
+    return _Candidate(document=document, combined_score=score)
+
+
+def test_support_selection_treats_count_as_ceiling_and_keeps_only_useful_context() -> None:
+    primary = _selection_candidate(
+        "Mira promised to carry the brass astrolabe to the Old Tower after three moon bells.",
+        sequence=1,
+        score=0.80,
+    )
+    useful = _selection_candidate(
+        "The Old Tower custodian opens the moonward stair after the third moon bell for safe "
+        "astrolabe delivery.",
+        sequence=2,
+        score=0.50,
+    )
+    generic = _selection_candidate(
+        "Chronicle 279: patrol 13 advanced quest Recover the Astrolabe after branch Mira.",
+        sequence=3,
+        score=0.60,
+    )
+    duplicate = _selection_candidate(
+        "Mira promised to carry the brass astrolabe to the Old Tower after three moon bells!",
+        sequence=4,
+        score=0.70,
+    )
+    ranked = [primary, duplicate, generic, useful]
+    query = "What did Mira promise about the brass astrolabe and Old Tower?"
+
+    selected, truncated = _select_bounded(
+        ranked,
+        query_text=query,
+        requested_count=4,
+        context_budget_chars=6000,
+    )
+
+    assert [candidate for candidate, _ in selected] == [primary, useful]
+    assert truncated is True
+
+    legacy, _ = _select_bounded(
+        ranked,
+        query_text=query,
+        requested_count=4,
+        context_budget_chars=6000,
+        ranking_policy=LEGACY_RANKING_POLICY,
+    )
+    assert [candidate for candidate, _ in legacy] == ranked
 
 
 def test_hybrid_retrieval_filters_before_rank_bounds_context_and_replays(
@@ -303,9 +370,15 @@ def test_hybrid_retrieval_filters_before_rank_bounds_context_and_replays(
     with get_session_factory()() as session:
         audit = session.get(MemoryRetrieval, result.retrieval_id)
         assert audit is not None
-        assert audit.ranking_policy == "hybrid-rrf-entity-recency-1.0.0"
+        assert audit.ranking_policy == "hybrid-rrf-entity-recency-1.1.0"
         assert audit.filters["max_event_sequence"] == base_sequence + 5
         assert audit.filters["audience"] == "player"
+        assert audit.filters["support_selection"] == {
+            "policy": "relative-score-query-evidence-diversity-1.0.0",
+            "minimum_relative_score": 0.5,
+            "minimum_query_term_coverage": 0.4,
+            "maximum_content_similarity": 0.8,
+        }
         assert query not in json.dumps(audit.filters)
         items = list(
             session.scalars(
@@ -326,6 +399,61 @@ def test_hybrid_retrieval_filters_before_rank_bounds_context_and_replays(
         )
     with pytest.raises(MemoryRetrievalReplayError, match="provider does not match"):
         replay_memory_retrieval(result.retrieval_id, query_text=query, provider=wrong_provider)
+
+    # Existing immutable 1.0.0 audits remain replayable after support selection becomes 1.1.0.
+    single = retrieve_memories(
+        MemoryQuery(
+            campaign_id=campaign_id,
+            query_text=query,
+            requested_count=1,
+            max_event_sequence=base_sequence + 5,
+            location_id=location_id,
+        ),
+        provider=provider,
+    )
+    with get_session_factory()() as session:
+        source_audit = session.get(MemoryRetrieval, single.retrieval_id)
+        source_item = session.scalar(
+            select(MemoryRetrievalItem).where(
+                MemoryRetrievalItem.retrieval_id == single.retrieval_id
+            )
+        )
+        assert source_audit is not None and source_item is not None
+        legacy_audit = MemoryRetrieval(
+            campaign_id=source_audit.campaign_id,
+            profile_id=source_audit.profile_id,
+            ranking_policy=LEGACY_RANKING_POLICY,
+            query_source_sha256=source_audit.query_source_sha256,
+            filters=source_audit.filters,
+            requested_count=source_audit.requested_count,
+            returned_count=source_audit.returned_count,
+            latency_ms=source_audit.latency_ms,
+            context_budget_chars=source_audit.context_budget_chars,
+            truncated=source_audit.truncated,
+            status="succeeded",
+        )
+        session.add(legacy_audit)
+        session.flush()
+        session.add(
+            MemoryRetrievalItem(
+                retrieval_id=legacy_audit.id,
+                document_id=source_item.document_id,
+                rank=source_item.rank,
+                semantic_score=source_item.semantic_score,
+                lexical_score=source_item.lexical_score,
+                recency_score=source_item.recency_score,
+                entity_score=source_item.entity_score,
+                combined_score=source_item.combined_score,
+                selected_chars=source_item.selected_chars,
+            )
+        )
+        session.commit()
+        legacy_retrieval_id = legacy_audit.id
+
+    legacy_replay = replay_memory_retrieval(
+        legacy_retrieval_id, query_text=query, provider=provider
+    )
+    assert legacy_replay.matched is True
 
 
 def test_retrieval_failure_is_safely_audited_without_raw_query(client: TestClient) -> None:

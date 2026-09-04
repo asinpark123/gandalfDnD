@@ -1,8 +1,10 @@
 # M4.5 Memory Relevance and Continuity Owner Checklist
 
-- **Milestone state:** Verification — technical gate passed, owner review pending
+- **Milestone state:** Completed initial review — focused rework required
 - **External model use:** None
-- **Required technical work:** None; the fixture and automated tests have already passed
+- **Outcome:** Primary recall passed; unclear generic supporting results and an inconclusive
+  same-name sample triggered ISSUE-016
+- **Next review:** [`M4_5_TARGETED_RETEST.md`](M4_5_TARGETED_RETEST.md)
 - **Your task:** Read the five retrieval samples below and answer the five review questions
 - **Estimated review time:** 10–15 minutes
 - **Results form:** [`../testM4_5_ACCEPTANCE_CHECKLIST_RESULTS.md`](../testM4_5_ACCEPTANCE_CHECKLIST_RESULTS.md)

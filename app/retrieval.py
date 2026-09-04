@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import math
+import re
 import time
 import uuid
 from dataclasses import dataclass, field
@@ -25,7 +26,9 @@ from app.models import (
     MemoryRetrievalItem,
 )
 
-RANKING_POLICY = "hybrid-rrf-entity-recency-1.0.0"
+LEGACY_RANKING_POLICY = "hybrid-rrf-entity-recency-1.0.0"
+RANKING_POLICY = "hybrid-rrf-entity-recency-1.1.0"
+SUPPORTED_RANKING_POLICIES = frozenset({LEGACY_RANKING_POLICY, RANKING_POLICY})
 MAX_MEMORY_ITEMS = 8
 MAX_MEMORY_CONTEXT_CHARS = 6000
 CANDIDATE_LIMIT = 50
@@ -33,6 +36,61 @@ RRF_SEMANTIC_WEIGHT = 0.65
 RRF_LEXICAL_WEIGHT = 0.25
 ENTITY_WEIGHT = 0.07
 RECENCY_WEIGHT = 0.03
+SUPPORT_MIN_RELATIVE_SCORE = 0.50
+SUPPORT_MIN_QUERY_TERM_COVERAGE = 0.40
+SUPPORT_MAX_CONTENT_SIMILARITY = 0.80
+_TERM_PATTERN = re.compile(r"[a-z0-9]+")
+_QUERY_STOPWORDS = frozenset(
+    {
+        "a",
+        "about",
+        "after",
+        "all",
+        "an",
+        "and",
+        "are",
+        "as",
+        "at",
+        "be",
+        "before",
+        "by",
+        "can",
+        "did",
+        "do",
+        "does",
+        "for",
+        "from",
+        "had",
+        "has",
+        "have",
+        "how",
+        "i",
+        "in",
+        "is",
+        "it",
+        "of",
+        "on",
+        "or",
+        "our",
+        "the",
+        "their",
+        "them",
+        "there",
+        "they",
+        "this",
+        "to",
+        "was",
+        "were",
+        "what",
+        "when",
+        "where",
+        "which",
+        "who",
+        "why",
+        "will",
+        "with",
+    }
+)
 
 
 class MemoryRetrievalError(RuntimeError):
@@ -278,6 +336,12 @@ def _filters_payload(
         "max_event_sequence": max_event_sequence,
         "candidate_limit": CANDIDATE_LIMIT,
         "source_range_deduplication": "overlap",
+        "support_selection": {
+            "policy": "relative-score-query-evidence-diversity-1.0.0",
+            "minimum_relative_score": SUPPORT_MIN_RELATIVE_SCORE,
+            "minimum_query_term_coverage": SUPPORT_MIN_QUERY_TERM_COVERAGE,
+            "maximum_content_similarity": SUPPORT_MAX_CONTENT_SIMILARITY,
+        },
         "entities": entities,
     }
 
@@ -360,14 +424,75 @@ def _ranges_overlap(left: MemoryDocument, right: MemoryDocument) -> bool:
     )
 
 
+def _significant_terms(value: str) -> frozenset[str]:
+    return frozenset(
+        token
+        for token in _TERM_PATTERN.findall(value.casefold())
+        if len(token) > 2 and token not in _QUERY_STOPWORDS
+    )
+
+
+def _query_term_coverage(candidate: _Candidate, query_terms: frozenset[str]) -> float:
+    if not query_terms:
+        return 0.0
+    document_terms = _significant_terms(candidate.document.content)
+    return len(query_terms.intersection(document_terms)) / len(query_terms)
+
+
+def _content_similarity(left: _Candidate, right: _Candidate) -> float:
+    left_terms = _significant_terms(left.document.content)
+    right_terms = _significant_terms(right.document.content)
+    union = left_terms.union(right_terms)
+    if not union:
+        return 1.0
+    return len(left_terms.intersection(right_terms)) / len(union)
+
+
+def _support_is_useful(
+    candidate: _Candidate,
+    *,
+    primary: _Candidate,
+    query_terms: frozenset[str],
+    selected: list[tuple[_Candidate, str]],
+) -> bool:
+    if candidate.combined_score < primary.combined_score * SUPPORT_MIN_RELATIVE_SCORE:
+        return False
+    if _query_term_coverage(candidate, query_terms) < SUPPORT_MIN_QUERY_TERM_COVERAGE:
+        return False
+    return all(
+        _content_similarity(candidate, prior) < SUPPORT_MAX_CONTENT_SIMILARITY
+        for prior, _ in selected
+    )
+
+
 def _select_bounded(
-    ranked: list[_Candidate], *, requested_count: int, context_budget_chars: int
+    ranked: list[_Candidate],
+    *,
+    query_text: str,
+    requested_count: int,
+    context_budget_chars: int,
+    ranking_policy: str = RANKING_POLICY,
 ) -> tuple[list[tuple[_Candidate, str]], bool]:
     selected: list[tuple[_Candidate, str]] = []
     used = 0
     skipped = False
+    query_terms = _significant_terms(query_text)
+    primary = ranked[0] if ranked else None
     for candidate in ranked:
         if any(_ranges_overlap(candidate.document, prior.document) for prior, _ in selected):
+            skipped = True
+            continue
+        if (
+            ranking_policy != LEGACY_RANKING_POLICY
+            and primary is not None
+            and candidate is not primary
+            and not _support_is_useful(
+                candidate,
+                primary=primary,
+                query_terms=query_terms,
+                selected=selected,
+            )
+        ):
             skipped = True
             continue
         if len(selected) >= requested_count or used >= context_budget_chars:
@@ -523,6 +648,7 @@ def retrieve_memories(
         )
         selected, truncated = _select_bounded(
             ranked,
+            query_text=query_text,
             requested_count=request.requested_count,
             context_budget_chars=request.context_budget_chars,
         )
@@ -567,7 +693,7 @@ def replay_memory_retrieval(
         audit = session.get(MemoryRetrieval, retrieval_id)
         if audit is None or audit.status != "succeeded":
             raise MemoryRetrievalReplayError("successful retrieval audit not found")
-        if audit.ranking_policy != RANKING_POLICY:
+        if audit.ranking_policy not in SUPPORTED_RANKING_POLICIES:
             raise MemoryRetrievalReplayError("ranking policy is not supported for replay")
         if audit.query_source_sha256 != _query_sha256(canonical):
             raise MemoryRetrievalReplayError("query text does not match the audit hash")
@@ -608,8 +734,10 @@ def replay_memory_retrieval(
     )
     selected, _ = _select_bounded(
         ranked,
+        query_text=canonical,
         requested_count=request.requested_count,
         context_budget_chars=request.context_budget_chars,
+        ranking_policy=audit.ranking_policy,
     )
     replayed = tuple(candidate.document.id for candidate, _ in selected)
     score_match = len(expected_items) == len(selected) and all(

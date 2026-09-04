@@ -7,6 +7,11 @@
 - **Strategy:** [`M4_IMPLEMENTATION_STRATEGY.md`](M4_IMPLEMENTATION_STRATEGY.md)
 - **Indexing foundation:** [`M4_2_SOURCE_INDEXING.md`](M4_2_SOURCE_INDEXING.md)
 
+> Historical policy note: M4.5 owner evidence later introduced
+> `hybrid-rrf-entity-recency-1.1.0`, which preserves this rank fusion but gates supporting results
+> after rank 1. Existing `1.0.0` audits remain replayable. See
+> [`M4_5_TECHNICAL_ACCEPTANCE.md`](M4_5_TECHNICAL_ACCEPTANCE.md).
+
 ## 1. Outcome
 
 M4.3 passed. GandalfDnD now has an internal hybrid retrieval service that combines exact pgvector

@@ -268,7 +268,13 @@ def test_owner_relevance_fixture_passes_without_external_provider_calls() -> Non
     assert result["quality_gate"]["latency_p95_ms"] <= 250
     assert all(result["security_checks"].values())
     assert result["restart_results_identical"] is True
-    assert len(result["review_queries"]) == 5
+    assert len(result["review_queries"]) == 6
     assert all(review["expected_source_recalled"] for review in result["review_queries"])
-    assert all(len(review["items"]) <= 3 for review in result["review_queries"])
+    assert all(1 <= len(review["items"]) <= 3 for review in result["review_queries"])
+    assert any(len(review["items"]) > 1 for review in result["review_queries"])
+    assert all(
+        not item["excerpt"].startswith("Chronicle")
+        for review in result["review_queries"]
+        for item in review["items"]
+    )
     assert all(review["context_chars"] <= 6000 for review in result["review_queries"])

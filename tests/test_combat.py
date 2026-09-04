@@ -11,9 +11,13 @@ from app.combat import (
     apply_healing,
     apply_temporary_hit_points,
     resolve_character_attack,
+    resolve_damage_at_zero,
+    resolve_death_save,
     resolve_effect_boundary,
     resolve_initiative,
     resolve_monster_attack,
+    resolve_second_wind,
+    resolve_stabilization,
 )
 from app.rulesets import RulesetRegistry
 
@@ -34,6 +38,41 @@ def combat_catalog() -> CombatRulesCatalog:
     )
     assert isinstance(loaded.combat.document, CombatRulesCatalog)
     return loaded.combat.document
+
+
+@pytest.fixture(scope="module")
+def combat_health_catalog() -> CombatRulesCatalog:
+    registry = RulesetRegistry.load(REPOSITORY_ROOT / "rulesets/registry.json")
+    loaded = registry.get_combat_catalogs(
+        "srd-5.2.1",
+        "srd-5.2.1-party-state-v1",
+        "srd-5.2.1-combat-v2",
+    )
+    assert isinstance(loaded.combat.document, CombatRulesCatalog)
+    return loaded.combat.document
+
+
+def test_combat_v2_adds_exact_health_rule_slice_without_mutating_v1(
+    combat_health_catalog: CombatRulesCatalog,
+) -> None:
+    assert combat_health_catalog.schema_version == "1.1.0"
+    assert combat_health_catalog.resolver_version == "combat-resolution-1.1.0"
+    assert {
+        "second_wind",
+        "unconscious_at_zero",
+        "death_saves",
+        "stabilization",
+        "damage_at_zero",
+        "instant_death",
+        "melee_knockout",
+        "encounter_outcomes",
+    } <= {rule.id for rule in combat_health_catalog.rules}
+    assert (
+        RulesetRegistry.load(REPOSITORY_ROOT / "rulesets/registry.json")
+        .get_data_catalog("srd-5.2.1", "srd-5.2.1-combat-v1")
+        .sha256
+        == "423b80e84593738d4cadc5537278d208a51fbebacbb074a2d79531f0ee023204"
+    )
 
 
 def test_combat_catalog_is_strict_source_cited_and_complete(
@@ -104,7 +143,7 @@ def test_combat_catalog_is_strict_source_cited_and_complete(
             lambda raw: raw["monsters"][0]["attacks"][0].update(source_ids=["missing"]),
             "unknown source",
         ),
-        (lambda raw: raw["rules"].pop(), "core rule slice"),
+        (lambda raw: raw["rules"].pop(), "complete versioned rule slice"),
         (lambda raw: raw["weapons"].pop(), "supported weapons"),
         (
             lambda raw: raw["weapons"][0].update(player_character_supported=False),
@@ -705,9 +744,93 @@ def test_timed_effects_consume_expire_and_ignore_unrelated_boundaries(
     )
     assert unrelated.active_after
     assert unrelated.end_reason == "active"
+
+
+def test_second_wind_caps_healing_and_spends_exactly_one_use(
+    combat_health_catalog: CombatRulesCatalog,
+) -> None:
+    resolved = resolve_second_wind(
+        combat_health_catalog,
+        current_hit_points=8,
+        maximum_hit_points=12,
+        temporary_hit_points=3,
+        uses_remaining=2,
+        die_face=7,
+        fighter_level=1,
+    )
+    assert resolved.uses_after == 1
+    assert resolved.healing.hit_points_restored == 4
+    assert resolved.healing.hit_points_after == 12
+    assert resolved.healing.temporary_hit_points_unchanged == 3
+    with pytest.raises(CombatError, match="remaining use"):
+        resolve_second_wind(
+            combat_health_catalog,
+            current_hit_points=8,
+            maximum_hit_points=12,
+            temporary_hit_points=0,
+            uses_remaining=0,
+            die_face=7,
+            fighter_level=1,
+        )
+
+
+@pytest.mark.parametrize(
+    ("die_face", "successes", "failures", "outcome", "state", "hp"),
+    [
+        (1, 0, 1, "dead", "dead", 0),
+        (9, 0, 2, "dead", "dead", 0),
+        (10, 2, 0, "stable", "stable", 0),
+        (20, 1, 1, "revived", "active", 1),
+    ],
+)
+def test_death_save_natural_and_three_result_boundaries(
+    combat_health_catalog: CombatRulesCatalog,
+    die_face: int,
+    successes: int,
+    failures: int,
+    outcome: str,
+    state: str,
+    hp: int,
+) -> None:
+    result = resolve_death_save(
+        combat_health_catalog,
+        die_face=die_face,
+        successes=successes,
+        failures=failures,
+    )
+    assert (result.outcome, result.state_after, result.hit_points_after) == (
+        outcome,
+        state,
+        hp,
+    )
+
+
+def test_stabilization_and_damage_at_zero_are_exact(
+    combat_health_catalog: CombatRulesCatalog,
+) -> None:
+    assert resolve_stabilization(combat_health_catalog, die_face=9, medicine_modifier=1).success
+    assert not resolve_stabilization(combat_health_catalog, die_face=8, medicine_modifier=1).success
+    critical = resolve_damage_at_zero(
+        combat_health_catalog,
+        damage=3,
+        maximum_hit_points=12,
+        failures=0,
+        critical=True,
+    )
+    assert critical.failures_after == 2
+    assert critical.state_after == "unconscious"
+    massive = resolve_damage_at_zero(
+        combat_health_catalog,
+        damage=12,
+        maximum_hit_points=12,
+        failures=0,
+        critical=False,
+    )
+    assert massive.instant_death
+    assert massive.state_after == "dead"
     with pytest.raises(CombatError, match="unsupported timed effect"):
         resolve_effect_boundary(
-            combat_catalog,
+            combat_health_catalog,
             effect_id="unknown",
             source_combatant_id="fighter-a",
             target_combatant_id="goblin-a",
@@ -716,7 +839,7 @@ def test_timed_effects_consume_expire_and_ignore_unrelated_boundaries(
         )
     with pytest.raises(CombatError, match="unsupported effect boundary"):
         resolve_effect_boundary(
-            combat_catalog,
+            combat_health_catalog,
             effect_id="slow",
             source_combatant_id="fighter-a",
             target_combatant_id="goblin-a",

@@ -1,6 +1,6 @@
 # M5 Core Deterministic Combat Implementation Strategy
 
-- **Status:** In progress at M5.5; M5.0-M5.4 Done
+- **Status:** M5.5 implemented; required owner acceptance pending before M5.6
 - **Prepared:** 2026-09-05
 - **Depends on:** M1 character/rules foundation (Done), M3 persistent world (Done)
 - **Uses:** M2 resumable provider boundary and M4 bounded memory, only after deterministic combat
@@ -311,6 +311,10 @@ mastery fixtures reproduce exact rolls and post-state after restart.
 
 ### M5.5 - Health, recovery, defeat, and encounter completion
 
+**Status:** Implemented on 2026-09-05; owner acceptance pending. Evidence:
+[`M5_5_HEALTH_RECOVERY_OUTCOMES.md`](M5_5_HEALTH_RECOVERY_OUTCOMES.md). Owner gate:
+[`player/M5_5_ACCEPTANCE_CHECKLIST.md`](player/M5_5_ACCEPTANCE_CHECKLIST.md).
+
 - integrate Temporary HP, Resistance/Vulnerability order, Second Wind, 0 HP, death saves,
   stabilization, damage while down, massive damage, explicit knockout, and monster death;
 - complete encounter outcomes for defeat, surrender, flight, or agreement;
@@ -406,12 +410,10 @@ content during M5.
 
 ## 14. Immediate implementation order
 
-1. Add immutable health/resource/outcome resolutions for Second Wind, Temporary HP, death saves,
-   stabilization/first aid, damage while down, massive damage, and explicit melee knockout.
-2. Complete encounter outcomes for victory, defeat, surrender, flight, and agreement while keeping
-   character HP/resources and combat projections atomic.
-3. Preserve recoverable thrown-item state and emit one bounded, cited material encounter summary
-   rather than indexing every atomic combat event.
-4. Add deterministic favorable, Low, Moderate, High, defeat, recovery, knockout, death-save, and
-   reconnect fixtures plus strict-SRD measurements that do not claim guaranteed balance.
-5. Record M5.5 evidence and prepare the required owner backend playtest before provider integration.
+1. Run the required M5.5 owner checklist and analyze all expected-result and subjective answers.
+2. Fix and retest any M5.5 defect; otherwise accept M5.5 and close its gate.
+3. Implement M5.6 typed combat intent and post-resolution narration without granting a provider
+   numeric or state authority.
+4. Add bounded relevant M4 context, one material encounter memory, complete deterministic scenario
+   replay, usage measurements, and final owner acceptance.
+5. Request separate authorization before any capped live OpenClaw M5 evaluation.

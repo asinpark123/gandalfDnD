@@ -743,7 +743,7 @@ class CombatEncounterCreate(BaseModel):
     command_id: uuid.UUID
     expected_world_revision: int = Field(ge=0)
     scene_id: uuid.UUID
-    combat_catalog_id: str = Field(default="srd-5.2.1-combat-v1", max_length=100)
+    combat_catalog_id: str = Field(default="srd-5.2.1-combat-v2", max_length=100)
     grid_width: int = Field(default=12, ge=2, le=40)
     grid_height: int = Field(default=12, ge=2, le=40)
     party: list[PartyCombatantCreate] = Field(min_length=2, max_length=4)
@@ -805,6 +805,9 @@ class CombatantRead(BaseModel):
     initiative_order: int | None
     reaction_available: bool
     state: str
+    death_save_successes: int
+    death_save_failures: int
+    second_wind_remaining: int | None
     revision: int
 
 
@@ -895,6 +898,14 @@ class CombatEncounterRead(BaseModel):
     grid_height: int
     round_number: int
     active_turn_index: int | None
+    difficulty_label: Literal["favorable", "low", "moderate", "high"]
+    enemy_xp: int
+    low_xp_budget: int
+    moderate_xp_budget: int
+    high_xp_budget: int
+    outcome: Literal["victory", "defeat", "surrender", "flight", "agreement"] | None
+    outcome_summary: dict | None
+    completed_at: datetime | None
     combatants: list[CombatantRead]
     initiative_ties: list[CombatInitiativeTieRead]
     current_turn: CombatTurnRead | None = None
@@ -970,6 +981,7 @@ class CombatAttackCreate(BaseModel):
     attack_definition_id: StableKey
     attack_mode: Literal["melee", "ranged"]
     use_mastery: bool = True
+    knock_out: bool = False
     reaction_window_id: uuid.UUID | None = None
 
     @model_validator(mode="after")
@@ -1011,6 +1023,85 @@ class CombatAttackReplayRead(BaseModel):
     resolution_id: uuid.UUID
     equivalent: bool
     encounter_id: uuid.UUID
+
+
+class CombatHealthCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    command_id: uuid.UUID
+    actor_combatant_id: uuid.UUID
+    target_combatant_id: uuid.UUID
+    expected_encounter_revision: int = Field(ge=0)
+    expected_actor_revision: int = Field(ge=0)
+    expected_target_revision: int = Field(ge=0)
+    action: Literal["second_wind", "death_save", "stabilize"]
+
+    @model_validator(mode="after")
+    def validate_action_fields(self) -> "CombatHealthCreate":
+        if self.action in {"second_wind", "death_save"} and (
+            self.actor_combatant_id != self.target_combatant_id
+        ):
+            raise ValueError(f"{self.action} must target the acting combatant")
+        return self
+
+
+class CombatHealthResolutionRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    encounter_id: uuid.UUID
+    actor_combatant_id: uuid.UUID
+    target_combatant_id: uuid.UUID
+    resolution_type: str
+    ruleset_release_id: str
+    combat_catalog_id: str
+    resolver_version: str
+    actor_revision_before: int
+    actor_revision_after: int
+    target_revision_before: int
+    target_revision_after: int
+    command: CombatHealthCreate
+    resolution_input: dict
+    result: dict
+    rng_version: str
+    created_at: datetime
+
+
+class CombatHealthExecutionRead(BaseModel):
+    resolution: CombatHealthResolutionRead
+    encounter: CombatEncounterRead
+
+
+class CombatOutcomeCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    command_id: uuid.UUID
+    expected_encounter_revision: int = Field(ge=0)
+    outcome: Literal["surrender", "flight", "agreement"]
+    affected_side: Literal["party", "enemy"] | None = None
+
+    @model_validator(mode="after")
+    def validate_affected_side(self) -> "CombatOutcomeCreate":
+        if self.outcome == "agreement" and self.affected_side is not None:
+            raise ValueError("Agreement applies to both sides and has no affected side")
+        if self.outcome != "agreement" and self.affected_side is None:
+            raise ValueError("Surrender and flight require an affected side")
+        return self
+
+
+class CombatOutcomeResolutionRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    encounter_id: uuid.UUID
+    outcome: Literal["victory", "defeat", "surrender", "flight", "agreement"]
+    summary: dict
+    created_at: datetime
+
+
+class CombatOutcomeExecutionRead(BaseModel):
+    resolution: CombatOutcomeResolutionRead
+    encounter: CombatEncounterRead
 
 
 class HealthRead(BaseModel):

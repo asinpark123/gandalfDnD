@@ -162,14 +162,14 @@ class EncounterBudgetDefinition(CombatRuleDefinition):
 
 class CombatRulesCatalog(StrictModel):
     schema_uri: str | None = Field(default=None, alias="$schema")
-    schema_version: Literal["1.0.0"]
-    id: Literal["srd-5.2.1-combat-v1"]
+    schema_version: Literal["1.0.0", "1.1.0"]
+    id: Literal["srd-5.2.1-combat-v1", "srd-5.2.1-combat-v2"]
     ruleset_release_id: Literal["srd-5.2.1"]
     base_character_state_catalog_id: Literal["srd-5.2.1-party-state-v1"]
     base_character_state_catalog_sha256: Literal[
         "aba4fcdbffb037eece88c862c76be988ffc60808b46361cc9a9dda0730fe763b"
     ]
-    resolver_version: Literal["combat-resolution-1.0.0"]
+    resolver_version: Literal["combat-resolution-1.0.0", "combat-resolution-1.1.0"]
     sources: list[CombatRuleSource] = Field(min_length=1)
     rules: list[CombatRuleDefinition] = Field(min_length=1)
     weapons: list[WeaponAttackDefinition] = Field(min_length=1)
@@ -209,7 +209,7 @@ class CombatRulesCatalog(StrictModel):
                 if not set(attack.source_ids) <= known_sources:
                     raise ValueError(f"monster attack {attack.id} cites an unknown source")
 
-        expected_rules = {
+        foundation_rules = {
             "attack_roll",
             "critical_hit",
             "damage",
@@ -220,8 +220,33 @@ class CombatRulesCatalog(StrictModel):
             "temporary_hit_points",
             "vulnerability",
         }
+        health_rules = {
+            "damage_at_zero",
+            "death_saves",
+            "encounter_outcomes",
+            "instant_death",
+            "melee_knockout",
+            "second_wind",
+            "stabilization",
+            "unconscious_at_zero",
+        }
+        expected_identity = {
+            "srd-5.2.1-combat-v1": (
+                "1.0.0",
+                "combat-resolution-1.0.0",
+                foundation_rules,
+            ),
+            "srd-5.2.1-combat-v2": (
+                "1.1.0",
+                "combat-resolution-1.1.0",
+                foundation_rules | health_rules,
+            ),
+        }
+        expected_schema, expected_resolver, expected_rules = expected_identity[self.id]
+        if self.schema_version != expected_schema or self.resolver_version != expected_resolver:
+            raise ValueError("combat catalog identity, schema, and resolver versions must agree")
         if {rule.id for rule in self.rules} != expected_rules:
-            raise ValueError("combat catalog must define the complete M5.1 core rule slice")
+            raise ValueError("combat catalog must define its complete versioned rule slice")
         if {weapon.id for weapon in self.weapons} != {
             "dagger",
             "flail",
@@ -379,6 +404,57 @@ class ResolvedEffectBoundary(StrictModel):
     applies_to_event: bool
     active_after: bool
     end_reason: EffectEndReason
+    rule_definition_keys: list[str] = Field(min_length=1)
+    source_ids: list[str] = Field(min_length=1)
+    catalog_id: str
+    resolver_version: str
+
+
+class ResolvedSecondWind(StrictModel):
+    die_face: int = Field(ge=1, le=10)
+    fighter_level: int = Field(ge=1, le=20)
+    healing: ResolvedHealing
+    uses_before: int = Field(ge=1, le=2)
+    uses_after: int = Field(ge=0, le=1)
+    rule_definition_keys: list[str] = Field(min_length=1)
+    source_ids: list[str] = Field(min_length=1)
+    catalog_id: str
+    resolver_version: str
+
+
+class ResolvedDeathSave(StrictModel):
+    die_face: int = Field(ge=1, le=20)
+    outcome: Literal["success", "failure", "critical_failure", "revived", "stable", "dead"]
+    successes_before: int = Field(ge=0, le=2)
+    failures_before: int = Field(ge=0, le=2)
+    successes_after: int = Field(ge=0, le=3)
+    failures_after: int = Field(ge=0, le=3)
+    hit_points_after: Literal[0, 1]
+    state_after: Literal["active", "unconscious", "stable", "dead"]
+    rule_definition_keys: list[str] = Field(min_length=1)
+    source_ids: list[str] = Field(min_length=1)
+    catalog_id: str
+    resolver_version: str
+
+
+class ResolvedStabilization(StrictModel):
+    d20: ResolvedD20Roll
+    difficulty_class: Literal[10]
+    success: bool
+    state_after: Literal["unconscious", "stable"]
+    rule_definition_keys: list[str] = Field(min_length=1)
+    source_ids: list[str] = Field(min_length=1)
+    catalog_id: str
+    resolver_version: str
+
+
+class ResolvedDamageAtZero(StrictModel):
+    damage: int = Field(gt=0)
+    critical: bool
+    failures_before: int = Field(ge=0, le=2)
+    failures_after: int = Field(ge=0, le=3)
+    instant_death: bool
+    state_after: Literal["unconscious", "dead"]
     rule_definition_keys: list[str] = Field(min_length=1)
     source_ids: list[str] = Field(min_length=1)
     catalog_id: str
@@ -544,6 +620,7 @@ def _resolve_attack(
     mastery_enabled: bool,
     bonus_damage_expression: DiceExpression | None,
     bonus_damage_dice_faces: list[int],
+    critical_on_hit: bool,
 ) -> ResolvedAttack:
     if attack_mode not in ("melee", "ranged"):
         raise CombatError("attack mode must be 'melee' or 'ranged'")
@@ -590,16 +667,17 @@ def _resolve_attack(
         advantage_sources=advantage_sources,
         disadvantage_sources=disadvantage_sources,
     )
-    critical = d20.selected_die == 20
+    natural_critical = d20.selected_die == 20
     if d20.selected_die == 1:
         hit = False
         miss_reason: Literal["natural_one", "below_armor_class"] | None = "natural_one"
-    elif critical or d20.total >= target_armor_class:
+    elif natural_critical or d20.total >= target_armor_class:
         hit = True
         miss_reason = None
     else:
         hit = False
         miss_reason = "below_armor_class"
+    critical = natural_critical or (critical_on_hit and hit)
 
     if mastery_enabled and weapon.supported_mastery_id is None:
         raise CombatError(f"{weapon.name} mastery is outside the M5 combat slice")
@@ -693,6 +771,7 @@ def resolve_character_attack(
     disadvantage_sources: list[str] | None = None,
     fighting_style_id: str | None = None,
     mastery_enabled: bool = False,
+    critical_on_hit: bool = False,
 ) -> ResolvedAttack:
     weapon = _find_weapon(catalog, weapon_id)
     if not weapon.player_character_supported:
@@ -712,6 +791,7 @@ def resolve_character_attack(
         mastery_enabled=mastery_enabled,
         bonus_damage_expression=None,
         bonus_damage_dice_faces=[],
+        critical_on_hit=critical_on_hit,
     )
 
 
@@ -727,6 +807,7 @@ def resolve_monster_attack(
     bonus_damage_dice_faces: list[int] | None = None,
     advantage_sources: list[str] | None = None,
     disadvantage_sources: list[str] | None = None,
+    critical_on_hit: bool = False,
 ) -> ResolvedAttack:
     try:
         monster = next(monster for monster in catalog.monsters if monster.id == monster_id)
@@ -751,6 +832,7 @@ def resolve_monster_attack(
         mastery_enabled=False,
         bonus_damage_expression=attack.advantage_bonus_damage_dice,
         bonus_damage_dice_faces=bonus_damage_dice_faces or [],
+        critical_on_hit=critical_on_hit,
     )
     keys = _unique([*resolved.rule_definition_keys, monster.definition_key, attack.definition_key])
     sources = _unique([*resolved.source_ids, *monster.source_ids, *attack.source_ids])
@@ -905,6 +987,159 @@ def resolve_effect_boundary(
         applies_to_event=applies,
         active_after=active_after,
         end_reason=end_reason,
+        rule_definition_keys=keys,
+        source_ids=source_ids,
+        catalog_id=catalog.id,
+        resolver_version=catalog.resolver_version,
+    )
+
+
+def resolve_second_wind(
+    catalog: CombatRulesCatalog,
+    *,
+    current_hit_points: int,
+    maximum_hit_points: int,
+    temporary_hit_points: int,
+    uses_remaining: int,
+    die_face: int,
+    fighter_level: int,
+) -> ResolvedSecondWind:
+    if uses_remaining not in (1, 2):
+        raise CombatError("Second Wind requires at least one remaining use")
+    if not 1 <= die_face <= 10:
+        raise CombatError("Second Wind d10 face must be from 1 through 10")
+    if not 1 <= fighter_level <= 20:
+        raise CombatError("Fighter level must be from 1 through 20")
+    if current_hit_points == 0:
+        raise CombatError("Second Wind cannot be used while unconscious")
+    healing = apply_healing(
+        catalog,
+        current_hit_points=current_hit_points,
+        maximum_hit_points=maximum_hit_points,
+        temporary_hit_points=temporary_hit_points,
+        healing=die_face + fighter_level,
+    )
+    rule = _rule(catalog, "second_wind")
+    keys, source_ids = _definition_sources(catalog, [rule])
+    return ResolvedSecondWind(
+        die_face=die_face,
+        fighter_level=fighter_level,
+        healing=healing,
+        uses_before=uses_remaining,
+        uses_after=uses_remaining - 1,
+        rule_definition_keys=_unique([*keys, *healing.rule_definition_keys]),
+        source_ids=_unique([*source_ids, *healing.source_ids]),
+        catalog_id=catalog.id,
+        resolver_version=catalog.resolver_version,
+    )
+
+
+def resolve_death_save(
+    catalog: CombatRulesCatalog,
+    *,
+    die_face: int,
+    successes: int,
+    failures: int,
+) -> ResolvedDeathSave:
+    if not 1 <= die_face <= 20:
+        raise CombatError("death save d20 face must be from 1 through 20")
+    if not 0 <= successes <= 2 or not 0 <= failures <= 2:
+        raise CombatError("pending death save counters must be from zero through two")
+    successes_after = successes
+    failures_after = failures
+    hit_points_after: Literal[0, 1] = 0
+    state_after: Literal["active", "unconscious", "stable", "dead"] = "unconscious"
+    if die_face == 20:
+        outcome = "revived"
+        hit_points_after = 1
+        state_after = "active"
+        successes_after = 0
+        failures_after = 0
+    elif die_face == 1:
+        failures_after = min(3, failures + 2)
+        outcome = "dead" if failures_after == 3 else "critical_failure"
+        state_after = "dead" if failures_after == 3 else "unconscious"
+    elif die_face >= 10:
+        successes_after = successes + 1
+        outcome = "stable" if successes_after == 3 else "success"
+        state_after = "stable" if successes_after == 3 else "unconscious"
+        if successes_after == 3:
+            successes_after = 0
+            failures_after = 0
+    else:
+        failures_after = failures + 1
+        outcome = "dead" if failures_after == 3 else "failure"
+        state_after = "dead" if failures_after == 3 else "unconscious"
+    definitions = [_rule(catalog, "death_saves"), _rule(catalog, "unconscious_at_zero")]
+    keys, source_ids = _definition_sources(catalog, definitions)
+    return ResolvedDeathSave(
+        die_face=die_face,
+        outcome=outcome,
+        successes_before=successes,
+        failures_before=failures,
+        successes_after=successes_after,
+        failures_after=failures_after,
+        hit_points_after=hit_points_after,
+        state_after=state_after,
+        rule_definition_keys=keys,
+        source_ids=source_ids,
+        catalog_id=catalog.id,
+        resolver_version=catalog.resolver_version,
+    )
+
+
+def resolve_stabilization(
+    catalog: CombatRulesCatalog, *, die_face: int, medicine_modifier: int
+) -> ResolvedStabilization:
+    d20 = _resolve_d20(
+        modifier=medicine_modifier,
+        dice_faces=[die_face],
+        advantage_sources=[],
+        disadvantage_sources=[],
+    )
+    success = d20.total >= 10
+    rule = _rule(catalog, "stabilization")
+    keys, source_ids = _definition_sources(catalog, [rule])
+    return ResolvedStabilization(
+        d20=d20,
+        difficulty_class=10,
+        success=success,
+        state_after="stable" if success else "unconscious",
+        rule_definition_keys=keys,
+        source_ids=source_ids,
+        catalog_id=catalog.id,
+        resolver_version=catalog.resolver_version,
+    )
+
+
+def resolve_damage_at_zero(
+    catalog: CombatRulesCatalog,
+    *,
+    damage: int,
+    maximum_hit_points: int,
+    failures: int,
+    critical: bool,
+) -> ResolvedDamageAtZero:
+    if damage <= 0:
+        raise CombatError("damage at zero Hit Points must be positive")
+    if maximum_hit_points <= 0:
+        raise CombatError("maximum Hit Points must be positive")
+    if not 0 <= failures <= 2:
+        raise CombatError("pending death save failures must be from zero through two")
+    instant_death = damage >= maximum_hit_points
+    failures_after = min(3, failures + (2 if critical else 1))
+    dead = instant_death or failures_after == 3
+    definitions = [_rule(catalog, "damage_at_zero")]
+    if instant_death:
+        definitions.append(_rule(catalog, "instant_death"))
+    keys, source_ids = _definition_sources(catalog, definitions)
+    return ResolvedDamageAtZero(
+        damage=damage,
+        critical=critical,
+        failures_before=failures,
+        failures_after=failures_after,
+        instant_death=instant_death,
+        state_after="dead" if dead else "unconscious",
         rule_definition_keys=keys,
         source_ids=source_ids,
         catalog_id=catalog.id,

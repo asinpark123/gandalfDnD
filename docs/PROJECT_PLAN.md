@@ -4,12 +4,12 @@
 - **Last updated:** 2026-09-05
 - **Rules baseline:** SRD 5.2.1 (pinned; character-state, check/save-resolution, and combat catalogs
   pass integrity and schema verification)
-- **Current delivery stage:** M5 In progress at M5.5. M5.4 added canonical ordinary and
-  Opportunity Attacks, exact attributed attack/damage dice, range/equipment/Fighting Style/mastery
-  enforcement, atomic HP/inventory/effect projections, immutable resolutions, idempotency,
-  reconnect, and semantic replay. The focused kernel/integration gate passes 62 tests and all 216
-  repository tests pass, with three expected live skips. M5.5 health, recovery, defeat, and
-  encounter completion is Ready
+- **Current delivery stage:** M5.5 implementation and automated verification are complete; required
+  owner acceptance is next. Catalog `srd-5.2.1-combat-v2` and migration `0019` add deterministic
+  difficulty inputs, Second Wind, death saves/stabilization, damage while down, explicit knockout,
+  victory/defeat/surrender/flight/agreement, thrown-item recovery, bounded completion evidence, and
+  reconnect. The focused combat gate passes 85 tests and the complete repository suite passes 239,
+  with three expected opt-in live skips. M5.6 remains gated on the owner review
 - **Canonical repository:** `~/Git/gandalfDnD`
 
 ## 1. Purpose of this document
@@ -356,7 +356,7 @@ Use these values consistently:
 | M3 | Persistent world model | Done | NPCs, quests, scenes, clues, time, decisions, and visibility |
 | M4 | Long-term memory and retrieval | Done | Coherent recall without full history in context |
 | PG18 | PostgreSQL 18 migration | Done/Monitoring | Active cutover passed; PG15 rollback retained during stabilization |
-| M5 | Core deterministic combat | In progress at M5.5 | Reproducible initiative, actions, attacks, health, and encounter outcomes |
+| M5 | Core deterministic combat | M5.5 owner acceptance pending | Reproducible initiative, actions, attacks, health, and encounter outcomes |
 | M6 | Spoiler-safe Guide | Proposed | Beginner help with enforceable knowledge boundaries |
 | M7 | Play interface and campaign administration | Proposed | Usable play, recap, correction, and export workflows |
 | M8 | Deployment and operations | Deferred | Dedicated reliable service with backups and monitoring |
@@ -1267,7 +1267,7 @@ search database p95 must remain at most 250 ms on the audited VM.
 
 ### M5 — Core deterministic combat
 
-- **Status:** In progress at M5.5; M5.0-M5.4 complete 2026-09-05
+- **Status:** M5.5 implemented; required owner acceptance pending before M5.6
 - **Depends on:** M1 and M3
 - **Detailed strategy:** [`M5_IMPLEMENTATION_STRATEGY.md`](M5_IMPLEMENTATION_STRATEGY.md)
 
@@ -1298,8 +1298,10 @@ Delivery sequence:
 5. M5.4 (Done) integrates supported attacks, range/equipment, damage, Fighting Styles, and all three
    current weapon masteries. See
    [`M5_4_ATTACKS_DAMAGE_MASTERIES.md`](M5_4_ATTACKS_DAMAGE_MASTERIES.md).
-6. M5.5 completes Second Wind, Temporary HP, unconsciousness/death saves/stability, knockout,
-   defeat, recovery, encounter completion, and strict-SRD party benchmarks.
+6. M5.5 (Implemented; owner acceptance pending) completes Second Wind, Temporary HP damage
+   semantics, unconsciousness/death saves/stability, knockout, defeat, recovery, encounter
+   completion, and strict-SRD party-budget evidence. See
+   [`M5_5_HEALTH_RECOVERY_OUTCOMES.md`](M5_5_HEALTH_RECOVERY_OUTCOMES.md).
 7. M5.6 connects typed provider intent/narration, persistent world, and bounded M4 memory, then runs
    owner acceptance before requesting any separately capped live OpenClaw evaluation.
 
@@ -1423,6 +1425,9 @@ after M5 evidence identifies the first finite expansion set.
 | ISSUE-018 | Migration reversibility | Resolved | The first full M5.2 regression run reached an older empty-database downgrade/re-upgrade fixture after immutable ruleset rows had been cleared; `0016` initially inserted its combat catalog without restoring the parent SRD release row | One migration test failed and later fixtures cascaded during that run, while development data and gameplay behavior remained unchanged | `0016` now idempotently restores the exact immutable SRD release before the combat catalog; the exact empty downgrade/re-upgrade case, 13-test encounter/ruleset gate, and final complete suite pass; `M5_2_ENCOUNTERS_INITIATIVE.md` |
 | ISSUE-019 | Migration guard | Resolved | The first focused M5.4 run showed that `0018` checked response, responding-command, and resolved-revision fields as immutable before evaluating a legal reaction status transition | Existing M5.3 `pass` and Opportunity Attack selection requests reached a database exception instead of their valid transition | The guard now freezes reaction identity only and explicitly permits `pending -> passed/opportunity_attack_pending -> opportunity_attack_resolved`; all inherited M5.3 and new M5.4 reaction fixtures pass, and the corrected function is installed without deleting data; `M5_4_ATTACKS_DAMAGE_MASTERIES.md` |
 | ISSUE-020 | Combat audit accuracy | Resolved | Critical attacks doubled and stored the correct damage faces but labelled the roll with the base weapon expression (`2d6`) rather than the actual critical expression (`4d6`) | Damage totals were mechanically correct, but human audit output and attributed dice notation were misleading | The pure resolver now derives notation from the actual rolled die count for both weapon and bonus critical damage; exact Greatsword and Goblin critical assertions plus the focused/full replay gates pass; `M5_4_ATTACKS_DAMAGE_MASTERIES.md` |
+| ISSUE-021 | Test database maintenance | Resolved/prevention required | Years of repeated development downgrade/re-upgrade cycles exhausted PostgreSQL's internal dropped-column slots in the disposable `gandalfdnd_test.turns` table (1,582 dropped of 1,591 slots) | New M5.5 migration verification could not add columns even though application code and the development database were intact | After exact target/version/ACL checks, created and checksum-validated a PostgreSQL 18 custom-format backup, rebuilt only `gandalfdnd_test.public`, restored its exact ACL and pgvector 0.8.6, and reapplied migrations through head; retain the backup at `/private/tmp/gandalfdnd_test-pre-reset-20260904T214018Z.dump` (SHA-256 `fce16bc55ac26d91a88d1c149f47189ac491d76d01969de237b521043ea42e3d`) and periodically rebuild the disposable test schema instead of accumulating indefinite migration churn |
+| ISSUE-022 | Migration compatibility | Resolved | The first M5.5 migration cycle backfilled Second Wind before finishing `ALTER TABLE combatants`; an existing active encounter caused an older deferred consistency trigger to queue events, and PostgreSQL then rejected the remaining table alteration | A deployment with an in-progress encounter could not upgrade, although the failed transaction rolled back without data loss | Add all combatant columns/constraints before the backfill, tolerate an absent newly introduced reverse trigger during interrupted-development downgrade, and retain an exact existing-active-encounter downgrade/upgrade regression; focused migration and 85-test combat gates pass |
+| ISSUE-023 | Combat continuity | Resolved | M5.5 initially preserved post-combat HP and encounter state but did not stop a later encounter projection from treating a defeated, dead, fled, surrendered, or knocked-out character as active | A new combat could silently cure or resurrect a character before any recovery rule ran | Encounter creation now checks canonical HP plus the character's newest completed combatant state and returns a recoverable conflict until a future source-backed rest/recovery transition exists; defeat-to-new-encounter regression and RUL-048 preserve the boundary |
 | ISSUE-004 | Character-state provenance | Resolved | The first M1.3 owner run showed empty projected source/acquisition provenance for Dice Set and GP; ordinary package items were unaffected | The visible equipment projection did not meet GF-004 even though canonical grants remained intact | The corrected projection and exhaustive regression passed 39 automated tests; the 2026-09-01 owner retest confirmed complete Dice Set/GP definition, source, and acquisition-event provenance for both existing characters |
 | UX-001 | Player interface | Deferred/partially prepared | M3 absent/inactive/hidden-target conflicts now provide stable codes and safe recovery text, but JSON cannot validate visual actor/state clarity and other endpoints still need error normalization; M4 owner acceptance also requires qualifying supporting memories to be visible without quota-filling noise | Ordinary players may not know what happened, how to correct an invalid action, or which cited earlier details support current play | In M7, map stable typed API errors to actionable messages, normalize remaining error contracts, test actor/state explanations, and present the primary memory plus any genuinely qualifying cited support without fixed empty/noisy rank slots |
 
@@ -1609,10 +1614,8 @@ Destination milestone:
 1. Monitor the active PG18 connection, application/database errors, startup behavior, connections,
    disk, extension compatibility, and migration behavior while retaining all recovery bundles and
    both PG15 Gandalf copies/roles unchanged.
-2. Implement M5.5's immutable health/resource/outcome resolution: Second Wind, Temporary HP,
-   unconsciousness/death saves/stability, damage while down, massive damage, explicit knockout,
-   recoverable thrown items, defeat/surrender/flight/agreement completion, bounded encounter
-   summary, reconnect, and strict-SRD Party Commander measurements.
+2. Complete the required M5.5 owner checklist, analyze its mechanical and subjective findings, and
+   fix or accept the health/recovery/outcome slice before starting M5.6 provider integration.
 3. Keep the 11 pre-existing development indexes inactive until their own campaign-specific
    activation evidence passes.
 4. Request a later explicit destructive-action decision before disabling old PG15 logins, deleting
@@ -1677,3 +1680,4 @@ Destination milestone:
 | 2026-09-05 | DOC-053 | Completed M5.2 and advanced M5.3 to Ready with migration `0016`, guarded encounter/combatant/command/tie/event state, attributed application dice, explicit tie decisions, five API operations, and exact restart/replay | Canonical party/Goblin projections, no-tie and tie order, idempotency, stale/unsupported no-roll rollback, one-open-encounter, immutable audits, guarded downgrade, and empty re-upgrade pass. The focused encounter/ruleset gate passes 13 tests; all 206 repository tests, static checks, compilation, migration-head and zero-drift checks pass with three expected live skips; ISSUE-018 records the migration seed edge found and fixed during full regression | Implement M5.3 turn economy, stepwise movement, Dodge/Disengage/Dash, and explicit Opportunity Attack reaction windows; keep live/provider and infrastructure work separately gated |
 | 2026-09-05 | DOC-054 | Completed M5.3 and advanced M5.4 to Ready with migration `0017`, active turn/budget/effect/reaction records, four typed API operations, exact grid movement, Dash/Disengage/Dodge, explicit reaction choices, round advancement, reconnect, and fail-closed Opportunity Attack handoff | Split movement, one Action, full-round rollover, Dodge expiry, occupied/wrong-actor rollback, pass-before-move, Disengage suppression, one-Reaction consumption, empty migration reversal, 18 focused migration/ruleset/combat tests, and all 210 repository tests pass; three live suites remain intentionally opt-in and no provider/infrastructure operation occurred | Resolve ordinary and pending Opportunity Attacks in M5.4 before movement continues; add exact attack/damage/equipment/style/mastery replay and retain all M5.3 stale/idempotency boundaries |
 | 2026-09-05 | DOC-055 | Completed M5.4 and advanced M5.5 to Ready with migration `0018`, canonical ordinary/Opportunity Attacks, exact attack/damage dice, range/equipment/style/mastery enforcement, atomic projections, immutable evidence, reconnect, and replay | Hit/miss/natural boundaries, critical/GWF notation, long/close range, no-roll rejection, Javelin inventory/Slow, Graze, Sap consumption, Goblin reaction damage, continued interrupted movement, idempotency, immutability, guarded downgrade, 62 focused tests, and all 216 repository tests pass. ISSUE-019 and ISSUE-020 preserve the two pre-commit defects and corrections; no provider, Clawvis, package, cluster, or unrelated-service operation occurred | Implement M5.5 health/recovery/outcomes and deterministic difficulty evidence, then prepare the required owner combat playtest before M5.6 |
+| 2026-09-05 | DOC-056 | Implemented M5.5 and advanced it to required owner acceptance with catalog `srd-5.2.1-combat-v2`, migration `0019`, deterministic health/outcomes, a safe owner runner/checklist, and permanent operational evidence | The 85-test combat gate and all 239 repository tests cover difficulty inputs, Temporary HP authority/absorption, Second Wind, death saves, stabilization, damage while down, massive death, knockout, automatic/explicit outcomes, Javelin recovery, reconnect, idempotency, active-encounter migration, projection guards, and fail-closed post-combat continuity. Development upgraded to `0019` with zero drift and the nine-campaign owner dry run matched every expected value. ISSUE-021 preserves the isolated test-schema rebuild and backup; ISSUE-022 the existing-encounter migration correction; ISSUE-023 the no-silent-recovery correction. No provider, Clawvis, package, or service operation occurred | Run and analyze the owner checklist; fix or accept M5.5, then begin M5.6 typed provider integration |

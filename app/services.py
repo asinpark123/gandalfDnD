@@ -199,7 +199,7 @@ ACTIVE_TURN_STATUSES = {
     "narrating",
 }
 RESOLUTION_CATALOG_ID = "srd-5.2.1-check-save-resolution-v1"
-COMBAT_CATALOG_ID = "srd-5.2.1-combat-v1"
+COMBAT_CATALOG_ID = "srd-5.2.1-combat-v2"
 
 
 def _unpack_provider_result(result: Any) -> tuple[Any, int | None, int | None]:
@@ -2913,6 +2913,14 @@ def _combat_encounter_read(session: Session, encounter: CombatEncounter) -> Comb
         grid_height=encounter.grid_height,
         round_number=encounter.round_number,
         active_turn_index=encounter.active_turn_index,
+        difficulty_label=encounter.difficulty_label,
+        enemy_xp=encounter.enemy_xp,
+        low_xp_budget=encounter.low_xp_budget,
+        moderate_xp_budget=encounter.moderate_xp_budget,
+        high_xp_budget=encounter.high_xp_budget,
+        outcome=encounter.outcome,
+        outcome_summary=encounter.outcome_summary,
+        completed_at=encounter.completed_at,
         combatants=[CombatantRead.model_validate(item) for item in combatants],
         initiative_ties=[CombatInitiativeTieRead.model_validate(item) for item in ties],
         current_turn=(CombatTurnRead.model_validate(current_turn) if current_turn else None),
@@ -3028,6 +3036,29 @@ def create_combat_encounter(
         raise ConflictError(
             "Combat setup must place every finalized active party character exactly once"
         )
+    unavailable_characters: list[str] = []
+    for character in active_characters:
+        latest_combatant = session.scalar(
+            select(Combatant)
+            .join(CombatEncounter, CombatEncounter.id == Combatant.encounter_id)
+            .where(
+                Combatant.character_id == character.id,
+                CombatEncounter.status == "completed",
+            )
+            .order_by(CombatEncounter.completed_at.desc(), CombatEncounter.created_at.desc())
+            .limit(1)
+        )
+        if (
+            character.hp is None
+            or character.hp <= 0
+            or (latest_combatant is not None and latest_combatant.state != "active")
+        ):
+            unavailable_characters.append(character.name)
+    if unavailable_characters:
+        raise ConflictError(
+            "Combat cannot start while party characters require recovery: "
+            f"{sorted(unavailable_characters)}. Out-of-combat recovery is not yet supported."
+        )
 
     loaded, catalog, creation_catalog, state_catalog = _load_combat_catalog(
         session, campaign, data.combat_catalog_id
@@ -3040,6 +3071,23 @@ def create_combat_encounter(
     }
     if unknown_monsters:
         raise ConflictError(f"Unsupported monster definitions: {sorted(unknown_monsters)}")
+
+    party_size = len(active_characters)
+    enemy_xp = sum(
+        monster_by_id[enemy.monster_definition_id].experience_points for enemy in data.enemies
+    )
+    low_xp_budget = party_size * catalog.encounter_budget.low_xp_per_character
+    moderate_xp_budget = party_size * catalog.encounter_budget.moderate_xp_per_character
+    high_xp_budget = party_size * catalog.encounter_budget.high_xp_per_character
+    difficulty_label = (
+        "favorable"
+        if enemy_xp < low_xp_budget
+        else "low"
+        if enemy_xp < moderate_xp_budget
+        else "moderate"
+        if enemy_xp < high_xp_budget
+        else "high"
+    )
 
     encounter = CombatEncounter(
         campaign_id=campaign_id,
@@ -3055,6 +3103,14 @@ def create_combat_encounter(
         grid_height=data.grid_height,
         round_number=0,
         active_turn_index=None,
+        difficulty_label=difficulty_label,
+        enemy_xp=enemy_xp,
+        low_xp_budget=low_xp_budget,
+        moderate_xp_budget=moderate_xp_budget,
+        high_xp_budget=high_xp_budget,
+        outcome=None,
+        outcome_summary=None,
+        completed_at=None,
     )
     session.add(encounter)
     session.flush()
@@ -3091,6 +3147,9 @@ def create_combat_encounter(
                 position_y=placement.y,
                 initiative_modifier=mechanics.initiative.value,
                 state="active",
+                death_save_successes=0,
+                death_save_failures=0,
+                second_wind_remaining=character.resources.get("second_wind", 0),
                 revision=0,
             )
         )
@@ -3118,6 +3177,9 @@ def create_combat_encounter(
                 position_y=enemy.y,
                 initiative_modifier=monster.initiative_modifier,
                 state="active",
+                death_save_successes=0,
+                death_save_failures=0,
+                second_wind_remaining=None,
                 revision=0,
             )
         )
@@ -3135,6 +3197,14 @@ def create_combat_encounter(
             "scene_id": str(scene.id),
             "combat_catalog_id": loaded.id,
             "combat_catalog_sha256": loaded.sha256,
+            "difficulty": {
+                "label": difficulty_label,
+                "enemy_xp": enemy_xp,
+                "low_xp_budget": low_xp_budget,
+                "moderate_xp_budget": moderate_xp_budget,
+                "high_xp_budget": high_xp_budget,
+                "interpretation": "published XP input, not a guaranteed balance result",
+            },
             "grid": {"width": data.grid_width, "height": data.grid_height},
             "combatant_ids": [str(item.id) for item in combatants],
             "world_revision": campaign.world_revision,

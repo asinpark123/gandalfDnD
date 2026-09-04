@@ -42,6 +42,7 @@ def _encounter_actor_turn(
     *,
     expected_encounter_revision: int,
     expected_combatant_revision: int,
+    allowed_states: tuple[str, ...] = ("active",),
 ) -> tuple[Campaign, CombatEncounter, Combatant, CombatTurn]:
     campaign = _campaign_for_update(session, campaign_id)
     encounter = session.scalar(
@@ -73,7 +74,7 @@ def _encounter_actor_turn(
             f"Stale combatant revision: expected {expected_combatant_revision}, "
             f"current {actor.revision}"
         )
-    if actor.state != "active":
+    if actor.state not in allowed_states:
         raise ConflictError("Acting combatant cannot act in its current state")
     turn = session.scalar(
         select(CombatTurn)
@@ -550,6 +551,7 @@ def end_combat_turn(
         data.actor_combatant_id,
         expected_encounter_revision=data.expected_encounter_revision,
         expected_combatant_revision=data.expected_combatant_revision,
+        allowed_states=("active", "unconscious", "stable"),
     )
     _reject_unresolved_reactions(session, encounter_id)
     combatants = list(

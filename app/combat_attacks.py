@@ -12,6 +12,7 @@ from app.combat import (
     CombatRulesCatalog,
     apply_damage,
     resolve_character_attack,
+    resolve_damage_at_zero,
     resolve_monster_attack,
 )
 from app.combat_turns import _reject_unresolved_reactions
@@ -22,6 +23,7 @@ from app.models import (
     Combatant,
     CombatAttackResolution,
     CombatCommand,
+    CombatDroppedItem,
     CombatEffect,
     CombatEncounter,
     CombatReactionWindow,
@@ -180,8 +182,10 @@ def execute_combat_attack(
         )
     if actor.side == target.side:
         raise ConflictError("Combat attacks require an opposing-side target")
-    if actor.state != "active" or target.state != "active":
-        raise ConflictError("Attacker and target must both be active")
+    if actor.state != "active":
+        raise ConflictError("Attacker must be active")
+    if target.state not in {"active", "unconscious", "stable"}:
+        raise ConflictError("Target cannot be attacked in its current state")
 
     campaign = session.get(Campaign, campaign_id)
     assert campaign is not None
@@ -193,6 +197,12 @@ def execute_combat_attack(
         or loaded.sha256 != encounter.combat_catalog_sha256
     ):
         raise ConflictError("Pinned combat catalog is unavailable")
+    if target.state != "active" and catalog.id != "srd-5.2.1-combat-v2":
+        raise ConflictError("Damage at 0 HP requires the combat-v2 rules catalog")
+    if data.knock_out and catalog.id != "srd-5.2.1-combat-v2":
+        raise ConflictError("Knockout requires the combat-v2 rules catalog")
+    if data.knock_out and data.attack_mode != "melee":
+        raise ConflictError("Only a melee attack can knock a creature out")
     turn = session.scalar(
         select(CombatTurn)
         .where(CombatTurn.encounter_id == encounter_id, CombatTurn.status == "active")
@@ -290,6 +300,9 @@ def execute_combat_attack(
         damage_modifier = attack.damage_modifier
 
     distance = _distance_feet(actor, target)
+    target_state_before = target.state
+    target_was_down = target.hp == 0 and target.state in {"unconscious", "stable"}
+    critical_on_hit = target_was_down and distance <= 5
     disadvantage_sources: list[str] = []
     advantage_sources: list[str] = []
     if data.attack_mode == "melee":
@@ -313,6 +326,8 @@ def execute_combat_attack(
         )
         if hostile_adjacent is not None:
             disadvantage_sources.append("hostile_within_5_feet")
+    if target_was_down:
+        advantage_sources.append("target_unconscious")
     dodge_effect = session.scalar(
         select(CombatEffect).where(
             CombatEffect.encounter_id == encounter_id,
@@ -355,7 +370,7 @@ def execute_combat_attack(
     hit = selected == 20 or (
         selected != 1 and selected + applied_attack_modifier >= target.armor_class
     )
-    critical = selected == 20
+    critical = selected == 20 or (critical_on_hit and hit)
     damage_faces: list[int] = []
     bonus_faces: list[int] = []
     if hit:
@@ -385,6 +400,7 @@ def execute_combat_attack(
                 disadvantage_sources=disadvantage_sources,
                 fighting_style_id=fighting_style_id,
                 mastery_enabled=mastery_enabled,
+                critical_on_hit=critical_on_hit,
             )
         else:
             assert monster_id is not None
@@ -399,6 +415,7 @@ def execute_combat_attack(
                 bonus_damage_dice_faces=bonus_faces,
                 advantage_sources=advantage_sources,
                 disadvantage_sources=disadvantage_sources,
+                critical_on_hit=critical_on_hit,
             )
         damage = apply_damage(
             catalog,
@@ -482,8 +499,37 @@ def execute_combat_attack(
         sap_effect.ended_round = encounter.round_number
     target.hp = damage.hit_points_after
     target.temporary_hp = damage.temporary_hit_points_after
-    if target.hp == 0:
-        target.state = "unconscious" if target.character_id is not None else "dead"
+    damage_at_zero: dict | None = None
+    knocked_out = False
+    if (
+        data.knock_out
+        and resolved.hit
+        and target_was_down is False
+        and damage.hit_points_after == 0
+    ):
+        target.hp = 1
+        target.state = "unconscious"
+        target.death_save_successes = 0
+        target.death_save_failures = 0
+        knocked_out = True
+    elif target_was_down and damage.after_vulnerability > damage.temporary_hit_points_absorbed:
+        zero_result = resolve_damage_at_zero(
+            catalog,
+            damage=damage.after_vulnerability - damage.temporary_hit_points_absorbed,
+            maximum_hit_points=target.max_hp,
+            failures=target.death_save_failures,
+            critical=resolved.critical,
+        )
+        target.death_save_failures = zero_result.failures_after
+        target.state = zero_result.state_after
+        damage_at_zero = zero_result.model_dump(mode="json")
+    elif target.hp == 0:
+        if target.character_id is None or damage.excess_damage >= target.max_hp:
+            target.state = "dead"
+        else:
+            target.state = "unconscious"
+            target.death_save_successes = 0
+            target.death_save_failures = 0
     if target.character_id is not None and resolved.damage_total > 0:
         target_character = session.scalar(
             select(Character).where(Character.id == target.character_id).with_for_update()
@@ -546,12 +592,15 @@ def execute_combat_attack(
         "disadvantage_sources": disadvantage_sources,
         "fighting_style_id": fighting_style_id,
         "mastery_enabled": mastery_enabled,
+        "critical_on_hit": critical_on_hit,
+        "target_state_before": target_state_before,
         "target_hp_before": damage.hit_points_before,
         "target_max_hp": target.max_hp,
         "target_temporary_hp_before": damage.temporary_hit_points_before,
         "attack_roll_id": str(attack_dice.id),
         "damage_roll_id": str(damage_dice.id) if damage_dice else None,
         "bonus_damage_roll_id": str(bonus_dice.id) if bonus_dice else None,
+        "knock_out": data.knock_out,
     }
     resolution = CombatAttackResolution(
         id=resolution_id,
@@ -575,6 +624,18 @@ def execute_combat_attack(
     )
     session.add(resolution)
     session.flush()
+    if character is not None and data.attack_mode == "ranged" and weapon.id == "javelin":
+        session.add(
+            CombatDroppedItem(
+                encounter_id=encounter_id,
+                attack_resolution_id=resolution.id,
+                owner_character_id=character.id,
+                item_id=weapon.id,
+                item_name=weapon.name,
+                quantity=1,
+                recovered=False,
+            )
+        )
     _combat_event(
         session,
         encounter_id,
@@ -589,6 +650,8 @@ def execute_combat_attack(
             ),
             "attack": resolution.attack_result,
             "damage": resolution.damage_result,
+            "damage_at_zero": damage_at_zero,
+            "knocked_out": knocked_out,
             "dice_roll_ids": [
                 str(item.id) for item in (attack_dice, damage_dice, bonus_dice) if item is not None
             ],
@@ -607,11 +670,18 @@ def execute_combat_attack(
             "hit": resolved.hit,
             "critical": resolved.critical,
             "damage_total": resolved.damage_total,
-            "target_hp_after": damage.hit_points_after,
+            "target_hp_after": target.hp,
+            "target_state_after": target.state,
+            "damage_at_zero": damage_at_zero,
+            "knocked_out": knocked_out,
             "encounter_revision": encounter.revision,
         },
         actor_character_id=actor.character_id,
     )
+    from app.combat_health import maybe_complete_combat_encounter
+
+    if catalog.id == "srd-5.2.1-combat-v2":
+        maybe_complete_combat_encounter(session, campaign, encounter, command)
     session.commit()
     return CombatAttackExecutionRead(
         resolution=_attack_read(resolution),
@@ -673,6 +743,7 @@ def replay_combat_attack(
                 disadvantage_sources=inputs["disadvantage_sources"],
                 fighting_style_id=inputs["fighting_style_id"],
                 mastery_enabled=inputs["mastery_enabled"],
+                critical_on_hit=inputs.get("critical_on_hit", False),
             )
         else:
             replayed = resolve_monster_attack(
@@ -686,6 +757,7 @@ def replay_combat_attack(
                 bonus_damage_dice_faces=list(bonus_roll.rolls) if bonus_roll else [],
                 advantage_sources=inputs["advantage_sources"],
                 disadvantage_sources=inputs["disadvantage_sources"],
+                critical_on_hit=inputs.get("critical_on_hit", False),
             )
         damage = apply_damage(
             catalog,

@@ -37,6 +37,12 @@
           "kind": "combat",
           "path": "data/combat-v1.json",
           "sha256": "423b80e84593738d4cadc5537278d208a51fbebacbb074a2d79531f0ee023204"
+        },
+        {
+          "id": "srd-5.2.1-combat-v2",
+          "kind": "combat",
+          "path": "data/combat-v2.json",
+          "sha256": "641b107c6b0381ab94ba305679e02b694542841ede552b485312c0e8813b08d6"
         }
       ]
     }

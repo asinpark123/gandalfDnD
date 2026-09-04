@@ -768,7 +768,10 @@
       "type": "array"
     },
     "id": {
-      "const": "srd-5.2.1-combat-v1",
+      "enum": [
+        "srd-5.2.1-combat-v1",
+        "srd-5.2.1-combat-v2"
+      ],
       "title": "Id",
       "type": "string"
     },
@@ -789,7 +792,10 @@
       "type": "array"
     },
     "resolver_version": {
-      "const": "combat-resolution-1.0.0",
+      "enum": [
+        "combat-resolution-1.0.0",
+        "combat-resolution-1.1.0"
+      ],
       "title": "Resolver Version",
       "type": "string"
     },
@@ -807,7 +813,10 @@
       "type": "string"
     },
     "schema_version": {
-      "const": "1.0.0",
+      "enum": [
+        "1.0.0",
+        "1.1.0"
+      ],
       "title": "Schema Version",
       "type": "string"
     },

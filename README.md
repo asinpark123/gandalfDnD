@@ -72,6 +72,10 @@ maintained in the [living development plan](docs/PROJECT_PLAN.md).
   grid paths, Dodge/Disengage/Dash, reaction windows, restart, and regression evidence
 - [M5.4 attacks, damage, equipment, and masteries](docs/M5_4_ATTACKS_DAMAGE_MASTERIES.md) —
   canonical attacks, exact dice/damage, range, equipment, styles, masteries, reactions, and replay
+- [M5.5 health, recovery, and outcomes](docs/M5_5_HEALTH_RECOVERY_OUTCOMES.md) — deterministic
+  recovery, 0 HP, defeat/victory, knockout, difficulty inputs, continuity, and owner-gate evidence
+- [M5.5 owner checklist](docs/player/M5_5_ACCEPTANCE_CHECKLIST.md) — one-command backend review of
+  difficulty, Second Wind, revival, knockout, defeat, item recovery, and reconnect
 - [PostgreSQL 18 migration strategy](docs/POSTGRESQL_18_MIGRATION_STRATEGY.md) — parallel-cluster,
   Gandalf-only migration, acceptance, rollback, and longevity gates
 - [PostgreSQL 18 readiness audit](docs/POSTGRESQL_18_READINESS_AUDIT.md) — verified package impact,
@@ -119,12 +123,13 @@ live M4 supplement also passed: the final prompt and retrieval contracts recalle
 Miras correctly, kept hostile quoted prose mechanically inert, excluded a DM-only secret, and left
 exact state unchanged across a database reconnection.
 
-M5.4 is Done and M5.5 health/recovery/encounter completion is Ready. The deliberately narrow first
-combat slice uses the existing level-one
-Human/Soldier/Fighters, Greatsword/Flail/Javelin mechanics, Graze/Sap/Slow, Second Wind, and SRD
-Goblin Minion/Warrior opponents. Spells, broad content, companion autonomy, and lone-hero balancing
-remain deferred until deterministic Party Commander combat passes. M5 is the core combat
-foundation, not a permanent simplified mode; broader combat rules and content are tracked in M10.
+M5.5 is implemented and awaiting its required owner review before M5.6. The deliberately narrow
+first combat slice uses the existing level-one Human/Soldier/Fighters,
+Greatsword/Flail/Javelin mechanics, Graze/Sap/Slow, Second Wind, SRD health/0-HP and encounter
+completion rules, and Goblin Minion/Warrior opponents. It fails closed rather than silently
+recovering a defeated character. Spells, out-of-combat recovery, broad content, companion autonomy,
+and lone-hero balancing remain deferred. M5 is the core combat foundation, not a permanent
+simplified mode; broader combat rules and content are tracked in M10.
 
 ## Versioned rulesets
 
@@ -189,7 +194,8 @@ checksum, size, license, attribution, normalized-data catalogs, and schema versi
   direct-API adapter remains disabled because API spend is not authorized
 
 Not included yet: activated production memory profiles, approximate vector indexes, the spoiler-safe
-Guide, combat, a web UI, Redis, Celery, or a permanent application VM.
+Guide, provider-driven combat, out-of-combat recovery, a web UI, Redis, Celery, or a permanent
+application VM.
 
 ## Local setup
 
@@ -278,6 +284,15 @@ authoritative deterministic services first.
 | `GET` | `/campaigns/{id}/resolutions` | List immutable authoritative resolutions |
 | `GET` | `/campaigns/{id}/resolutions/{resolution_id}` | Read one authoritative resolution and its provenance |
 | `POST` | `/campaigns/{id}/resolutions/{resolution_id}/replay` | Recompute stored dice/modifier inputs and verify equivalence |
+| `POST` | `/campaigns/{id}/combat-encounters` | Create a source-pinned Party Commander encounter and difficulty inputs |
+| `GET` | `/campaigns/{id}/combat-encounters/{encounter_id}` | Read exact initiative, turn, combatant, effect, health, and outcome state |
+| `POST` | `/campaigns/{id}/combat-encounters/{encounter_id}/start` | Roll attributed initiative and start or expose explicit ties |
+| `POST` | `/campaigns/{id}/combat-encounters/{encounter_id}/move` | Apply a validated stepwise grid path and open required reactions |
+| `POST` | `/campaigns/{id}/combat-encounters/{encounter_id}/actions` | Spend a supported Dash, Disengage, Dodge, or pass action |
+| `POST` | `/campaigns/{id}/combat-encounters/{encounter_id}/attacks` | Resolve an ordinary or Opportunity Attack from canonical mechanics |
+| `POST` | `/campaigns/{id}/combat-encounters/{encounter_id}/health-actions` | Resolve Second Wind, a death save, or first-aid stabilization |
+| `POST` | `/campaigns/{id}/combat-encounters/{encounter_id}/outcome` | Complete surrender, flight, or agreement; victory/defeat can resolve automatically |
+| `POST` | `/campaigns/{id}/combat-encounters/{encounter_id}/end-turn` | Advance the exact initiative order and refresh timed resources |
 | `GET` | `/campaigns/{id}/events` | Read the ordered player-visible event trail |
 
 ## Verification

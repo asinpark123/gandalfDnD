@@ -372,6 +372,7 @@ def _started_encounter(
     enemy_x: int = 7,
     enemy_y: int = 2,
     first_fighting_style: str = "defense",
+    combat_catalog_id: str = "srd-5.2.1-combat-v1",
 ) -> tuple[str, dict[str, Any]]:
     campaign_id, scene_id, character_ids = _ready_party(
         client,
@@ -380,6 +381,7 @@ def _started_encounter(
     create = _encounter_command(
         scene_id,
         character_ids,
+        combat_catalog_id=combat_catalog_id,
         enemies=[
             {
                 "monster_definition_id": "goblin_warrior",
@@ -810,7 +812,7 @@ def test_ranged_attack_persists_damage_mastery_replay_and_idempotency(
         ).scalar_one()
     get_engine().dispose()
     config = Config(str(Path(__file__).parents[1] / "alembic.ini"))
-    with pytest.raises(DBAPIError, match="Cannot downgrade after combat attacks"):
+    with pytest.raises(DBAPIError, match="Cannot downgrade after combat"):
         command.downgrade(config, "0017_combat_turns_movement")
     with get_engine().connect() as connection:
         assert (
@@ -1135,3 +1137,456 @@ def test_opportunity_attack_resolves_then_original_movement_can_continue(
     assert continued.status_code == 200, continued.text
     assert continued.json()["combatants"][0]["position_x"] == 0
     assert continued.json()["current_turn"]["movement_spent_feet"] == 5
+
+
+@pytest.mark.parametrize(
+    ("enemy_count", "expected_label", "expected_xp"),
+    [(1, "favorable", 50), (2, "low", 100), (3, "moderate", 150), (4, "high", 200)],
+)
+def test_combat_v2_records_strict_xp_inputs_without_balance_claims(
+    client: TestClient,
+    enemy_count: int,
+    expected_label: str,
+    expected_xp: int,
+) -> None:
+    campaign_id, scene_id, character_ids = _ready_party(client)
+    enemies = [
+        {
+            "monster_definition_id": "goblin_warrior",
+            "instance_name": f"Budget Goblin {index}",
+            "x": 5 + index,
+            "y": 2,
+        }
+        for index in range(enemy_count)
+    ]
+    created = client.post(
+        f"/campaigns/{campaign_id}/combat-encounters",
+        json=_encounter_command(
+            scene_id,
+            character_ids,
+            combat_catalog_id="srd-5.2.1-combat-v2",
+            enemies=enemies,
+        ),
+    )
+    assert created.status_code == 201, created.text
+    body = created.json()
+    assert body["difficulty_label"] == expected_label
+    assert body["enemy_xp"] == expected_xp
+    assert (body["low_xp_budget"], body["moderate_xp_budget"], body["high_xp_budget"]) == (
+        100,
+        150,
+        200,
+    )
+    assert (
+        "not a guaranteed balance result"
+        in body["events"][0]["payload"]["difficulty"]["interpretation"]
+    )
+
+
+def test_health_migration_upgrades_an_existing_active_encounter(client: TestClient) -> None:
+    _, encounter = _started_encounter(client)
+    get_engine().dispose()
+    config = Config(str(Path(__file__).parents[1] / "alembic.ini"))
+    command.downgrade(config, "0018_combat_attacks")
+    command.upgrade(config, "head")
+    with get_engine().connect() as connection:
+        rows = connection.execute(
+            text(
+                "SELECT side, second_wind_remaining FROM combatants "
+                "WHERE encounter_id = CAST(:id AS uuid) ORDER BY initiative_order"
+            ),
+            {"id": encounter["id"]},
+        ).all()
+    assert rows == [("party", 2), ("party", 2), ("enemy", None)]
+
+
+def test_second_wind_is_atomic_idempotent_and_survives_restart(client: TestClient) -> None:
+    campaign_id, encounter = _started_encounter(client, combat_catalog_id="srd-5.2.1-combat-v2")
+    actor = encounter["combatants"][0]
+    with get_engine().begin() as connection:
+        connection.execute(
+            text("UPDATE characters SET hp = 5 WHERE id = CAST(:id AS uuid)"),
+            {"id": actor["character_id"]},
+        )
+        connection.execute(
+            text("UPDATE combatants SET hp = 5 WHERE id = CAST(:id AS uuid)"),
+            {"id": actor["id"]},
+        )
+    command_id = str(uuid.uuid4())
+    payload = {
+        "command_id": command_id,
+        "actor_combatant_id": actor["id"],
+        "target_combatant_id": actor["id"],
+        "expected_encounter_revision": 1,
+        "expected_actor_revision": 0,
+        "expected_target_revision": 0,
+        "action": "second_wind",
+    }
+    _fixed_dice([6])
+    response = client.post(
+        f"/campaigns/{campaign_id}/combat-encounters/{encounter['id']}/health-actions",
+        json=payload,
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["resolution"]["result"]["healing"]["hit_points_after"] == 12
+    assert body["resolution"]["result"]["uses_after"] == 1
+    assert body["encounter"]["current_turn"]["bonus_action_available"] is False
+    assert body["encounter"]["combatants"][0]["second_wind_remaining"] == 1
+    _fixed_dice([])
+    assert (
+        client.post(
+            f"/campaigns/{campaign_id}/combat-encounters/{encounter['id']}/health-actions",
+            json=payload,
+        ).json()
+        == body
+    )
+    get_engine().dispose()
+    restored = client.get(f"/campaigns/{campaign_id}/combat-encounters/{encounter['id']}").json()
+    assert restored["combatants"][0]["hp"] == 12
+    assert restored["combatants"][0]["second_wind_remaining"] == 1
+
+
+def test_death_save_natural_twenty_and_first_aid_are_persistent(client: TestClient) -> None:
+    campaign_id, encounter = _started_encounter(client, combat_catalog_id="srd-5.2.1-combat-v2")
+    actor = encounter["combatants"][0]
+    with get_engine().begin() as connection:
+        connection.execute(
+            text("UPDATE characters SET hp = 0 WHERE id = CAST(:id AS uuid)"),
+            {"id": actor["character_id"]},
+        )
+        connection.execute(
+            text(
+                "UPDATE combatants SET hp = 0, state = 'unconscious' WHERE id = CAST(:id AS uuid)"
+            ),
+            {"id": actor["id"]},
+        )
+    _fixed_dice([20])
+    revived = client.post(
+        f"/campaigns/{campaign_id}/combat-encounters/{encounter['id']}/health-actions",
+        json={
+            "command_id": str(uuid.uuid4()),
+            "actor_combatant_id": actor["id"],
+            "target_combatant_id": actor["id"],
+            "expected_encounter_revision": 1,
+            "expected_actor_revision": 0,
+            "expected_target_revision": 0,
+            "action": "death_save",
+        },
+    )
+    assert revived.status_code == 200, revived.text
+    assert revived.json()["resolution"]["result"]["outcome"] == "revived"
+    assert revived.json()["encounter"]["combatants"][0]["hp"] == 1
+
+    # A fresh encounter isolates the first-aid action and its Action budget.
+    client.post(
+        f"/campaigns/{campaign_id}/combat-encounters/{encounter['id']}/outcome",
+        json={
+            "command_id": str(uuid.uuid4()),
+            "expected_encounter_revision": 2,
+            "outcome": "agreement",
+        },
+    )
+
+
+def test_first_aid_stabilizes_adjacent_party_member(client: TestClient) -> None:
+    campaign_id, encounter = _started_encounter(client, combat_catalog_id="srd-5.2.1-combat-v2")
+    actor, target = encounter["combatants"][:2]
+    with get_engine().begin() as connection:
+        connection.execute(
+            text("UPDATE characters SET hp = 0 WHERE id = CAST(:id AS uuid)"),
+            {"id": target["character_id"]},
+        )
+        connection.execute(
+            text(
+                "UPDATE combatants SET hp = 0, state = 'unconscious' WHERE id = CAST(:id AS uuid)"
+            ),
+            {"id": target["id"]},
+        )
+    _fixed_dice([10])
+    stabilized = client.post(
+        f"/campaigns/{campaign_id}/combat-encounters/{encounter['id']}/health-actions",
+        json={
+            "command_id": str(uuid.uuid4()),
+            "actor_combatant_id": actor["id"],
+            "target_combatant_id": target["id"],
+            "expected_encounter_revision": 1,
+            "expected_actor_revision": 0,
+            "expected_target_revision": 0,
+            "action": "stabilize",
+        },
+    )
+    assert stabilized.status_code == 200, stabilized.text
+    body = stabilized.json()
+    assert body["resolution"]["result"]["success"] is True
+    assert body["encounter"]["combatants"][1]["state"] == "stable"
+    assert body["encounter"]["current_turn"]["action_available"] is False
+
+
+def test_explicit_melee_knockout_completes_victory_at_one_hp(client: TestClient) -> None:
+    campaign_id, encounter = _started_encounter(
+        client, enemy_x=2, enemy_y=2, combat_catalog_id="srd-5.2.1-combat-v2"
+    )
+    actor = encounter["combatants"][0]
+    enemy = encounter["combatants"][2]
+    _fixed_dice([15, 4, 4])
+    response = client.post(
+        f"/campaigns/{campaign_id}/combat-encounters/{encounter['id']}/attacks",
+        json={
+            "command_id": str(uuid.uuid4()),
+            "actor_combatant_id": actor["id"],
+            "target_combatant_id": enemy["id"],
+            "expected_encounter_revision": 1,
+            "expected_actor_revision": 0,
+            "expected_target_revision": 0,
+            "attack_definition_id": "greatsword",
+            "attack_mode": "melee",
+            "knock_out": True,
+        },
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()["encounter"]
+    assert body["status"] == "completed"
+    assert body["outcome"] == "victory"
+    assert body["combatants"][2]["hp"] == 1
+    assert body["combatants"][2]["state"] == "unconscious"
+    assert body["events"][-1]["event_type"] == "combat_encounter_completed"
+
+
+def test_damage_while_down_is_close_range_critical_and_massive(client: TestClient) -> None:
+    campaign_id, encounter = _started_encounter(
+        client, enemy_x=2, enemy_y=2, combat_catalog_id="srd-5.2.1-combat-v2"
+    )
+    actor = encounter["combatants"][0]
+    enemy = encounter["combatants"][2]
+    with get_engine().begin() as connection:
+        connection.execute(
+            text(
+                "UPDATE combatants SET hp = 0, state = 'unconscious' WHERE id = CAST(:id AS uuid)"
+            ),
+            {"id": enemy["id"]},
+        )
+    _fixed_dice([15, 12, 1, 2, 3, 4])
+    response = client.post(
+        f"/campaigns/{campaign_id}/combat-encounters/{encounter['id']}/attacks",
+        json={
+            "command_id": str(uuid.uuid4()),
+            "actor_combatant_id": actor["id"],
+            "target_combatant_id": enemy["id"],
+            "expected_encounter_revision": 1,
+            "expected_actor_revision": 0,
+            "expected_target_revision": 0,
+            "attack_definition_id": "greatsword",
+            "attack_mode": "melee",
+        },
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["resolution"]["attack_result"]["critical"] is True
+    assert body["resolution"]["attack_result"]["weapon_damage"]["notation"] == "4d6"
+    assert body["encounter"]["combatants"][2]["state"] == "dead"
+    assert body["encounter"]["outcome"] == "victory"
+
+
+def test_agreement_recovers_thrown_javelin_and_emits_one_summary(client: TestClient) -> None:
+    campaign_id, encounter = _started_encounter(client, combat_catalog_id="srd-5.2.1-combat-v2")
+    actor = encounter["combatants"][0]
+    enemy = encounter["combatants"][2]
+    _fixed_dice([15, 1])
+    attack = client.post(
+        f"/campaigns/{campaign_id}/combat-encounters/{encounter['id']}/attacks",
+        json={
+            "command_id": str(uuid.uuid4()),
+            "actor_combatant_id": actor["id"],
+            "target_combatant_id": enemy["id"],
+            "expected_encounter_revision": 1,
+            "expected_actor_revision": 0,
+            "expected_target_revision": 0,
+            "attack_definition_id": "javelin",
+            "attack_mode": "ranged",
+        },
+    )
+    assert attack.status_code == 200, attack.text
+    outcome = client.post(
+        f"/campaigns/{campaign_id}/combat-encounters/{encounter['id']}/outcome",
+        json={
+            "command_id": str(uuid.uuid4()),
+            "expected_encounter_revision": 2,
+            "outcome": "agreement",
+        },
+    )
+    assert outcome.status_code == 200, outcome.text
+    body = outcome.json()
+    assert body["encounter"]["status"] == "completed"
+    assert body["encounter"]["outcome"] == "agreement"
+    assert body["resolution"]["summary"]["recovered_items"][0]["item_id"] == "javelin"
+    with get_engine().connect() as connection:
+        inventory = connection.execute(
+            text("SELECT inventory FROM characters WHERE id = CAST(:id AS uuid)"),
+            {"id": actor["character_id"]},
+        ).scalar_one()
+        assert inventory["Javelin"] == 8
+        assert (
+            connection.execute(
+                text(
+                    "SELECT count(*) FROM campaign_events "
+                    "WHERE campaign_id = CAST(:id AS uuid) "
+                    "AND event_type = 'combat_encounter_completed'"
+                ),
+                {"id": campaign_id},
+            ).scalar_one()
+            == 1
+        )
+
+
+def test_temporary_hit_points_absorb_damage_without_becoming_healing(client: TestClient) -> None:
+    campaign_id, encounter = _started_encounter(
+        client, enemy_x=2, enemy_y=2, combat_catalog_id="srd-5.2.1-combat-v2"
+    )
+    actor = encounter["combatants"][0]
+    target = encounter["combatants"][2]
+    with get_engine().begin() as connection:
+        connection.execute(
+            text("UPDATE combatants SET temporary_hp = 5 WHERE id = CAST(:id AS uuid)"),
+            {"id": target["id"]},
+        )
+    _fixed_dice([15, 4])
+    response = client.post(
+        f"/campaigns/{campaign_id}/combat-encounters/{encounter['id']}/attacks",
+        json={
+            "command_id": str(uuid.uuid4()),
+            "actor_combatant_id": actor["id"],
+            "target_combatant_id": target["id"],
+            "expected_encounter_revision": 1,
+            "expected_actor_revision": 0,
+            "expected_target_revision": 0,
+            "attack_definition_id": "javelin",
+            "attack_mode": "melee",
+        },
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["resolution"]["damage_result"]["temporary_hit_points_absorbed"] == 5
+    assert body["resolution"]["damage_result"]["temporary_hit_points_after"] == 0
+    assert body["encounter"]["combatants"][2]["hp"] == 8
+    assert body["encounter"]["combatants"][2]["temporary_hp"] == 0
+    get_engine().dispose()
+    restored = client.get(f"/campaigns/{campaign_id}/combat-encounters/{encounter['id']}").json()
+    assert restored["combatants"][2]["hp"] == 8
+    assert restored["combatants"][2]["temporary_hp"] == 0
+
+
+def test_temporary_hit_point_grant_requires_a_future_canonical_source(
+    client: TestClient,
+) -> None:
+    campaign_id, encounter = _started_encounter(client, combat_catalog_id="srd-5.2.1-combat-v2")
+    actor = encounter["combatants"][0]
+    response = client.post(
+        f"/campaigns/{campaign_id}/combat-encounters/{encounter['id']}/health-actions",
+        json={
+            "command_id": str(uuid.uuid4()),
+            "actor_combatant_id": actor["id"],
+            "target_combatant_id": actor["id"],
+            "expected_encounter_revision": 1,
+            "expected_actor_revision": 0,
+            "expected_target_revision": 0,
+            "action": "temporary_hit_points",
+            "offered_temporary_hit_points": 999,
+            "temporary_hit_point_choice": "replace",
+        },
+    )
+    assert response.status_code == 422
+    unchanged = client.get(f"/campaigns/{campaign_id}/combat-encounters/{encounter['id']}").json()
+    assert unchanged["revision"] == 1
+    assert unchanged["combatants"][0]["temporary_hp"] == 0
+
+
+def test_last_fighting_party_member_falling_completes_defeat(client: TestClient) -> None:
+    campaign_id, encounter = _started_encounter(
+        client,
+        enemy_x=2,
+        enemy_y=2,
+        combat_catalog_id="srd-5.2.1-combat-v2",
+    )
+    first, second, enemy = encounter["combatants"]
+    for expected_revision, actor in ((1, first), (2, second)):
+        ended = client.post(
+            f"/campaigns/{campaign_id}/combat-encounters/{encounter['id']}/end-turn",
+            json={
+                "command_id": str(uuid.uuid4()),
+                "actor_combatant_id": actor["id"],
+                "expected_encounter_revision": expected_revision,
+                "expected_combatant_revision": 0,
+            },
+        )
+        assert ended.status_code == 200, ended.text
+    with get_engine().begin() as connection:
+        connection.execute(
+            text("UPDATE characters SET hp = 5 WHERE id = CAST(:id AS uuid)"),
+            {"id": first["character_id"]},
+        )
+        connection.execute(
+            text("UPDATE combatants SET hp = 5 WHERE id = CAST(:id AS uuid)"),
+            {"id": first["id"]},
+        )
+        connection.execute(
+            text("UPDATE characters SET hp = 0 WHERE id = CAST(:id AS uuid)"),
+            {"id": second["character_id"]},
+        )
+        connection.execute(
+            text("UPDATE combatants SET hp = 0, state = 'stable' WHERE id = CAST(:id AS uuid)"),
+            {"id": second["id"]},
+        )
+    _fixed_dice([15, 6])
+    attacked = client.post(
+        f"/campaigns/{campaign_id}/combat-encounters/{encounter['id']}/attacks",
+        json={
+            "command_id": str(uuid.uuid4()),
+            "actor_combatant_id": enemy["id"],
+            "target_combatant_id": first["id"],
+            "expected_encounter_revision": 3,
+            "expected_actor_revision": 0,
+            "expected_target_revision": 0,
+            "attack_definition_id": "scimitar",
+            "attack_mode": "melee",
+        },
+    )
+    assert attacked.status_code == 200, attacked.text
+    body = attacked.json()["encounter"]
+    assert body["status"] == "completed"
+    assert body["outcome"] == "defeat"
+    assert all(row["state"] != "active" for row in body["combatants"] if row["side"] == "party")
+    character_ids = [
+        row["character_id"] for row in encounter["combatants"] if row["side"] == "party"
+    ]
+    next_encounter = client.post(
+        f"/campaigns/{campaign_id}/combat-encounters",
+        json=_encounter_command(
+            encounter["scene_id"],
+            character_ids,
+            expected_world_revision=2,
+            combat_catalog_id="srd-5.2.1-combat-v2",
+        ),
+    )
+    assert next_encounter.status_code == 409
+    assert "require recovery" in next_encounter.json()["detail"]
+
+
+@pytest.mark.parametrize(("outcome", "state"), [("surrender", "surrendered"), ("flight", "fled")])
+def test_explicit_surrender_and_flight_close_the_selected_side(
+    client: TestClient, outcome: str, state: str
+) -> None:
+    campaign_id, encounter = _started_encounter(client, combat_catalog_id="srd-5.2.1-combat-v2")
+    response = client.post(
+        f"/campaigns/{campaign_id}/combat-encounters/{encounter['id']}/outcome",
+        json={
+            "command_id": str(uuid.uuid4()),
+            "expected_encounter_revision": 1,
+            "outcome": outcome,
+            "affected_side": "enemy",
+        },
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()["encounter"]
+    assert body["outcome"] == outcome
+    assert all(row["state"] == state for row in body["combatants"] if row["side"] == "enemy")

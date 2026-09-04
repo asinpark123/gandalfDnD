@@ -1013,6 +1013,14 @@ class CombatEncounter(TimestampMixin, Base):
     grid_height: Mapped[int] = mapped_column(Integer, nullable=False)
     round_number: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     active_turn_index: Mapped[int | None] = mapped_column(Integer)
+    difficulty_label: Mapped[str] = mapped_column(String(20), nullable=False)
+    enemy_xp: Mapped[int] = mapped_column(Integer, nullable=False)
+    low_xp_budget: Mapped[int] = mapped_column(Integer, nullable=False)
+    moderate_xp_budget: Mapped[int] = mapped_column(Integer, nullable=False)
+    high_xp_budget: Mapped[int] = mapped_column(Integer, nullable=False)
+    outcome: Mapped[str | None] = mapped_column(String(20))
+    outcome_summary: Mapped[dict[str, Any] | None] = mapped_column(JSONB(none_as_null=True))
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     __table_args__ = (
         CheckConstraint(
@@ -1028,6 +1036,27 @@ class CombatEncounter(TimestampMixin, Base):
         CheckConstraint(
             "active_turn_index IS NULL OR active_turn_index >= 0",
             name="combat_encounter_turn_index_nonnegative",
+        ),
+        CheckConstraint(
+            "difficulty_label IN ('favorable', 'low', 'moderate', 'high')",
+            name="combat_encounter_difficulty_label",
+        ),
+        CheckConstraint(
+            "enemy_xp >= 0 AND low_xp_budget > 0 AND moderate_xp_budget > low_xp_budget "
+            "AND high_xp_budget > moderate_xp_budget",
+            name="combat_encounter_xp_budgets",
+        ),
+        CheckConstraint(
+            "outcome IS NULL OR outcome IN "
+            "('victory', 'defeat', 'surrender', 'flight', 'agreement')",
+            name="combat_encounter_outcome",
+        ),
+        CheckConstraint(
+            "(status = 'completed' AND outcome IS NOT NULL AND outcome_summary IS NOT NULL "
+            "AND completed_at IS NOT NULL AND active_turn_index IS NULL) OR "
+            "(status <> 'completed' AND outcome IS NULL AND outcome_summary IS NULL "
+            "AND completed_at IS NULL)",
+            name="combat_encounter_completion_shape",
         ),
         Index(
             "uq_combat_encounters_one_open_per_campaign",
@@ -1066,6 +1095,9 @@ class Combatant(TimestampMixin, Base):
     initiative_order: Mapped[int | None] = mapped_column(Integer)
     reaction_available: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     state: Mapped[str] = mapped_column(String(20), nullable=False, default="active")
+    death_save_successes: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    death_save_failures: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    second_wind_remaining: Mapped[int | None] = mapped_column(Integer)
     revision: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
     __table_args__ = (
@@ -1108,6 +1140,15 @@ class Combatant(TimestampMixin, Base):
             "state IN ('active', 'unconscious', 'stable', 'dead', 'fled', 'surrendered')",
             name="combatant_state",
         ),
+        CheckConstraint(
+            "death_save_successes BETWEEN 0 AND 3 AND death_save_failures BETWEEN 0 AND 3",
+            name="combatant_death_save_bounds",
+        ),
+        CheckConstraint(
+            "(side = 'party' AND second_wind_remaining BETWEEN 0 AND 2) OR "
+            "(side = 'enemy' AND second_wind_remaining IS NULL)",
+            name="combatant_second_wind_shape",
+        ),
         CheckConstraint("revision >= 0", name="combatant_revision_nonnegative"),
         UniqueConstraint("encounter_id", "character_id", name="uq_combatants_encounter_character"),
         UniqueConstraint("encounter_id", "position_x", "position_y", name="uq_combatants_position"),
@@ -1135,7 +1176,8 @@ class CombatCommand(TimestampMixin, Base):
         CheckConstraint(
             "command_type IN ('create_encounter', 'start_initiative', "
             "'resolve_initiative_tie', 'combat_move', 'combat_action', "
-            "'combat_reaction', 'end_combat_turn', 'combat_attack')",
+            "'combat_reaction', 'end_combat_turn', 'combat_attack', "
+            "'combat_health', 'combat_outcome')",
             name="combat_command_type",
         ),
         CheckConstraint(
@@ -1411,6 +1453,96 @@ class CombatAttackResolution(TimestampMixin, Base):
             "target_revision_after > target_revision_before",
             name="combat_attack_revision_progress",
         ),
+    )
+
+
+class CombatHealthResolution(TimestampMixin, Base):
+    __tablename__ = "combat_health_resolutions"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    encounter_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("combat_encounters.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    command_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("combat_commands.id", ondelete="RESTRICT"), nullable=False, unique=True
+    )
+    actor_combatant_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("combatants.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    target_combatant_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("combatants.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    resolution_type: Mapped[str] = mapped_column(String(30), nullable=False)
+    ruleset_release_id: Mapped[str] = mapped_column(
+        ForeignKey("ruleset_releases.id", ondelete="RESTRICT"), nullable=False
+    )
+    combat_catalog_id: Mapped[str] = mapped_column(
+        ForeignKey("ruleset_data_catalogs.id", ondelete="RESTRICT"), nullable=False
+    )
+    resolver_version: Mapped[str] = mapped_column(String(60), nullable=False)
+    actor_revision_before: Mapped[int] = mapped_column(Integer, nullable=False)
+    actor_revision_after: Mapped[int] = mapped_column(Integer, nullable=False)
+    target_revision_before: Mapped[int] = mapped_column(Integer, nullable=False)
+    target_revision_after: Mapped[int] = mapped_column(Integer, nullable=False)
+    command: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    resolution_input: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    result: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    rng_version: Mapped[str] = mapped_column(String(60), nullable=False)
+
+    __table_args__ = (
+        CheckConstraint(
+            "resolution_type IN ('second_wind', 'death_save', 'stabilize')",
+            name="combat_health_resolution_type",
+        ),
+        CheckConstraint(
+            "actor_revision_after >= actor_revision_before AND "
+            "target_revision_after > target_revision_before",
+            name="combat_health_revision_progress",
+        ),
+    )
+
+
+class CombatOutcomeResolution(TimestampMixin, Base):
+    __tablename__ = "combat_outcome_resolutions"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    encounter_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("combat_encounters.id", ondelete="CASCADE"), nullable=False, unique=True
+    )
+    command_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("combat_commands.id", ondelete="RESTRICT"), nullable=False, unique=True
+    )
+    outcome: Mapped[str] = mapped_column(String(20), nullable=False)
+    summary: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+
+    __table_args__ = (
+        CheckConstraint(
+            "outcome IN ('victory', 'defeat', 'surrender', 'flight', 'agreement')",
+            name="combat_outcome_resolution_outcome",
+        ),
+    )
+
+
+class CombatDroppedItem(TimestampMixin, Base):
+    __tablename__ = "combat_dropped_items"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    encounter_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("combat_encounters.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    attack_resolution_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("combat_attack_resolutions.id", ondelete="RESTRICT"), nullable=False, unique=True
+    )
+    owner_character_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("characters.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    item_id: Mapped[str] = mapped_column(String(80), nullable=False)
+    item_name: Mapped[str] = mapped_column(String(120), nullable=False)
+    quantity: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    recovered: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+
+    __table_args__ = (
+        CheckConstraint("quantity > 0", name="combat_dropped_item_quantity_positive"),
     )
 
 

@@ -1,6 +1,6 @@
 # M5 Core Deterministic Combat Implementation Strategy
 
-- **Status:** In progress at M5.3; M5.0-M5.2 Done
+- **Status:** In progress at M5.4; M5.0-M5.3 Done
 - **Prepared:** 2026-09-05
 - **Depends on:** M1 character/rules foundation (Done), M3 persistent world (Done)
 - **Uses:** M2 resumable provider boundary and M4 bounded memory, only after deterministic combat
@@ -283,6 +283,9 @@ illegal or stale starts produce no rolls or partial encounter.
 
 ### M5.3 - Turn economy, movement, and reactions
 
+**Status:** Done on 2026-09-05. Evidence:
+[`M5_3_TURNS_MOVEMENT_REACTIONS.md`](M5_3_TURNS_MOVEMENT_REACTIONS.md).
+
 - add active-turn enforcement and explicit move/action/Bonus Action/Reaction/free-interaction
   budgets;
 - validate stepwise grid movement, split movement, Dash, Disengage, Dodge, and end turn;
@@ -400,12 +403,12 @@ content during M5.
 
 ## 14. Immediate implementation order
 
-1. Design M5.3 turn, entitlement, movement, effect, and reaction-window records on the M5.2
-   encounter/command/event boundary.
-2. Add active-turn initialization and exact Action, Bonus Action, Reaction, free-interaction, and
-   movement budgets without creating a second encounter state.
-3. Add stepwise move, Dash, Disengage, Dodge, pass-reaction, and end-turn commands with stale and
-   actor checks before any state change.
-4. Prove a full round, split movement, occupied/out-of-bounds/over-budget rejection, explicit
-   Opportunity Attack windows, reconnect, idempotency, and replay.
-5. Record M5.3 evidence before advancing to attack and damage integration in M5.4.
+1. Add an immutable combat-resolution record for ordinary and Opportunity Attacks, exact attack and
+   damage dice, pre/post state, applied definitions, and semantic replay.
+2. Derive supported character weapon/style/mastery and Goblin attacks from canonical source
+   snapshots; reject client-supplied bonuses, AC, damage, or effects.
+3. Enforce hands, melee/thrown range, long-range and close-ranged Disadvantage, criticals, Great
+   Weapon Fighting, Graze, Sap, Slow, and thrown-item state.
+4. Resolve selected Opportunity Attacks before their triggering movement may continue and prove
+   one Reaction, exact timing, rollback, idempotency, reconnect, and replay.
+5. Record M5.4 evidence before advancing to complete health, recovery, and encounter outcomes.

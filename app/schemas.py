@@ -803,6 +803,7 @@ class CombatantRead(BaseModel):
     initiative_selected_die: int | None
     initiative_total: int | None
     initiative_order: int | None
+    reaction_available: bool
     state: str
     revision: int
 
@@ -828,6 +829,55 @@ class CombatEventRead(BaseModel):
     created_at: datetime
 
 
+class CombatTurnRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    combatant_id: uuid.UUID
+    round_number: int
+    turn_index: int
+    status: Literal["active", "completed"]
+    movement_allowance_feet: int
+    movement_spent_feet: int
+    action_available: bool
+    bonus_action_available: bool
+    free_interaction_available: bool
+    disengaged: bool
+    started_encounter_revision: int
+    completed_encounter_revision: int | None
+
+
+class CombatEffectRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    source_combatant_id: uuid.UUID
+    target_combatant_id: uuid.UUID
+    effect_id: str
+    stacking_key: str
+    status: Literal["active", "expired"]
+    starts_round: int
+    expires_on_source_turn_start: bool
+    ended_round: int | None
+
+
+class CombatReactionWindowRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    mover_combatant_id: uuid.UUID
+    reactor_combatant_id: uuid.UUID
+    round_number: int
+    from_x: int
+    from_y: int
+    to_x: int
+    to_y: int
+    status: Literal["pending", "passed", "opportunity_attack_pending"]
+    response: Literal["pass", "opportunity_attack"] | None
+    opened_encounter_revision: int
+    resolved_encounter_revision: int | None
+
+
 class CombatEncounterRead(BaseModel):
     id: uuid.UUID
     campaign_id: uuid.UUID
@@ -845,6 +895,9 @@ class CombatEncounterRead(BaseModel):
     active_turn_index: int | None
     combatants: list[CombatantRead]
     initiative_ties: list[CombatInitiativeTieRead]
+    current_turn: CombatTurnRead | None = None
+    effects: list[CombatEffectRead] = Field(default_factory=list)
+    reaction_windows: list[CombatReactionWindowRead] = Field(default_factory=list)
     events: list[CombatEventRead]
     created_at: datetime
 
@@ -855,6 +908,52 @@ class CombatReplayRead(BaseModel):
     replayed_initiative_order: list[uuid.UUID]
     stored_initiative_order: list[uuid.UUID]
     encounter: CombatEncounterRead
+
+
+class CombatMoveCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    command_id: uuid.UUID
+    actor_combatant_id: uuid.UUID
+    expected_encounter_revision: int = Field(ge=0)
+    expected_combatant_revision: int = Field(ge=0)
+    path: list[CombatCell] = Field(min_length=1, max_length=40)
+
+    @model_validator(mode="after")
+    def reject_repeated_cells(self) -> "CombatMoveCreate":
+        cells = [(cell.x, cell.y) for cell in self.path]
+        if len(cells) != len(set(cells)):
+            raise ValueError("movement path cannot repeat a cell")
+        return self
+
+
+class CombatActionCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    command_id: uuid.UUID
+    actor_combatant_id: uuid.UUID
+    expected_encounter_revision: int = Field(ge=0)
+    expected_combatant_revision: int = Field(ge=0)
+    action: Literal["dash", "disengage", "dodge"]
+
+
+class CombatReactionCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    command_id: uuid.UUID
+    reactor_combatant_id: uuid.UUID
+    expected_encounter_revision: int = Field(ge=0)
+    expected_combatant_revision: int = Field(ge=0)
+    response: Literal["pass", "opportunity_attack"]
+
+
+class CombatEndTurnCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    command_id: uuid.UUID
+    actor_combatant_id: uuid.UUID
+    expected_encounter_revision: int = Field(ge=0)
+    expected_combatant_revision: int = Field(ge=0)
 
 
 class HealthRead(BaseModel):

@@ -1064,6 +1064,7 @@ class Combatant(TimestampMixin, Base):
     initiative_selected_die: Mapped[int | None] = mapped_column(Integer)
     initiative_total: Mapped[int | None] = mapped_column(Integer)
     initiative_order: Mapped[int | None] = mapped_column(Integer)
+    reaction_available: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     state: Mapped[str] = mapped_column(String(20), nullable=False, default="active")
     revision: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
@@ -1132,7 +1133,9 @@ class CombatCommand(TimestampMixin, Base):
 
     __table_args__ = (
         CheckConstraint(
-            "command_type IN ('create_encounter', 'start_initiative', 'resolve_initiative_tie')",
+            "command_type IN ('create_encounter', 'start_initiative', "
+            "'resolve_initiative_tie', 'combat_move', 'combat_action', "
+            "'combat_reaction', 'end_combat_turn')",
             name="combat_command_type",
         ),
         CheckConstraint(
@@ -1187,6 +1190,176 @@ class CombatEvent(TimestampMixin, Base):
         CheckConstraint("sequence > 0", name="combat_event_sequence_positive"),
         CheckConstraint("visibility IN ('player', 'dm_only')", name="combat_event_visibility"),
         UniqueConstraint("encounter_id", "sequence", name="uq_combat_events_encounter_sequence"),
+    )
+
+
+class CombatTurn(TimestampMixin, Base):
+    __tablename__ = "combat_turns"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    encounter_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("combat_encounters.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    combatant_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("combatants.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    round_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    turn_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="active")
+    movement_allowance_feet: Mapped[int] = mapped_column(Integer, nullable=False)
+    movement_spent_feet: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    action_available: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    bonus_action_available: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    free_interaction_available: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    disengaged: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    started_encounter_revision: Mapped[int] = mapped_column(Integer, nullable=False)
+    completed_encounter_revision: Mapped[int | None] = mapped_column(Integer)
+
+    __table_args__ = (
+        CheckConstraint("round_number > 0", name="combat_turn_round_positive"),
+        CheckConstraint("turn_index >= 0", name="combat_turn_index_nonnegative"),
+        CheckConstraint("status IN ('active', 'completed')", name="combat_turn_status"),
+        CheckConstraint(
+            "movement_allowance_feet >= 0 AND movement_allowance_feet % 5 = 0 "
+            "AND movement_spent_feet >= 0 AND movement_spent_feet % 5 = 0 "
+            "AND movement_spent_feet <= movement_allowance_feet",
+            name="combat_turn_movement_bounds",
+        ),
+        CheckConstraint(
+            "started_encounter_revision >= 0 AND "
+            "(completed_encounter_revision IS NULL OR "
+            "completed_encounter_revision > started_encounter_revision)",
+            name="combat_turn_revision_bounds",
+        ),
+        CheckConstraint(
+            "(status = 'active' AND completed_encounter_revision IS NULL) OR "
+            "(status = 'completed' AND completed_encounter_revision IS NOT NULL)",
+            name="combat_turn_completion_shape",
+        ),
+        UniqueConstraint(
+            "encounter_id", "round_number", "turn_index", name="uq_combat_turn_position"
+        ),
+        UniqueConstraint(
+            "encounter_id", "round_number", "combatant_id", name="uq_combat_turn_combatant_round"
+        ),
+        Index(
+            "uq_combat_turn_one_active_per_encounter",
+            "encounter_id",
+            unique=True,
+            postgresql_where=text("status = 'active'"),
+        ),
+    )
+
+
+class CombatEffect(TimestampMixin, Base):
+    __tablename__ = "combat_effects"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    encounter_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("combat_encounters.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    source_combatant_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("combatants.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    target_combatant_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("combatants.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    effect_id: Mapped[str] = mapped_column(String(80), nullable=False)
+    stacking_key: Mapped[str] = mapped_column(String(80), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="active")
+    starts_round: Mapped[int] = mapped_column(Integer, nullable=False)
+    expires_on_source_turn_start: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    ended_round: Mapped[int | None] = mapped_column(Integer)
+    created_by_command_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("combat_commands.id", ondelete="RESTRICT"), nullable=False
+    )
+
+    __table_args__ = (
+        CheckConstraint("status IN ('active', 'expired')", name="combat_effect_status"),
+        CheckConstraint("starts_round > 0", name="combat_effect_start_round_positive"),
+        CheckConstraint(
+            "(status = 'active' AND ended_round IS NULL) OR "
+            "(status = 'expired' AND ended_round >= starts_round)",
+            name="combat_effect_end_shape",
+        ),
+        Index(
+            "uq_combat_effect_active_stack",
+            "encounter_id",
+            "target_combatant_id",
+            "stacking_key",
+            unique=True,
+            postgresql_where=text("status = 'active'"),
+        ),
+    )
+
+
+class CombatReactionWindow(TimestampMixin, Base):
+    __tablename__ = "combat_reaction_windows"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    encounter_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("combat_encounters.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    mover_combatant_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("combatants.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    reactor_combatant_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("combatants.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    opened_by_command_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("combat_commands.id", ondelete="RESTRICT"), nullable=False
+    )
+    responded_by_command_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("combat_commands.id", ondelete="RESTRICT")
+    )
+    round_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    from_x: Mapped[int] = mapped_column(Integer, nullable=False)
+    from_y: Mapped[int] = mapped_column(Integer, nullable=False)
+    to_x: Mapped[int] = mapped_column(Integer, nullable=False)
+    to_y: Mapped[int] = mapped_column(Integer, nullable=False)
+    status: Mapped[str] = mapped_column(String(30), nullable=False, default="pending")
+    response: Mapped[str | None] = mapped_column(String(30))
+    opened_encounter_revision: Mapped[int] = mapped_column(Integer, nullable=False)
+    resolved_encounter_revision: Mapped[int | None] = mapped_column(Integer)
+
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('pending', 'passed', 'opportunity_attack_pending')",
+            name="combat_reaction_window_status",
+        ),
+        CheckConstraint(
+            "(status = 'pending' AND response IS NULL AND responded_by_command_id IS NULL "
+            "AND resolved_encounter_revision IS NULL) OR "
+            "(status IN ('passed', 'opportunity_attack_pending') AND response IS NOT NULL "
+            "AND responded_by_command_id IS NOT NULL AND resolved_encounter_revision IS NOT NULL)",
+            name="combat_reaction_window_response_shape",
+        ),
+        CheckConstraint(
+            "response IS NULL OR response IN ('pass', 'opportunity_attack')",
+            name="combat_reaction_window_response",
+        ),
+        CheckConstraint(
+            "opened_encounter_revision >= 0 AND "
+            "(resolved_encounter_revision IS NULL OR "
+            "resolved_encounter_revision > opened_encounter_revision)",
+            name="combat_reaction_window_revision_bounds",
+        ),
+        CheckConstraint("round_number > 0", name="combat_reaction_window_round_positive"),
+        CheckConstraint(
+            "from_x >= 0 AND from_y >= 0 AND to_x >= 0 AND to_y >= 0",
+            name="combat_reaction_window_position_nonnegative",
+        ),
+        UniqueConstraint(
+            "encounter_id",
+            "mover_combatant_id",
+            "reactor_combatant_id",
+            "round_number",
+            "from_x",
+            "from_y",
+            "to_x",
+            "to_y",
+            name="uq_combat_reaction_transition",
+        ),
     )
 
 

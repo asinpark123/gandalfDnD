@@ -346,10 +346,325 @@ def test_combat_audit_is_immutable_and_migration_refuses_material_data(
         ).scalar_one()
     get_engine().dispose()
     config = Config(str(Path(__file__).parents[1] / "alembic.ini"))
-    with pytest.raises(DBAPIError, match="Cannot downgrade after combat encounter data"):
+    with pytest.raises(DBAPIError, match="Cannot downgrade after combat (turn|encounter) data"):
         command.downgrade(config, "0015_memory_summaries")
     with get_engine().connect() as connection:
         assert (
             connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
             == expected_revision
         )
+
+
+def _started_encounter(
+    client: TestClient,
+    *,
+    enemy_x: int = 7,
+    enemy_y: int = 2,
+) -> tuple[str, dict[str, Any]]:
+    campaign_id, scene_id, character_ids = _ready_party(client)
+    create = _encounter_command(
+        scene_id,
+        character_ids,
+        enemies=[
+            {
+                "monster_definition_id": "goblin_warrior",
+                "instance_name": "Road Goblin",
+                "x": enemy_x,
+                "y": enemy_y,
+            }
+        ],
+    )
+    encounter = client.post(f"/campaigns/{campaign_id}/combat-encounters", json=create).json()
+    _fixed_dice([18, 12, 1])
+    started = client.post(
+        f"/campaigns/{campaign_id}/combat-encounters/{encounter['id']}/start",
+        json={"command_id": str(uuid.uuid4()), "expected_encounter_revision": 0},
+    )
+    assert started.status_code == 200, started.text
+    return campaign_id, started.json()
+
+
+def test_turn_budget_split_movement_full_round_dodge_expiry_and_restart(
+    client: TestClient,
+) -> None:
+    campaign_id, encounter = _started_encounter(client)
+    encounter_id = encounter["id"]
+    first, second, enemy = encounter["combatants"]
+    assert encounter["current_turn"]["combatant_id"] == first["id"]
+    assert encounter["current_turn"]["movement_allowance_feet"] == 30
+    assert encounter["current_turn"]["action_available"] is True
+
+    moved = client.post(
+        f"/campaigns/{campaign_id}/combat-encounters/{encounter_id}/move",
+        json={
+            "command_id": str(uuid.uuid4()),
+            "actor_combatant_id": first["id"],
+            "expected_encounter_revision": 1,
+            "expected_combatant_revision": 0,
+            "path": [{"x": 2, "y": 2}, {"x": 3, "y": 2}],
+        },
+    )
+    assert moved.status_code == 200, moved.text
+    state = moved.json()
+    assert state["combatants"][0]["position_x"] == 3
+    assert state["current_turn"]["movement_spent_feet"] == 10
+
+    dash_command = {
+        "command_id": str(uuid.uuid4()),
+        "actor_combatant_id": first["id"],
+        "expected_encounter_revision": 2,
+        "expected_combatant_revision": 1,
+        "action": "dash",
+    }
+    dashed = client.post(
+        f"/campaigns/{campaign_id}/combat-encounters/{encounter_id}/actions",
+        json=dash_command,
+    )
+    assert dashed.status_code == 200, dashed.text
+    state = dashed.json()
+    assert state["current_turn"]["movement_allowance_feet"] == 60
+    assert state["current_turn"]["action_available"] is False
+    duplicate = client.post(
+        f"/campaigns/{campaign_id}/combat-encounters/{encounter_id}/actions",
+        json=dash_command,
+    )
+    assert duplicate.status_code == 200
+    assert duplicate.json()["revision"] == 3
+
+    split = client.post(
+        f"/campaigns/{campaign_id}/combat-encounters/{encounter_id}/move",
+        json={
+            "command_id": str(uuid.uuid4()),
+            "actor_combatant_id": first["id"],
+            "expected_encounter_revision": 3,
+            "expected_combatant_revision": 2,
+            "path": [{"x": 4, "y": 2}],
+        },
+    )
+    assert split.status_code == 200, split.text
+    state = split.json()
+    assert state["current_turn"]["movement_spent_feet"] == 15
+    assert state["combatants"][0]["position_x"] == 4
+
+    wrong_actor = client.post(
+        f"/campaigns/{campaign_id}/combat-encounters/{encounter_id}/actions",
+        json={
+            "command_id": str(uuid.uuid4()),
+            "actor_combatant_id": second["id"],
+            "expected_encounter_revision": 4,
+            "expected_combatant_revision": 0,
+            "action": "dodge",
+        },
+    )
+    assert wrong_actor.status_code == 409
+    assert wrong_actor.json()["detail"] == "Combatant is not the active turn actor"
+
+    revisions = [(4, first["id"], 3), (5, second["id"], 0), (6, enemy["id"], 0)]
+    for expected_encounter, actor_id, expected_actor in revisions:
+        ended = client.post(
+            f"/campaigns/{campaign_id}/combat-encounters/{encounter_id}/end-turn",
+            json={
+                "command_id": str(uuid.uuid4()),
+                "actor_combatant_id": actor_id,
+                "expected_encounter_revision": expected_encounter,
+                "expected_combatant_revision": expected_actor,
+            },
+        )
+        assert ended.status_code == 200, ended.text
+        state = ended.json()
+    assert state["round_number"] == 2
+    assert state["current_turn"]["combatant_id"] == first["id"]
+    assert state["current_turn"]["movement_spent_feet"] == 0
+    assert state["current_turn"]["action_available"] is True
+
+    dodged = client.post(
+        f"/campaigns/{campaign_id}/combat-encounters/{encounter_id}/actions",
+        json={
+            "command_id": str(uuid.uuid4()),
+            "actor_combatant_id": first["id"],
+            "expected_encounter_revision": 7,
+            "expected_combatant_revision": 3,
+            "action": "dodge",
+        },
+    )
+    assert dodged.status_code == 200, dodged.text
+    state = dodged.json()
+    assert state["effects"][0]["effect_id"] == "dodge"
+    assert state["effects"][0]["status"] == "active"
+
+    revisions = [(8, first["id"], 4), (9, second["id"], 0), (10, enemy["id"], 0)]
+    for expected_encounter, actor_id, expected_actor in revisions:
+        ended = client.post(
+            f"/campaigns/{campaign_id}/combat-encounters/{encounter_id}/end-turn",
+            json={
+                "command_id": str(uuid.uuid4()),
+                "actor_combatant_id": actor_id,
+                "expected_encounter_revision": expected_encounter,
+                "expected_combatant_revision": expected_actor,
+            },
+        )
+        assert ended.status_code == 200, ended.text
+        state = ended.json()
+    assert state["round_number"] == 3
+    assert state["effects"][0]["status"] == "expired"
+    assert state["effects"][0]["ended_round"] == 3
+    get_engine().dispose()
+    restored = client.get(f"/campaigns/{campaign_id}/combat-encounters/{encounter_id}")
+    assert restored.status_code == 200
+    assert restored.json() == state
+
+
+def test_reaction_window_requires_explicit_pass_before_movement(client: TestClient) -> None:
+    campaign_id, encounter = _started_encounter(client, enemy_x=2, enemy_y=2)
+    encounter_id = encounter["id"]
+    actor = encounter["combatants"][0]
+    enemy = next(row for row in encounter["combatants"] if row["side"] == "enemy")
+    path = [{"x": 0, "y": 2}]
+    opened = client.post(
+        f"/campaigns/{campaign_id}/combat-encounters/{encounter_id}/move",
+        json={
+            "command_id": str(uuid.uuid4()),
+            "actor_combatant_id": actor["id"],
+            "expected_encounter_revision": 1,
+            "expected_combatant_revision": 0,
+            "path": path,
+        },
+    )
+    assert opened.status_code == 200, opened.text
+    pending = opened.json()
+    assert pending["combatants"][0]["position_x"] == 1
+    assert pending["current_turn"]["movement_spent_feet"] == 0
+    assert pending["reaction_windows"][0]["status"] == "pending"
+    window = pending["reaction_windows"][0]
+    assert window["reactor_combatant_id"] == enemy["id"]
+
+    passed = client.post(
+        f"/campaigns/{campaign_id}/combat-encounters/{encounter_id}"
+        f"/reaction-windows/{window['id']}",
+        json={
+            "command_id": str(uuid.uuid4()),
+            "reactor_combatant_id": enemy["id"],
+            "expected_encounter_revision": 2,
+            "expected_combatant_revision": 0,
+            "response": "pass",
+        },
+    )
+    assert passed.status_code == 200, passed.text
+    assert passed.json()["reaction_windows"][0]["status"] == "passed"
+    assert passed.json()["combatants"][2]["reaction_available"] is True
+
+    moved = client.post(
+        f"/campaigns/{campaign_id}/combat-encounters/{encounter_id}/move",
+        json={
+            "command_id": str(uuid.uuid4()),
+            "actor_combatant_id": actor["id"],
+            "expected_encounter_revision": 3,
+            "expected_combatant_revision": 0,
+            "path": path,
+        },
+    )
+    assert moved.status_code == 200, moved.text
+    state = moved.json()
+    assert state["combatants"][0]["position_x"] == 0
+    assert state["current_turn"]["movement_spent_feet"] == 5
+
+
+def test_disengage_prevents_window_and_invalid_path_is_atomic(client: TestClient) -> None:
+    campaign_id, encounter = _started_encounter(client, enemy_x=2, enemy_y=2)
+    encounter_id = encounter["id"]
+    actor = encounter["combatants"][0]
+    occupied = client.post(
+        f"/campaigns/{campaign_id}/combat-encounters/{encounter_id}/move",
+        json={
+            "command_id": str(uuid.uuid4()),
+            "actor_combatant_id": actor["id"],
+            "expected_encounter_revision": 1,
+            "expected_combatant_revision": 0,
+            "path": [{"x": 2, "y": 2}],
+        },
+    )
+    assert occupied.status_code == 409
+    assert occupied.json()["detail"] == "Movement path enters an occupied cell"
+    unchanged = client.get(f"/campaigns/{campaign_id}/combat-encounters/{encounter_id}").json()
+    assert unchanged["revision"] == 1
+    assert unchanged["combatants"][0]["revision"] == 0
+
+    disengaged = client.post(
+        f"/campaigns/{campaign_id}/combat-encounters/{encounter_id}/actions",
+        json={
+            "command_id": str(uuid.uuid4()),
+            "actor_combatant_id": actor["id"],
+            "expected_encounter_revision": 1,
+            "expected_combatant_revision": 0,
+            "action": "disengage",
+        },
+    )
+    assert disengaged.status_code == 200, disengaged.text
+    assert disengaged.json()["current_turn"]["disengaged"] is True
+    moved = client.post(
+        f"/campaigns/{campaign_id}/combat-encounters/{encounter_id}/move",
+        json={
+            "command_id": str(uuid.uuid4()),
+            "actor_combatant_id": actor["id"],
+            "expected_encounter_revision": 2,
+            "expected_combatant_revision": 1,
+            "path": [{"x": 0, "y": 2}],
+        },
+    )
+    assert moved.status_code == 200, moved.text
+    assert moved.json()["combatants"][0]["position_x"] == 0
+    assert moved.json()["reaction_windows"] == []
+
+
+def test_opportunity_attack_selection_consumes_reaction_and_blocks_movement(
+    client: TestClient,
+) -> None:
+    campaign_id, encounter = _started_encounter(client, enemy_x=2, enemy_y=2)
+    encounter_id = encounter["id"]
+    actor = encounter["combatants"][0]
+    enemy = next(row for row in encounter["combatants"] if row["side"] == "enemy")
+    path = [{"x": 0, "y": 2}]
+    pending = client.post(
+        f"/campaigns/{campaign_id}/combat-encounters/{encounter_id}/move",
+        json={
+            "command_id": str(uuid.uuid4()),
+            "actor_combatant_id": actor["id"],
+            "expected_encounter_revision": 1,
+            "expected_combatant_revision": 0,
+            "path": path,
+        },
+    ).json()
+    window = pending["reaction_windows"][0]
+    selected = client.post(
+        f"/campaigns/{campaign_id}/combat-encounters/{encounter_id}"
+        f"/reaction-windows/{window['id']}",
+        json={
+            "command_id": str(uuid.uuid4()),
+            "reactor_combatant_id": enemy["id"],
+            "expected_encounter_revision": 2,
+            "expected_combatant_revision": 0,
+            "response": "opportunity_attack",
+        },
+    )
+    assert selected.status_code == 200, selected.text
+    state = selected.json()
+    assert state["reaction_windows"][0]["status"] == "opportunity_attack_pending"
+    assert (
+        next(row for row in state["combatants"] if row["id"] == enemy["id"])["reaction_available"]
+        is False
+    )
+    blocked = client.post(
+        f"/campaigns/{campaign_id}/combat-encounters/{encounter_id}/move",
+        json={
+            "command_id": str(uuid.uuid4()),
+            "actor_combatant_id": actor["id"],
+            "expected_encounter_revision": 3,
+            "expected_combatant_revision": 0,
+            "path": path,
+        },
+    )
+    assert blocked.status_code == 409
+    assert "must resolve before" in blocked.json()["detail"]
+    restored = client.get(f"/campaigns/{campaign_id}/combat-encounters/{encounter_id}").json()
+    assert restored["combatants"][0]["position_x"] == 1
+    assert restored["current_turn"]["movement_spent_feet"] == 0

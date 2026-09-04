@@ -48,9 +48,12 @@ from app.models import (
     CharacterGrant,
     Combatant,
     CombatCommand,
+    CombatEffect,
     CombatEncounter,
     CombatEvent,
     CombatInitiativeTie,
+    CombatReactionWindow,
+    CombatTurn,
     DecisionOption,
     DecisionPoint,
     DecisionSelection,
@@ -91,13 +94,16 @@ from app.schemas import (
     CharacterRead,
     ClueRecord,
     CombatantRead,
+    CombatEffectRead,
     CombatEncounterCreate,
     CombatEncounterRead,
     CombatEventRead,
     CombatInitiativeTieRead,
+    CombatReactionWindowRead,
     CombatReplayRead,
     CombatStartCreate,
     CombatTieResolutionCreate,
+    CombatTurnRead,
     DecisionConsequence,
     DecisionFactConsequence,
     DecisionObjectiveConsequence,
@@ -2872,6 +2878,26 @@ def _combat_encounter_read(session: Session, encounter: CombatEncounter) -> Comb
             .order_by(CombatEvent.sequence)
         )
     )
+    current_turn = session.scalar(
+        select(CombatTurn).where(
+            CombatTurn.encounter_id == encounter.id,
+            CombatTurn.status == "active",
+        )
+    )
+    effects = list(
+        session.scalars(
+            select(CombatEffect)
+            .where(CombatEffect.encounter_id == encounter.id)
+            .order_by(CombatEffect.created_at, CombatEffect.id)
+        )
+    )
+    reaction_windows = list(
+        session.scalars(
+            select(CombatReactionWindow)
+            .where(CombatReactionWindow.encounter_id == encounter.id)
+            .order_by(CombatReactionWindow.created_at, CombatReactionWindow.id)
+        )
+    )
     return CombatEncounterRead(
         id=encounter.id,
         campaign_id=encounter.campaign_id,
@@ -2889,6 +2915,11 @@ def _combat_encounter_read(session: Session, encounter: CombatEncounter) -> Comb
         active_turn_index=encounter.active_turn_index,
         combatants=[CombatantRead.model_validate(item) for item in combatants],
         initiative_ties=[CombatInitiativeTieRead.model_validate(item) for item in ties],
+        current_turn=(CombatTurnRead.model_validate(current_turn) if current_turn else None),
+        effects=[CombatEffectRead.model_validate(item) for item in effects],
+        reaction_windows=[
+            CombatReactionWindowRead.model_validate(item) for item in reaction_windows
+        ],
         events=[CombatEventRead.model_validate(item) for item in events],
         created_at=encounter.created_at,
     )
@@ -3152,6 +3183,52 @@ def get_combat_encounter(
     return _combat_encounter_read(session, encounter)
 
 
+def _create_active_combat_turn(
+    session: Session,
+    encounter: CombatEncounter,
+    combatants: list[Combatant],
+) -> CombatTurn:
+    if encounter.active_turn_index is None or encounter.round_number <= 0:
+        raise ConflictError("Active encounter has no current turn position")
+    actor = next(
+        (item for item in combatants if item.initiative_order == encounter.active_turn_index),
+        None,
+    )
+    if actor is None:
+        raise ConflictError("Initiative order has no combatant for the active turn")
+    if not actor.reaction_available:
+        actor.reaction_available = True
+        actor.revision += 1
+    for effect in session.scalars(
+        select(CombatEffect).where(
+            CombatEffect.encounter_id == encounter.id,
+            CombatEffect.source_combatant_id == actor.id,
+            CombatEffect.status == "active",
+            CombatEffect.expires_on_source_turn_start.is_(True),
+        )
+    ):
+        effect.status = "expired"
+        effect.ended_round = encounter.round_number
+    turn = CombatTurn(
+        encounter_id=encounter.id,
+        combatant_id=actor.id,
+        round_number=encounter.round_number,
+        turn_index=encounter.active_turn_index,
+        status="active",
+        movement_allowance_feet=actor.speed_feet,
+        movement_spent_feet=0,
+        action_available=True,
+        bonus_action_available=True,
+        free_interaction_available=True,
+        disengaged=False,
+        started_encounter_revision=encounter.revision,
+        completed_encounter_revision=None,
+    )
+    session.add(turn)
+    session.flush()
+    return turn
+
+
 def start_combat_initiative(
     session: Session,
     campaign_id: uuid.UUID,
@@ -3301,6 +3378,8 @@ def start_combat_initiative(
         encounter.round_number = 1
         encounter.active_turn_index = 0
     encounter.revision = 1
+    if encounter.status == "active":
+        _create_active_combat_turn(session, encounter, combatants)
     session.flush()
     _combat_event(
         session,
@@ -3419,6 +3498,7 @@ def resolve_combat_initiative_tie(
         encounter.status = "active"
         encounter.round_number = 1
         encounter.active_turn_index = 0
+        _create_active_combat_turn(session, encounter, combatants)
     session.add(
         CombatCommand(
             command_id=data.command_id,

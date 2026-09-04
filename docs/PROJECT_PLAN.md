@@ -4,11 +4,11 @@
 - **Last updated:** 2026-09-05
 - **Rules baseline:** SRD 5.2.1 (pinned; character-state, check/save-resolution, and combat catalogs
   pass integrity and schema verification)
-- **Current delivery stage:** M5 In progress at M5.3. M5.2 added guarded encounter, combatant,
-  initiative, idempotent command, exact tie, attributed dice, event, restart, and replay
-  persistence on the immutable `srd-5.2.1-combat-v1` catalog. Its focused encounter/ruleset gate
-  passes 13 tests and all 206 repository tests pass, with three expected live skips. M5.3 turn
-  economy, movement, and reactions is Ready
+- **Current delivery stage:** M5 In progress at M5.4. M5.3 added persistent active-turn budgets,
+  bounded stepwise/split movement, Dash, Disengage, Dodge and exact expiry, round advancement,
+  Reaction refresh, and explicit pass/Opportunity Attack windows. The focused migration/ruleset/
+  combat gate passes 18 tests and all 210 repository tests pass, with three expected live skips.
+  M5.4 attack, damage, equipment, and mastery integration is Ready
 - **Canonical repository:** `~/Git/gandalfDnD`
 
 ## 1. Purpose of this document
@@ -352,7 +352,7 @@ Use these values consistently:
 | M3 | Persistent world model | Done | NPCs, quests, scenes, clues, time, decisions, and visibility |
 | M4 | Long-term memory and retrieval | Done | Coherent recall without full history in context |
 | PG18 | PostgreSQL 18 migration | Done/Monitoring | Active cutover passed; PG15 rollback retained during stabilization |
-| M5 | Core deterministic combat | In progress at M5.3 | Reproducible initiative, actions, attacks, health, and encounter outcomes |
+| M5 | Core deterministic combat | In progress at M5.4 | Reproducible initiative, actions, attacks, health, and encounter outcomes |
 | M6 | Spoiler-safe Guide | Proposed | Beginner help with enforceable knowledge boundaries |
 | M7 | Play interface and campaign administration | Proposed | Usable play, recap, correction, and export workflows |
 | M8 | Deployment and operations | Deferred | Dedicated reliable service with backups and monitoring |
@@ -1263,7 +1263,7 @@ search database p95 must remain at most 250 ms on the audited VM.
 
 ### M5 — Core deterministic combat
 
-- **Status:** In progress at M5.3; M5.0-M5.2 complete 2026-09-05
+- **Status:** In progress at M5.4; M5.0-M5.3 complete 2026-09-05
 - **Depends on:** M1 and M3
 - **Detailed strategy:** [`M5_IMPLEMENTATION_STRATEGY.md`](M5_IMPLEMENTATION_STRATEGY.md)
 
@@ -1288,8 +1288,9 @@ Delivery sequence:
 3. M5.2 (Done) adds guarded encounter/combatant/initiative/command/event persistence and exact
    tie/restart behavior. See
    [`M5_2_ENCOUNTERS_INITIATIVE.md`](M5_2_ENCOUNTERS_INITIATIVE.md).
-4. M5.3 adds active-turn action economy, bounded grid movement, Dodge/Disengage/Dash, and explicit
-   Opportunity Attack reaction windows.
+4. M5.3 (Done) adds active-turn action economy, bounded grid movement, Dodge/Disengage/Dash, and
+   explicit Opportunity Attack reaction windows. See
+   [`M5_3_TURNS_MOVEMENT_REACTIONS.md`](M5_3_TURNS_MOVEMENT_REACTIONS.md).
 5. M5.4 integrates supported attacks, range/equipment, damage, Fighting Styles, and all three
    current weapon masteries.
 6. M5.5 completes Second Wind, Temporary HP, unconsciousness/death saves/stability, knockout,
@@ -1601,9 +1602,9 @@ Destination milestone:
 1. Monitor the active PG18 connection, application/database errors, startup behavior, connections,
    disk, extension compatibility, and migration behavior while retaining all recovery bundles and
    both PG15 Gandalf copies/roles unchanged.
-2. Implement M5.3's active-turn economy, stepwise movement, Dash/Disengage/Dodge, explicit reaction
-   windows, idempotent commands/events, campaign isolation, and restart/replay evidence on the
-   completed M5.2 encounter boundary.
+2. Implement M5.4's immutable ordinary/Opportunity Attack and damage resolution, supported
+   range/equipment/style/mastery mechanics, attributed dice, idempotency, exact HP projection,
+   pending-movement release, restart, and semantic replay on the M5.3 turn/reaction boundary.
 3. Keep the 11 pre-existing development indexes inactive until their own campaign-specific
    activation evidence passes.
 4. Request a later explicit destructive-action decision before disabling old PG15 logins, deleting
@@ -1666,3 +1667,4 @@ Destination milestone:
 | 2026-09-05 | DOC-051 | Renamed M5 to Core Deterministic Combat and added M10 Advanced Combat and Rules Expansion | “Basic” described the intentionally narrow first implementation but could imply a separate official D&D combat tier or a permanent product limit; M10 now preserves broader spells, conditions, terrain, movement, class/equipment, monster, and encounter work as finite source-cited vertical slices | Complete M5, use its owner/balance evidence to scope M10.1, and keep companion/Lone Hero modes and M7 presentation in their existing destinations |
 | 2026-09-05 | DOC-052 | Completed M5.1 and advanced M5.2 to Ready with an immutable source-cited combat catalog, strict dependency composition, and pure deterministic combat kernel | Catalog/schema/checksum checks, 48 focused tests at 97% combat-module coverage, nine sequential ruleset/migration tests, and all 202 repository tests pass; no migration, API, provider, database data, or infrastructure change occurred. ISSUE-017 records and resolves the initial shared-test-database parallel-run collision | Implement guarded M5.2 encounter/combatant/initiative persistence and restart/replay APIs; retain sequential database-backed test execution unless databases are isolated per worker |
 | 2026-09-05 | DOC-053 | Completed M5.2 and advanced M5.3 to Ready with migration `0016`, guarded encounter/combatant/command/tie/event state, attributed application dice, explicit tie decisions, five API operations, and exact restart/replay | Canonical party/Goblin projections, no-tie and tie order, idempotency, stale/unsupported no-roll rollback, one-open-encounter, immutable audits, guarded downgrade, and empty re-upgrade pass. The focused encounter/ruleset gate passes 13 tests; all 206 repository tests, static checks, compilation, migration-head and zero-drift checks pass with three expected live skips; ISSUE-018 records the migration seed edge found and fixed during full regression | Implement M5.3 turn economy, stepwise movement, Dodge/Disengage/Dash, and explicit Opportunity Attack reaction windows; keep live/provider and infrastructure work separately gated |
+| 2026-09-05 | DOC-054 | Completed M5.3 and advanced M5.4 to Ready with migration `0017`, active turn/budget/effect/reaction records, four typed API operations, exact grid movement, Dash/Disengage/Dodge, explicit reaction choices, round advancement, reconnect, and fail-closed Opportunity Attack handoff | Split movement, one Action, full-round rollover, Dodge expiry, occupied/wrong-actor rollback, pass-before-move, Disengage suppression, one-Reaction consumption, empty migration reversal, 18 focused migration/ruleset/combat tests, and all 210 repository tests pass; three live suites remain intentionally opt-in and no provider/infrastructure operation occurred | Resolve ordinary and pending Opportunity Attacks in M5.4 before movement continues; add exact attack/damage/equipment/style/mastery replay and retain all M5.3 stale/idempotency boundaries |
